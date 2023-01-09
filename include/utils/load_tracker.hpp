@@ -51,7 +51,7 @@ class LoadTracker {
         /// The total time for the process
         double elapsedTime;
         /// The constructor
-        Values() : activeTimeAllProcesses(), idleTimeAllProcesses(), cpuName(), userTime(),  sysTime(), elapsedTime() {}
+        Values() : activeTimeAllProcesses(), idleTimeAllProcesses(), cpuName(), userTime(), sysTime(), elapsedTime() {}
     };
 
     private:
@@ -135,11 +135,10 @@ class LoadTracker {
             _loadValues[i]->idleTimeAllProcesses += static_cast<double>(getIdleTime(e2) - getIdleTime(e1));
 
             if (!e1.cpu.compare("tot")) {
-                _loadValues[i]->sysTime  += static_cast<double>(e2.sysTime - e1.sysTime);
-                _loadValues[i]->userTime  += static_cast<double>(e2.userTime - e1.userTime);
-                _loadValues[i]->elapsedTime  += static_cast<double>(e2.elapsedTime - e1.elapsedTime);
+                _loadValues[i]->sysTime += static_cast<double>(e2.sysTime - e1.sysTime);
+                _loadValues[i]->userTime += static_cast<double>(e2.userTime - e1.userTime);
+                _loadValues[i]->elapsedTime += static_cast<double>(e2.elapsedTime - e1.elapsedTime);
             }
-
         }
     }
 

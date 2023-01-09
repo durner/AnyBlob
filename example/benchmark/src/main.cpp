@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
     helpText += "-h https (default: 0)\n";
 
     if (argc < 3 || strcmp(argv[2], "bandwidth")) {
-        std::cerr << helpText << std::endl;
+        cerr << helpText << endl;
         return -1;
     }
 
@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
         } else if (!strcmp(argv[i], "-l")) {
             bandwithSettings.requests = atoi(argv[++i]);
         } else {
-            std::cerr << helpText << std::endl;
+            cerr << helpText << endl;
             return -1;
         }
     }

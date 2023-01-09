@@ -35,7 +35,6 @@ HTTPHelper::Info HTTPHelper::detect(const string_view header)
     else if (header.length() >= str_http_1_1_created.size() && !strncmp(header.data(), str_http_1_1_created.c_str(), str_http_1_1_created.size()))
         info.protocol = Protocol::HTTP_1_1_Created;
 
-
     if (info.protocol != Protocol::Unknown) {
         if (header.npos != header.find("Transfer-Encoding: chunked")) {
             info.encoding = Encoding::ChunkedEncoding;

@@ -38,7 +38,7 @@ TEST_CASE("azure") {
     REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
     utils::DataVector<uint8_t> putData(10);
-    dv = azure.putRequest("a/b/c.d", putData.data(), putData.size());
+    dv = azure.putRequest("a/b/c.d", string_view(reinterpret_cast<const char*>(putData.data()), putData.size()));
     resultString = "PUT /test/a/b/c.d HTTP/1.1\r\nAuthorization: SharedKey test:AiWIKIaUYFV5UOGADs2R+/C8jQu0pW0+lrWV1IfW7Lc=\r\nContent-Length: 10\r\nHost: test.blob.core.windows.net\r\nx-ms-blob-type: BlockBlob\r\nx-ms-date: ";
     resultString += azure.fakeXMSTimestamp;
     resultString += "\r\nx-ms-version: 2015-02-21\r\n\r\n";

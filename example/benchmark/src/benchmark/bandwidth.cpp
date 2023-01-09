@@ -6,6 +6,7 @@
 #include "network/messages.hpp"
 #include "network/s3_send_receiver.hpp"
 #include "network/tasked_send_receiver.hpp"
+#include "network/transaction.hpp"
 #include "perfevent/PerfEvent.hpp"
 #include "utils/timer.hpp"
 #include <fstream>
@@ -63,8 +64,8 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, cloud::Provider& cloudP
             return Aws::New<Aws::FStream>("S3Client", "/dev/null", ios_base::out);
         });
 
-        std::atomic<uint64_t> finishedMessages = 0;
-        auto callback = [&finishedMessages](std::unique_ptr<utils::DataVector<uint8_t>> /*data*/) {
+        atomic<uint64_t> finishedMessages = 0;
+        auto callback = [&finishedMessages](unique_ptr<utils::DataVector<uint8_t>> /*data*/) {
             finishedMessages++;
         };
 
@@ -140,12 +141,12 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, cloud::Provider& cloudP
         if (benchmarkSettings.report.size()) {
             auto report = fstream(benchmarkSettings.report, s.app | s.in | s.out);
             if (headerNeeded)
-                report << "Algorithm,Resolver,Iteration,Threads,Concurrency,Start,Finish,Diff,Size" << std::endl;
+                report << "Algorithm,Resolver,Iteration,Threads,Concurrency,Start,Finish,Diff,Size" << endl;
             for (const auto& t : timings)
                 if constexpr (is_same<S3SendReceiver, network::S3CurlSendReceiver>::value)
-                    report << "S3,," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << std::chrono::duration_cast<std::chrono::microseconds>(t.finish - t.start).count() << "," << t.size << std::endl;
+                    report << "S3,," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << t.size << endl;
                 else
-                    report << "S3Crt,," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << std::chrono::duration_cast<std::chrono::microseconds>(t.finish - t.start).count() << "," << t.size << std::endl;
+                    report << "S3Crt,," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << t.size << endl;
         }
 
         sendReceiver->stop();
@@ -174,10 +175,8 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
         }
     } else if (cloudProvider.getType() == cloud::Provider::CloudService::GCP) {
         auto gcpProvider = static_cast<cloud::GCP*>(&cloudProvider);
-        gcpProvider->initKey();
     } else if (cloudProvider.getType() == cloud::Provider::CloudService::Azure) {
         auto azureProvider = static_cast<cloud::Azure*>(&cloudProvider);
-        azureProvider->initKey();
     }
 
     for (auto iteration = 0u; iteration < benchmarkSettings.iterations; iteration++) {
@@ -193,9 +192,9 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
         uniform_int_distribution<mt19937::result_type> dist(1, benchmarkSettings.blobFiles);
         vector<unique_ptr<network::OriginalMessage>> requestMessages;
         pair<uint64_t, uint64_t> range = {0, 0};
-        std::atomic<uint64_t> finishedMessages = 0;
+        atomic<uint64_t> finishedMessages = 0;
 
-        auto callback = [&finishedMessages, &sendReceivers](std::unique_ptr<utils::DataVector<uint8_t>> data) {
+        auto callback = [&finishedMessages, &sendReceivers](unique_ptr<utils::DataVector<uint8_t>> data) {
             finishedMessages++;
             sendReceivers.back()->reuse(move(data));
         };
@@ -203,8 +202,8 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
         if (benchmarkSettings.blobFiles > benchmarkSettings.requests) {
             for (auto i = 0u; i <= benchmarkSettings.requests; i++) {
                 auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
-                auto message = cloudProvider.getRequest(filePath, range);
-                requestMessages.emplace_back(make_unique<network::OriginalCallbackMessage<decltype(callback)>>(callback, move(message), cloudProvider.getAddress(), cloudProvider.getPort(), nullptr, 0, i));
+                network::GetTransaction txn(filePath, range);
+                requestMessages.emplace_back(cloudProvider.getRequest(txn, callback));
 
                 //auto httpHeader = string("GET /1GB.bin HTTP/1.1\r\n") + "Host: ip-172-31-7-174.eu-central-1.compute.internal" + "\r\n\r\n";
                 //auto message = make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
@@ -213,8 +212,8 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
         } else {
             for (auto i = 1u; i <= benchmarkSettings.blobFiles; i++) {
                 auto filePath = benchmarkSettings.filePath + to_string(i) + ".bin";
-                auto message = cloudProvider.getRequest(filePath, range);
-                requestMessages.emplace_back(make_unique<network::OriginalCallbackMessage<decltype(callback)>>(callback, move(message), cloudProvider.getAddress(), cloudProvider.getPort(), nullptr, 0, i - 1));
+                network::GetTransaction txn(filePath, range);
+                requestMessages.emplace_back(cloudProvider.getRequest(txn, callback));
 
                 //auto httpHeader = string("GET /1GB.bin HTTP/1.1\r\n") + "Host: ip-172-31-7-174.eu-central-1.compute.internal" + "\r\n\r\n";
                 //auto message = make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
@@ -270,9 +269,8 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
                     auto end = (i + 1) * requestPerSocket;
                     for (uint64_t j = start; j < end; j++) {
                         auto filePath = "upload_" + benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
-                        auto message = cloudProvider.putRequest(filePath, blob->data(), blob->size());
-                        requestMessages.emplace_back(make_unique<network::OriginalCallbackMessage<decltype(callback)>>(callback, move(message), cloudProvider.getAddress(), cloudProvider.getPort()));
-                        requestMessages.back()->setPutRequestData(blob->data(), blob->size());
+                        network::PutTransaction txn(filePath, reinterpret_cast<const char*>(blob->data()), blob->size());
+                        requestMessages.emplace_back(cloudProvider.putRequest(txn, callback));
                     }
                 }
 
@@ -304,10 +302,10 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
         if (benchmarkSettings.report.size()) {
             auto report = fstream(benchmarkSettings.report, s.app | s.in | s.out);
             if (headerNeeded)
-                report << "Algorithm,Resolver,Iteration,Threads,Concurrency,Start,Finish,Diff,ReceiveLatency,Size" << std::endl;
+                report << "Algorithm,Resolver,Iteration,Threads,Concurrency,Start,Finish,Diff,ReceiveLatency,Size" << endl;
             for (const auto& t : timings)
                 if (t.size > 0)
-                    report << "Uring," + string(benchmarkSettings.resolver) << "," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << std::chrono::duration_cast<std::chrono::microseconds>(t.finish - t.start).count() << "," << std::chrono::duration_cast<std::chrono::microseconds>(t.recieve - t.start).count() << "," << t.size << std::endl;
+                    report << "Uring," + string(benchmarkSettings.resolver) << "," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << chrono::duration_cast<chrono::microseconds>(t.recieve - t.start).count() << "," << t.size << endl;
         }
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
             sendReceivers[i]->stop();

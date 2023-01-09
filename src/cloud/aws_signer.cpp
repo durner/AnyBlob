@@ -22,7 +22,7 @@ pair<string, string> AWSSigner::createCanonicalRequest(Request& request)
 // Creates the canonical request (task 1)
 // https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
 {
-    std::stringstream requestStream;
+    stringstream requestStream;
     // Step 1, canonicalize request method
     requestStream << request.method << "\n";
 
@@ -66,7 +66,7 @@ pair<string, string> AWSSigner::createCanonicalRequest(Request& request)
         auto it = request.headers.begin();
         while (it != request.headers.end()) {
             string val = it->first;
-            std::transform(val.begin(), val.end(), val.begin(), [](unsigned char c) { return std::tolower(c); });
+            transform(val.begin(), val.end(), val.begin(), [](unsigned char c) { return tolower(c); });
             sorted.emplace(val, it->second);
             ++it;
         }

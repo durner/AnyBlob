@@ -50,7 +50,7 @@ TEST_CASE("aws") {
     REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
     utils::DataVector<uint8_t> putData(10);
-    dv = aws.putRequest("a/b/c.d", putData.data(), putData.size());
+    dv = aws.putRequest("a/b/c.d", string_view(reinterpret_cast<const char*>(putData.data()), putData.size()));
     resultString = "PUT /a/b/c.d? HTTP/1.1\r\nAuthorization: AWS4-HMAC-SHA256 Credential=ABC/21000101/test/s3/aws4_request, SignedHeaders=content-length;content-md5;host;x-amz-content-sha256;x-amz-date;x-amz-request-payer;x-amz-security-token, Signature=8b1d89369e758299ed4fa88bdb34416b727f9d002bd4fb1a17c6e657d70f3e66\r\nContent-Length: 10\r\nContent-MD5: pjyQzDaErYsKIXamqP6QBQ==\r\nHost: test.s3.test.amazonaws.com\r\nx-amz-content-sha256: 01d448afd928065458cf670b60f5a594d735af0172c8d67f22a81680132681ca\r\nx-amz-date: ";
     resultString += aws.fakeAMZTimestamp;
     resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";

@@ -68,7 +68,7 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendRece
     return AWSInstance{string(s), 0, 0, ""};
 }
 //---------------------------------------------------------------------------
-string AWS::getRegion(network::TaskedSendReceiver& sendReceiver)
+string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
 /// Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo("placement/region");
@@ -149,10 +149,17 @@ bool AWS::updateSecret(string_view content)
     return true;
 }
 //---------------------------------------------------------------------------
+void AWS::initKey()
+/// Inits key
+{
+    ifstream ifs(_secret->keyFile);
+    _secret->secret = string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
+}
+//---------------------------------------------------------------------------
 bool AWS::validKeys() const
 /// Checks whether keys need to be refresehd
 {
-    if (_secret && _secret->experiation - 60 < chrono::system_clock::to_time_t(chrono::system_clock::now()))
+    if (!_secret || ((!_secret->sessionToken.empty() && _secret->experiation - 60 < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _secret->secret.empty()))
         return false;
     return true;
 }
@@ -183,7 +190,7 @@ void AWS::initResolver(network::TaskedSendReceiver& sendReceiver)
     sendReceiver.addResolver("amazonaws.com", unique_ptr<network::Resolver>(new cloud::AWSResolver(sendReceiver.getConcurrentRequests())));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, pair<uint64_t, uint64_t>& range) const
+unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
 /// Builds the http request for downloading a blob
 {
     if (!validKeys())
@@ -192,14 +199,17 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, p
     AWSSigner::Request request;
     request.method = "GET";
     request.type = "HTTP/1.1";
-    request.path = "/" + filePath;
+    if (_settings.endpoint.empty())
+        request.path = "/" + filePath;
+    else
+        request.path = "/" + _settings.bucket + "/" + filePath;
     request.bodyData = nullptr;
     request.bodyLength = 0;
     request.headers.emplace("Host", getAddress());
-
     request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
-    request.headers.emplace("x-amz-security-token", _secret->sessionToken);
     request.headers.emplace("x-amz-request-payer", "requester");
+    if (!_secret->sessionToken.empty())
+        request.headers.emplace("x-amz-security-token", _secret->sessionToken);
 
     if (range.first != range.second) {
         stringstream rangeString;
@@ -217,7 +227,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, p
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, const uint8_t* data, const uint64_t length) const
+unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, const string_view object) const
 /// Builds the http request for putting objects without the object data itself
 {
     if (!validKeys())
@@ -226,14 +236,20 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, c
     AWSSigner::Request request;
     request.method = "PUT";
     request.type = "HTTP/1.1";
-    request.path = "/" + filePath;
-    request.bodyData = data;
-    request.bodyLength = length;
+    request.bodyData = reinterpret_cast<const uint8_t*>(object.data());
+    ;
+    if (_settings.endpoint.empty())
+        request.path = "/" + filePath;
+    else
+        request.path = "/" + _settings.bucket + "/" + filePath;
+    request.bodyLength = object.size();
     request.headers.emplace("Host", getAddress());
     request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
-    request.headers.emplace("x-amz-security-token", _secret->sessionToken);
-    request.headers.emplace("Content-Length", to_string(length));
+    request.headers.emplace("Content-Length", to_string(request.bodyLength));
     request.headers.emplace("x-amz-request-payer", "requester");
+    if (!_secret->sessionToken.empty())
+        request.headers.emplace("x-amz-security-token", _secret->sessionToken);
+
     auto canonical = AWSSigner::createCanonicalRequest(request);
 
     AWSSigner::StringToSign stringToSign = {.request = request, .requestSHA = canonical.second, .region = _settings.region, .service = "s3"};
@@ -248,12 +264,14 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, c
 uint32_t AWS::getPort() const
 /// Gets the port of AWS S3 on http
 {
-    return 80;
+    return _settings.port;
 }
 //---------------------------------------------------------------------------
 string AWS::getAddress() const
 /// Gets the address of AWS S3
 {
+    if (!_settings.endpoint.empty())
+        return _settings.endpoint;
     return _settings.bucket + ".s3." + _settings.region + ".amazonaws.com";
 }
 //---------------------------------------------------------------------------

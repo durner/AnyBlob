@@ -69,7 +69,6 @@ TEST_CASE("gcp") {
     }
 
     GCP gcp("test", "test", "test@test.com", filename);
-    gcp.initKey();
     REQUIRE(!strcmp(gcp.getIAMAddress(), "169.254.169.254"));
     REQUIRE(gcp.getIAMPort() == 80);
 
@@ -83,7 +82,7 @@ TEST_CASE("gcp") {
     REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
     utils::DataVector<uint8_t> putData(10);
-    dv = gcp.putRequest("a/b/c.d", putData.data(), putData.size());
+    dv = gcp.putRequest("a/b/c.d", string_view(reinterpret_cast<const char*>(putData.data()), putData.size()));
     resultString = "PUT /a/b/c.d?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=test%40test.com%2F21000101%2Ftest%2Fstorage%2Fgoog4_request&X-Goog-Date=21000101T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=content-length%3Bdate%3Bhost&x-goog-signature=64a1ebc70a5e5cde6e75ac2a14a0967d36c097de6d464c97e07a0b25e7292bc28c908f407ab4f6c19e21f0868e5774d9c170215a8e72bd327d160e61ec0f4596943924b3c25854826886f626757467839d3bc167d3b8e1b889ae9bf48460eb7e62e2a0e490baeec05fa819704184e18c472dfd8a445806b332f50bfc551dbb49b39998dbe79a55b53287e4bc1d49c98f8263fb399c6eed21b247d1fa7412b886a28b69b7145a1a29c2c648d32df40df6cc2aed8dda64da52e0731fd6449844869eff9614ab2ea198b823f1f68f09c593a9a3be77223ef96f0f5908761a8e6ec9ffa7a382376a1ff18d043e8800ec8953eb61b0e2ca7732e3c4bb83e92743fa8d97b013222370a951d379607e59c7279727e9cd8bd711da985bf123ee4fb68e4ce48865ac1956497e585d5768213db762ec859855a5fdb7083f0a219a535d8a8e20659bcaad6897de1ddf87a73d48c16c7ccbca7e972517417f741aae0fed3bb4c9838d4aec52c06425238fc3c8b2b665d089f50bcedf48762f30c9650e603531 HTTP/1.1\r\nContent-Length: 10\r\nDate: ";
     resultString += gcp.fakeAMZTimestamp;
     resultString += "\r\nHost: test.storage.googleapis.com\r\n\r\n";

@@ -15,7 +15,7 @@ AnyBlob relies on some third-party libraries:
 
 For Ubuntu the following command install the third-party libraries:
 ```
-sudo apt update && sudo apt install liburing-dev openssl libssl-dev libjemalloc-dev
+sudo apt update && sudo apt install liburing-dev openssl libssl-dev libjemalloc-dev lld g++ cmake
 ```
 
 For building, use the following commands:

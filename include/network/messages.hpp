@@ -38,7 +38,7 @@ struct OriginalMessage {
 
     /// If it is a put request store the additional data
     /// The raw data ptr
-    uint8_t* data;
+    const uint8_t* data;
     /// The length
     uint64_t length;
 
@@ -49,7 +49,7 @@ struct OriginalMessage {
     virtual ~OriginalMessage() = default;
 
     /// Add the put request data to the message
-    void setPutRequestData(uint8_t* data, uint64_t length) {
+    void setPutRequestData(const uint8_t* data, uint64_t length) {
         this->data = data;
         this->length = length;
     }
@@ -68,7 +68,7 @@ struct OriginalCallbackMessage : public OriginalMessage {
     Callback callback;
 
     /// The constructor
-    OriginalCallbackMessage(Callback callback, std::unique_ptr<utils::DataVector<uint8_t>> message, std::string hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : OriginalMessage(move(message), hostname, port, receiveBuffer, bufferSize, traceId), callback(callback) {}
+    OriginalCallbackMessage(Callback&& callback, std::unique_ptr<utils::DataVector<uint8_t>> message, std::string hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : OriginalMessage(move(message), hostname, port, receiveBuffer, bufferSize, traceId), callback(forward<Callback>(callback)) {}
 
     /// The destructor
     virtual ~OriginalCallbackMessage() override = default;

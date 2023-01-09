@@ -1,5 +1,6 @@
-#include "utils/ring_buffer.hpp"
+#include "network/messages.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
+#include "utils/data_vector.hpp"
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -9,24 +10,12 @@
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
 namespace anyblob {
-namespace utils {
+namespace network {
 namespace test {
 //---------------------------------------------------------------------------
-TEST_CASE("ring_buffer") {
-    RingBuffer<uint64_t> rb(2);
-    REQUIRE(rb.insert<false>(1) == 0);
-    REQUIRE(rb.insert<false>(2) == 1);
-    REQUIRE(rb.insert<false>(2) == ~0ull);
-    REQUIRE(rb.consume<false>().value() == 1);
-    REQUIRE(rb.consume<false>().value() == 2);
-    REQUIRE(!rb.consume<false>().has_value());
-    uint64_t a[] = {3 , 4};
-    REQUIRE(rb.insert<false>(a) == 2);
-    REQUIRE(rb.consume<false>().value() == 3);
-    REQUIRE(rb.consume<false>().value() == 4);
-    REQUIRE(rb.empty());
+TEST_CASE("messages") {
 }
 //---------------------------------------------------------------------------
 } // namespace test
-} // namespace utils
+} // namespace network
 } // namespace anyblob

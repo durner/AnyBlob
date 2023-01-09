@@ -46,6 +46,9 @@ class Azure : public Provider {
     /// The secret
     std::unique_ptr<Secret> _secret;
 
+    /// Inits key from file
+    void initKey();
+
     public:
     /// Get instance details
     Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
@@ -69,6 +72,7 @@ class Azure : public Provider {
         _secret = std::make_unique<Secret>();
         _secret->accountName = clientEmail;
         _secret->rsaKeyFile = keyFile;
+        initKey();
     }
     /// The constructor
     Azure(const std::string& bucket, const std::string& clientEmail, const std::string& keyFile) : _settings({bucket}) {
@@ -76,17 +80,16 @@ class Azure : public Provider {
         _secret = std::make_unique<Secret>();
         _secret->accountName = clientEmail;
         _secret->rsaKeyFile = keyFile;
+        initKey();
     }
     /// Get the settings
     Settings getSettings() { return _settings; }
 
     /// Builds the http request for downloading a blob or listing the directory
-    std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, std::pair<uint64_t, uint64_t>& range) const override;
+    std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
-    std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const uint8_t* data, const uint64_t length) const override;
+    std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override;
 
-    /// Inits key if not already
-    void initKey();
     /// Get the address of the server
     std::string getAddress() const override;
     /// Get the port of the server

@@ -27,6 +27,10 @@ class AWS : public Provider {
         std::string bucket;
         /// The aws region
         std::string region;
+        /// The custom endpoint
+        std::string endpoint;
+        /// The port
+        int port = 80;
     };
 
     /// The secret
@@ -39,6 +43,8 @@ class AWS : public Provider {
         std::string secret;
         /// The session token
         std::string sessionToken;
+        /// The key file
+        std::string keyFile;
         /// The expieration
         int64_t experiation;
     };
@@ -54,13 +60,16 @@ class AWS : public Provider {
     /// The secret
     std::unique_ptr<Secret> _secret;
 
+    /// Init the key from file
+    void initKey();
+
     public:
     /// Get instance details
     Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
     /// Builds the info http request
     static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "instance-type");
     /// Get the region of the instance
-    static std::string getRegion(network::TaskedSendReceiver& sendReceiver);
+    static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
     /// Get the IAM address
     static constexpr const char* getIAMAddress() {
         return "169.254.169.254";
@@ -75,8 +84,16 @@ class AWS : public Provider {
         _type = Provider::CloudService::AWS;
     }
     /// The constructor
-    AWS(const std::string& bucket, const std::string& region) : _settings({bucket, region}) {
+    AWS(const std::string& bucket, const std::string& region) : _settings({bucket, region, "", 80}) {
         _type = Provider::CloudService::AWS;
+    }
+    /// The custom endpoint constructor
+    AWS(const std::string& bucket, const std::string& region, const std::string& keyId, const std::string& keyFile, const std::string endpoint = "", int port = 80) : _settings({bucket, region, endpoint, port}) {
+        _type = Provider::CloudService::AWS;
+        _secret = std::make_unique<Secret>();
+        _secret->keyId = keyId;
+        _secret->keyFile = keyFile;
+        initKey();
     }
     /// Initialize secret
     void initSecret(network::TaskedSendReceiver& sendReceiver) override;
@@ -94,9 +111,9 @@ class AWS : public Provider {
     void initResolver(network::TaskedSendReceiver& sendReceiver) override;
 
     /// Builds the http request for downloading a blob or listing the directory
-    std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, std::pair<uint64_t, uint64_t>& range) const override;
+    std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
-    std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const uint8_t* data, const uint64_t length) const override;
+    std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override;
 
     /// Get the address of the server
     std::string getAddress() const override;
