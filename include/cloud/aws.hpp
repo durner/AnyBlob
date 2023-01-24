@@ -1,6 +1,7 @@
 #pragma once
 #include "cloud/aws_instances.hpp"
 #include "cloud/provider.hpp"
+#include <cassert>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -43,8 +44,6 @@ class AWS : public Provider {
         std::string secret;
         /// The session token
         std::string sessionToken;
-        /// The key file
-        std::string keyFile;
         /// The expieration
         int64_t experiation;
     };
@@ -60,9 +59,6 @@ class AWS : public Provider {
     /// The secret
     std::unique_ptr<Secret> _secret;
 
-    /// Init the key from file
-    void initKey();
-
     public:
     /// Get instance details
     Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
@@ -71,29 +67,20 @@ class AWS : public Provider {
     /// Get the region of the instance
     static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
     /// Get the IAM address
-    static constexpr const char* getIAMAddress() {
-        return "169.254.169.254";
-    }
+    static constexpr const char* getIAMAddress() { return "169.254.169.254"; }
     /// Get the port of the IAM server
-    static constexpr uint32_t getIAMPort() {
-        return 80;
-    }
+    static constexpr uint32_t getIAMPort() { return 80; }
 
     /// The constructor
-    explicit AWS(Settings settings) : _settings(settings) {
-        _type = Provider::CloudService::AWS;
-    }
-    /// The constructor
-    AWS(const std::string& bucket, const std::string& region) : _settings({bucket, region, "", 80}) {
-        _type = Provider::CloudService::AWS;
+    explicit AWS(const RemoteInfo& info) : _settings({info.bucket, info.region, info.endpoint, info.port}) {
+        assert(info.provider == Provider::CloudService::AWS || info.provider == Provider::CloudService::MinIO);
+        _type = info.provider;
     }
     /// The custom endpoint constructor
-    AWS(const std::string& bucket, const std::string& region, const std::string& keyId, const std::string& keyFile, const std::string endpoint = "", int port = 80) : _settings({bucket, region, endpoint, port}) {
-        _type = Provider::CloudService::AWS;
+    AWS(const RemoteInfo& info, const std::string& keyId, const std::string& key) : AWS(info) {
         _secret = std::make_unique<Secret>();
         _secret->keyId = keyId;
-        _secret->keyFile = keyFile;
-        initKey();
+        _secret->secret = key;
     }
     /// Initialize secret
     void initSecret(network::TaskedSendReceiver& sendReceiver) override;

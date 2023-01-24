@@ -64,8 +64,60 @@ unique_ptr<network::OriginalMessage> Provider::putRequest(const network::Transac
     return originalMsg;
 }
 //---------------------------------------------------------------------------
+bool Provider::retrieveObject(network::TaskedSendReceiver& sendReceiver, network::Transaction& transaction) const
+// Downloads a multiple objects with the calling thread, changes transaction vector
+{
+    // Create the original request message and send it
+    auto originalMessage = getRequest(transaction);
+    sendReceiver.send(originalMessage.get());
+
+    // do the download work
+    sendReceiver.sendReceive();
+
+    // retrieve the results
+    auto content = sendReceiver.receive(originalMessage.get());
+    unique_ptr<network::HTTPHelper::Info> infoPtr;
+    network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+    transaction.size = infoPtr->length;
+    transaction.offset = infoPtr->headerLength;
+
+    // move the datavector data to the transaction if the transaction is not used as buffer
+    if (!transaction.data.get()) {
+        transaction.data = content->transferBuffer();
+        transaction.capacity = content->capacity();
+    }
+
+    return true;
+}
+//---------------------------------------------------------------------------
+bool Provider::uploadObject(network::TaskedSendReceiver& sendReceiver, network::Transaction& transaction) const
+// Uploads a multiple objects with the calling thread, changes blobs vector
+{
+    // Create the original message and send it
+    auto originalMessage = putRequest(transaction);
+    sendReceiver.send(originalMessage.get());
+
+    // do the download work
+    sendReceiver.sendReceive();
+
+    // retrieve the results
+    auto content = sendReceiver.receive(originalMessage.get());
+    unique_ptr<network::HTTPHelper::Info> infoPtr;
+    network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+    transaction.size = infoPtr->length;
+    transaction.offset = infoPtr->headerLength;
+
+    // move the datavector data to the transaction if the transaction is not used as buffer
+    if (!transaction.data.get()) {
+        transaction.data = content->transferBuffer();
+        transaction.capacity = content->capacity();
+    }
+
+    return true;
+}
+//---------------------------------------------------------------------------
 bool Provider::retrieveObjects(network::TaskedSendReceiver& sendReceiver, vector<unique_ptr<network::Transaction>>& transactions) const
-// Downloads a number of blobs with the calling thread, changes transactions vector
+// Downloads a multiple objects with the calling thread, changes transaction vector
 {
     vector<unique_ptr<network::OriginalMessage>> originalMessages;
     originalMessages.reserve(transactions.size());
@@ -99,7 +151,7 @@ bool Provider::retrieveObjects(network::TaskedSendReceiver& sendReceiver, vector
 }
 //---------------------------------------------------------------------------
 bool Provider::uploadObjects(network::TaskedSendReceiver& sendReceiver, vector<unique_ptr<network::Transaction>>& transactions) const
-// Downloads a number of blobs with the calling thread, changes transactions vector
+// Uploads a multiple objects with the calling thread, changes blobs vector
 {
     vector<unique_ptr<network::OriginalMessage>> originalMessages;
     originalMessages.reserve(transactions.size());
@@ -161,7 +213,7 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
                     info.endpoint = addressPort;
                     info.port = 80;
                 }
-                sub = sub.substr(pos+1);
+                sub = sub.substr(pos + 1);
             }
             auto pos = sub.find('/');
             auto bucketRegion = sub.substr(0, pos);
@@ -177,9 +229,15 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
     }
     return info;
 }
-
 //---------------------------------------------------------------------------
-unique_ptr<Provider> Provider::makeProvider(const string& filepath, const string& keyId, const string& keyFile, network::TaskedSendReceiver* sendReceiver)
+string Provider::getKey(const string& keyFile)
+/// Gets the key from the kefile
+{
+    ifstream ifs(keyFile);
+    return string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
+}
+//---------------------------------------------------------------------------
+unique_ptr<Provider> Provider::makeProvider(const string& filepath, const string& keyId, const string& secret, network::TaskedSendReceiver* sendReceiver)
 /// Create a provider
 {
     auto info = anyblob::cloud::Provider::getRemoteInfo(filepath);
@@ -189,25 +247,25 @@ unique_ptr<Provider> Provider::makeProvider(const string& filepath, const string
                 info.region = anyblob::cloud::AWS::getInstanceRegion(*sendReceiver);
 
             if (keyId.empty()) {
-                auto aws = make_unique<anyblob::cloud::AWS>(info.bucket, info.region);
+                auto aws = make_unique<anyblob::cloud::AWS>(info);
                 aws->initSecret(*sendReceiver);
                 return aws;
             }
-            auto aws = make_unique<anyblob::cloud::AWS>(info.bucket, info.region, keyId, keyFile);
+            auto aws = make_unique<anyblob::cloud::AWS>(info, keyId, secret);
             return aws;
         }
         case anyblob::cloud::Provider::CloudService::GCP: {
             if (sendReceiver && info.region.empty())
                 info.region = anyblob::cloud::GCP::getInstanceRegion(*sendReceiver);
-            auto gcp = make_unique<anyblob::cloud::GCP>(info.bucket, info.region, keyId, keyFile);
+            auto gcp = make_unique<anyblob::cloud::GCP>(info, keyId, secret);
             return gcp;
         }
         case anyblob::cloud::Provider::CloudService::Azure: {
-            auto azure = make_unique<anyblob::cloud::Azure>(info.bucket, keyId, keyFile);
+            auto azure = make_unique<anyblob::cloud::Azure>(info, keyId, secret);
             return azure;
         }
         case anyblob::cloud::Provider::CloudService::MinIO: {
-            auto minio = make_unique<anyblob::cloud::AWS>(info.bucket, info.region, keyId, keyFile, info.endpoint, info.port);
+            auto minio = make_unique<anyblob::cloud::AWS>(info, keyId, secret);
             return minio;
         }
         default: {

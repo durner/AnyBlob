@@ -22,53 +22,48 @@ using namespace std;
 TEST_CASE("gcp") {
     Provider::testEnviornment = true;
 
-    char filename[] = "/tmp/tmp.gcp.key";
-    {
-        ofstream outfile(filename);
-        string key = "-----BEGIN RSA PRIVATE KEY-----\n";
-        key += "MIIG5AIBAAKCAYEAwXO93Bw1bBixG2rcm3cPAv7gSXWk584wnlH08iwL7jCdzT2H\n";
-        key += "+6pkPWgHnG/bvlzSNoJg9B21axTica5zbman/tM/1MmLt/oXtYQL/Tbz9OL9PwIB\n";
-        key += "ogKzCgvMrzTWLKn45thLLD8GW+00XFJumbe1oPQ42/PVSy5EB2Qnxfu4kBuxPgSO\n";
-        key += "VwwXOp5i8KRlt3WDBcj82tM6d5bXo0ajhwSAOKWY3HMzhlSOCEQAEwo0kAqd2KXi\n";
-        key += "ZtUjkr8KWUbuZEuNW/hqBIyeYO3SWLCB7Bl+aOtLnYnfJJ+lD7m3F7EH0CnZNOtE\n";
-        key += "zBEtaDaMLRR9iN9XGZZOjd4yqgpJFTS6xTzXMEtS7fTWKbQarot8dDbHzTEqxdBP\n";
-        key += "W8OovvoJDMXQ8JSt60m8o3666BnJOVA5j2bM8dUWaqCw5/QzFd7KU6Y2izL1Bplz\n";
-        key += "UZ6dmDFsIwfyEk2FJ2zrkDZLdIeS0nt4CNaSinORWp2x3RbJ1kSUQiFli172BU9U\n";
-        key += "B0wHfT7lWxqy0JPnAgMBAAECggGAErN9LauecHo8mNFuTSsnzNrV1NQmInCY251B\n";
-        key += "qC2g46BYiPBDVo1kzljhr3pSzGbNvY5CECdVE+p7b5D1QL10zRof6BKpypnHM/l1\n";
-        key += "bT+kOs68u5wWi1Jme3iji2Z4s+2kjbBoJ/lZxIY8UxZ28a5ERTCG1KCQRInO8sX4\n";
-        key += "YFfSwj+jFUM8fWbCUhzgpLHH0YHvLh59bywPUWNIKlUYVuOU/6Tmj50lZH2FE4B7\n";
-        key += "X1vTs/8Kvlhe+CDvpO6J8hJ81j5FWyuCy+yj8Oakspz6rvnKAFKdPt+czu6tK64w\n";
-        key += "+YpNObEigrEchnElL3aIbSGM921xPXJkFXm9Wk4yKUBF39DtpM8VN13mYoNvkOE7\n";
-        key += "K+mHUZ2ZV4ph2tIVAu9pRQptg810hloFywBVOKDfUeB0DbgOU122QTJAmIBDOfwf\n";
-        key += "7P5ouymRSXtGZYuKAEiSTiwucQmLzbYvWt63REsiMWW2QRYb6DkpslI1G23ZIPDD\n";
-        key += "epMAS6t0DCFbX0b/sVahUtmqARj1AoHBAMJCJ11WxLGcWxFovPqAyDONdagLnRbz\n";
-        key += "s1AG382aFRjzzMWmQ66j675tLBNFZBd9PfMFvyTosKXguhrBLCzW2ceESesPG5sT\n";
-        key += "4PoOMAEADReqImumlTU5vzWfOTsWrrxIWKrQBKvFS1qVkz31w7Lcdg6a7PsIyl/h\n";
-        key += "vda2ysJljYJoH2pERsA1eLAwSd+l+FYGIAEylZiMoCgFekvVeTNzOe7U/zArTpE/\n";
-        key += "Tg6MHrLTgy0x2GdPO0lvJvbQAbmQMXczjQKBwQD+7/vC5FBhIHfanj++PXP0z7NZ\n";
-        key += "xPvIjkLU6wAxP4vwrQT8jGpVTZegD1Mkx81L3meBNogaB9bo91/Dvh+c/hrBa/n7\n";
-        key += "W1LlWNfD7ubHmKBwRdZXtZSvUdqgJcTe46kntmiyDuqd/rmkGa3mgyxqFR3BQ24x\n";
-        key += "SP5cjypsN2B6tkbSWgoohej+g0koogL6aGVKaWynl5Ki/I8dS96uiMEzUfilwkD3\n";
-        key += "1zTxkuPRLiDaQq0vX+YYIpWIsS2HFjqrQmy17kMCgcEAnxGOrGbdv9aZ1+KdRL9p\n";
-        key += "sJU4b/e6lc3O2kwWvYRbnEgfOQXRzFLcOt2oxsr+kCF1NehRwgZsiBhCLKBb7Qet\n";
-        key += "4yuXX8zKPS2E/x3Y/yisj+E4OFB7Q89anK0aLyF+yhyvxod6G7H951ot7QGvU2ol\n";
-        key += "ngYM4e8r0GHIkuaxl4eS3eMnPlxUVxYyEowoIeQFO2Pelzx1tSoKB1uc7jYK/i9v\n";
-        key += "k/uET0xXFKby4wSoKqT6eGqlmssNcC99h4OCthG1/7cNAoHBAJ9vQkoeM06q2Yn1\n";
-        key += "kfPNxukBxC6ODNDed1llJpemIESCUC4JOq7iecL2Eo9cDT43dw/OJMvyvyqvGkr2\n";
-        key += "ahrqp5zzhED4Wh1otHeqvtVw1FWit2ve+X+zd0DUngyu4Ckf4NYKkhwBI+RG0wTo\n";
-        key += "YCxvzE4Dd7SG69zDBErtTv8vY5dGDDhPlukk/enVeHtWMpKY4ATnvCMGRBKUUk1g\n";
-        key += "5ULNLu2rUKovAsNZk/RMHuug62JHXUUWy+HSvKBQ/JwCTK5ytQKBwHJURIdf0huo\n";
-        key += "XpCUbJ3RdeUoEynMlFrIDmQdd0sDNzP1NdUog+lxE2TziTq9+eob/EnDE/QI1OMb\n";
-        key += "T87Ns8QjBkff/DDANFRqpYHxDzppYgOtDiIh/3bnaXJkVzcnSYyeyWfgCA/3NOBo\n";
-        key += "HNt/F1aw+Rjvm9Lif9SI3xJ1qA97ClzQd8brBiR+r8Uk3Yb5vls7p0VCX6JPGAyv\n";
-        key += "062k0eITND4bsnYSsiUliWODaittHronyQ3OFNIkjEgbmA7+ulh+Bw==\n";
-        key += "-----END RSA PRIVATE KEY-----\n";
+    string key = "-----BEGIN RSA PRIVATE KEY-----\n";
+    key += "MIIG5AIBAAKCAYEAwXO93Bw1bBixG2rcm3cPAv7gSXWk584wnlH08iwL7jCdzT2H\n";
+    key += "+6pkPWgHnG/bvlzSNoJg9B21axTica5zbman/tM/1MmLt/oXtYQL/Tbz9OL9PwIB\n";
+    key += "ogKzCgvMrzTWLKn45thLLD8GW+00XFJumbe1oPQ42/PVSy5EB2Qnxfu4kBuxPgSO\n";
+    key += "VwwXOp5i8KRlt3WDBcj82tM6d5bXo0ajhwSAOKWY3HMzhlSOCEQAEwo0kAqd2KXi\n";
+    key += "ZtUjkr8KWUbuZEuNW/hqBIyeYO3SWLCB7Bl+aOtLnYnfJJ+lD7m3F7EH0CnZNOtE\n";
+    key += "zBEtaDaMLRR9iN9XGZZOjd4yqgpJFTS6xTzXMEtS7fTWKbQarot8dDbHzTEqxdBP\n";
+    key += "W8OovvoJDMXQ8JSt60m8o3666BnJOVA5j2bM8dUWaqCw5/QzFd7KU6Y2izL1Bplz\n";
+    key += "UZ6dmDFsIwfyEk2FJ2zrkDZLdIeS0nt4CNaSinORWp2x3RbJ1kSUQiFli172BU9U\n";
+    key += "B0wHfT7lWxqy0JPnAgMBAAECggGAErN9LauecHo8mNFuTSsnzNrV1NQmInCY251B\n";
+    key += "qC2g46BYiPBDVo1kzljhr3pSzGbNvY5CECdVE+p7b5D1QL10zRof6BKpypnHM/l1\n";
+    key += "bT+kOs68u5wWi1Jme3iji2Z4s+2kjbBoJ/lZxIY8UxZ28a5ERTCG1KCQRInO8sX4\n";
+    key += "YFfSwj+jFUM8fWbCUhzgpLHH0YHvLh59bywPUWNIKlUYVuOU/6Tmj50lZH2FE4B7\n";
+    key += "X1vTs/8Kvlhe+CDvpO6J8hJ81j5FWyuCy+yj8Oakspz6rvnKAFKdPt+czu6tK64w\n";
+    key += "+YpNObEigrEchnElL3aIbSGM921xPXJkFXm9Wk4yKUBF39DtpM8VN13mYoNvkOE7\n";
+    key += "K+mHUZ2ZV4ph2tIVAu9pRQptg810hloFywBVOKDfUeB0DbgOU122QTJAmIBDOfwf\n";
+    key += "7P5ouymRSXtGZYuKAEiSTiwucQmLzbYvWt63REsiMWW2QRYb6DkpslI1G23ZIPDD\n";
+    key += "epMAS6t0DCFbX0b/sVahUtmqARj1AoHBAMJCJ11WxLGcWxFovPqAyDONdagLnRbz\n";
+    key += "s1AG382aFRjzzMWmQ66j675tLBNFZBd9PfMFvyTosKXguhrBLCzW2ceESesPG5sT\n";
+    key += "4PoOMAEADReqImumlTU5vzWfOTsWrrxIWKrQBKvFS1qVkz31w7Lcdg6a7PsIyl/h\n";
+    key += "vda2ysJljYJoH2pERsA1eLAwSd+l+FYGIAEylZiMoCgFekvVeTNzOe7U/zArTpE/\n";
+    key += "Tg6MHrLTgy0x2GdPO0lvJvbQAbmQMXczjQKBwQD+7/vC5FBhIHfanj++PXP0z7NZ\n";
+    key += "xPvIjkLU6wAxP4vwrQT8jGpVTZegD1Mkx81L3meBNogaB9bo91/Dvh+c/hrBa/n7\n";
+    key += "W1LlWNfD7ubHmKBwRdZXtZSvUdqgJcTe46kntmiyDuqd/rmkGa3mgyxqFR3BQ24x\n";
+    key += "SP5cjypsN2B6tkbSWgoohej+g0koogL6aGVKaWynl5Ki/I8dS96uiMEzUfilwkD3\n";
+    key += "1zTxkuPRLiDaQq0vX+YYIpWIsS2HFjqrQmy17kMCgcEAnxGOrGbdv9aZ1+KdRL9p\n";
+    key += "sJU4b/e6lc3O2kwWvYRbnEgfOQXRzFLcOt2oxsr+kCF1NehRwgZsiBhCLKBb7Qet\n";
+    key += "4yuXX8zKPS2E/x3Y/yisj+E4OFB7Q89anK0aLyF+yhyvxod6G7H951ot7QGvU2ol\n";
+    key += "ngYM4e8r0GHIkuaxl4eS3eMnPlxUVxYyEowoIeQFO2Pelzx1tSoKB1uc7jYK/i9v\n";
+    key += "k/uET0xXFKby4wSoKqT6eGqlmssNcC99h4OCthG1/7cNAoHBAJ9vQkoeM06q2Yn1\n";
+    key += "kfPNxukBxC6ODNDed1llJpemIESCUC4JOq7iecL2Eo9cDT43dw/OJMvyvyqvGkr2\n";
+    key += "ahrqp5zzhED4Wh1otHeqvtVw1FWit2ve+X+zd0DUngyu4Ckf4NYKkhwBI+RG0wTo\n";
+    key += "YCxvzE4Dd7SG69zDBErtTv8vY5dGDDhPlukk/enVeHtWMpKY4ATnvCMGRBKUUk1g\n";
+    key += "5ULNLu2rUKovAsNZk/RMHuug62JHXUUWy+HSvKBQ/JwCTK5ytQKBwHJURIdf0huo\n";
+    key += "XpCUbJ3RdeUoEynMlFrIDmQdd0sDNzP1NdUog+lxE2TziTq9+eob/EnDE/QI1OMb\n";
+    key += "T87Ns8QjBkff/DDANFRqpYHxDzppYgOtDiIh/3bnaXJkVzcnSYyeyWfgCA/3NOBo\n";
+    key += "HNt/F1aw+Rjvm9Lif9SI3xJ1qA97ClzQd8brBiR+r8Uk3Yb5vls7p0VCX6JPGAyv\n";
+    key += "062k0eITND4bsnYSsiUliWODaittHronyQ3OFNIkjEgbmA7+ulh+Bw==\n";
+    key += "-----END RSA PRIVATE KEY-----\n";
 
-        outfile << key;
-    }
-
-    GCP gcp("test", "test", "test@test.com", filename);
+    auto provider = Provider::makeProvider("gcp://test:test/", "test@test.com", key);
+    GCP& gcp = *static_cast<GCP*>(provider.get());
     REQUIRE(!strcmp(gcp.getIAMAddress(), "169.254.169.254"));
     REQUIRE(gcp.getIAMPort() == 80);
 
@@ -91,7 +86,6 @@ TEST_CASE("gcp") {
     auto vec = GCPInstance::getInstanceDetails();
     REQUIRE(vec.size() > 0);
 
-    unlink(filename);
     Provider::testEnviornment = false;
 }
 //---------------------------------------------------------------------------

@@ -15,12 +15,11 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-MessageTask::MessageTask(OriginalMessage* message, uint8_t* receiveBuffer, uint64_t bufferSize) : originalMessage(message), sendBufferOffset(0), receiveBufferOffset(0), status(Status::Init), failures(0)
+MessageTask::MessageTask(OriginalMessage* message, uint8_t* receiveBuffer, uint64_t bufferSize) : originalMessage(message), sendBufferOffset(0), receiveBufferOffset(0), failures(0)
 // The constructor
 {
-    if (receiveBuffer) {
-        receive = make_unique<utils::DataVector<uint8_t>>(receiveBuffer, bufferSize);
-    }
+    if (receiveBuffer)
+        originalMessage->result = make_unique<utils::DataVector<uint8_t>>(receiveBuffer, bufferSize);
 }
 //---------------------------------------------------------------------------
 HTTPMessage::HTTPMessage(OriginalMessage* message, uint64_t chunkSize, uint8_t* receiveBuffer, uint64_t bufferSize) : MessageTask(message, receiveBuffer, bufferSize), chunkSize(chunkSize), info()
@@ -29,65 +28,61 @@ HTTPMessage::HTTPMessage(OriginalMessage* message, uint64_t chunkSize, uint8_t* 
     type = Type::HTTP;
 }
 //---------------------------------------------------------------------------
-MessageTask::Status HTTPMessage::execute(IOUringSocket& socket)
+MessageState HTTPMessage::execute(IOUringSocket& socket)
 // executes the task
 {
     int32_t fd = -1;
-    switch (status) {
-        case Status::Init: {
+    auto& state = originalMessage->state;
+    switch (state) {
+        case MessageState::Init: {
             try {
                 fd = socket.connect(originalMessage->hostname, originalMessage->port, tcpSettings);
-            } catch (exception& e) {
-                if (failures++ > failuresMax)
-                    throw runtime_error(string("HTTPMessage execute reaches failure limit: ") + e.what());
+            } catch (exception& /*e*/) {
+                state = MessageState::Aborted;
                 return execute(socket);
             }
+            state = MessageState::InitSending;
             sendBufferOffset = 0;
-            status = Status::InitSending;
         } // fallthrough
-        case Status::InitSending: // fallthrough
-        case Status::Sending: {
-            if (status != Status::InitSending) {
+        case MessageState::InitSending: // fallthrough
+        case MessageState::Sending: {
+            if (state != MessageState::InitSending) {
                 fd = request->fd;
                 if (request->length > 0) {
                     sendBufferOffset += request->length;
                 } else {
-                    if (failures++ > failuresMax)
-                        throw runtime_error("HTTPMessage execute reaches failure limit!");
-                    reset(socket);
+                    reset(socket, failures++ > failuresMax);
                     return execute(socket);
                 }
 
-                if (sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size() + originalMessage->length)) {
-                    status = Status::InitReceiving;
-                    if (!receive) {
-                        receive = make_unique<utils::DataVector<uint8_t>>();
-                    }
+                if (sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size() + originalMessage->putLength)) {
+                    state = MessageState::InitReceiving;
+                    if (!originalMessage->result)
+                        originalMessage->result = make_unique<utils::DataVector<uint8_t>>();
                     receiveBufferOffset = 0;
-                    receive->clear();
+                    originalMessage->result->clear();
                     return execute(socket);
                 }
             }
-            status = Status::Sending;
+            state = MessageState::Sending;
             {
                 const uint8_t* ptr;
                 ptr = originalMessage->message->data() + sendBufferOffset;
                 auto length = static_cast<int64_t>(originalMessage->message->size()) - sendBufferOffset;
-                if (originalMessage->length > 0 && sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size())) {
-                    ptr = originalMessage->data + sendBufferOffset - originalMessage->message->size();
-                    length = originalMessage->length + originalMessage->message->size() - sendBufferOffset;
+                if (originalMessage->putLength > 0 && sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size())) {
+                    ptr = originalMessage->putData + sendBufferOffset - originalMessage->message->size();
+                    length = originalMessage->putLength + originalMessage->message->size() - sendBufferOffset;
                 }
                 request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, length, fd, IOUringSocket::EventType::write, this});
                 socket.send_prep(request.get());
             }
             break;
         }
-        case Status::InitReceiving: {
-            // fallhrough
-        }
-        case Status::Receiving: {
+        case MessageState::InitReceiving: // fallhrough
+        case MessageState::Receiving: {
+            auto& receive = originalMessage->result;
             // check after first successful receiving if we are finished
-            if (status != Status::InitReceiving) {
+            if (state != MessageState::InitReceiving) {
                 if (request->length >= 0) {
                     // resize according to real downloaded size
                     receive->resize(receive->size() - (chunkSize - request->length));
@@ -96,45 +91,36 @@ MessageTask::Status HTTPMessage::execute(IOUringSocket& socket)
                     try {
                         // check whether finished http
                         if (HTTPHelper::finished(receive->data(), receiveBufferOffset, info)) {
-                            status = Status::Finished;
+                            state = MessageState::Finished;
                             socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, sendBufferOffset + receiveBufferOffset);
-                            return status;
+                            return originalMessage->state;
                         }
                     } catch (exception&) {
                         string header(reinterpret_cast<char*>(receive->data()), receive->size());
-                        if (failures++ > failuresMax)
-                            throw runtime_error(string("HTTPMessage execute reaches failure limit!\n") + header);
-                        reset(socket);
+                        reset(socket, failures++ > failuresMax);
                         return execute(socket);
                     }
 
                     if (!request->length) {
                         string header(reinterpret_cast<char*>(receive->data()), receive->size());
                         cerr << "Empty request - restart!" << endl;
-                        if (failures++ > failuresMax)
-                            throw runtime_error(string("HTTPMessage execute reaches failure limit!\n") + header);
-                        reset(socket);
+                        reset(socket, failures++ > failuresMax);
                         return execute(socket);
                     }
                 } else if (errno != EINPROGRESS) {
                     if (socket.checkTimeout(request->fd, tcpSettings)) {
                         string header(reinterpret_cast<char*>(receive->data()), receive->size());
                         cerr << "Timeout error! Error code: " << strerror(errno) << endl;
-                        if (failures++ > failuresMax)
-                            throw runtime_error(string("HTTPMessage execute reaches failure limit!\n") + header);
-                        reset(socket);
+                        reset(socket, failures++ > failuresMax);
                         return execute(socket);
                     }
                     string header(reinterpret_cast<char*>(receive->data()), receive->size());
                     cerr << "Request error! Error code: " << strerror(errno) << endl;
-                    if (failures++ > failuresMax)
-                        throw runtime_error(string("HTTPMessage execute reaches failure limit!\n") + header);
-                    reset(socket);
+                    reset(socket, failures++ > failuresMax);
                     return execute(socket);
                 } else {
                     receive->resize(receive->size() - chunkSize);
                 }
-
                 // resize and grow capacity
                 if (receive->capacity() < receive->size() + chunkSize && info) {
                     receive->reserve(max(info->length + info->headerLength + chunkSize, static_cast<uint64_t>(receive->capacity() * 1.5)));
@@ -143,22 +129,28 @@ MessageTask::Status HTTPMessage::execute(IOUringSocket& socket)
             receive->resize(receive->size() + chunkSize);
             request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = receive->data() + receiveBufferOffset}, static_cast<int64_t>(chunkSize), request->fd, IOUringSocket::EventType::read, this});
             socket.recv_prep(request.get(), tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
-            status = Status::Receiving;
+            state = MessageState::Receiving;
             break;
         }
+        case MessageState::Aborted:
+            break;
         default:
             break;
     }
-    return status;
+    return state;
 }
 //---------------------------------------------------------------------------
-void HTTPMessage::reset(IOUringSocket& socket)
+void HTTPMessage::reset(IOUringSocket& socket, bool aborted)
 // Reset for restart
 {
-    receive->clear();
-    receiveBufferOffset = 0;
-    sendBufferOffset = 0;
-    status = Status::Init;
+    if (!aborted) {
+        originalMessage->result->clear();
+        receiveBufferOffset = 0;
+        sendBufferOffset = 0;
+        originalMessage->state = MessageState::Init;
+    } else {
+        originalMessage->state = MessageState::Aborted;
+    }
     socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, true);
 }
 //---------------------------------------------------------------------------

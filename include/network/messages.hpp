@@ -21,14 +21,29 @@ class DataVector;
 //---------------------------------------------------------------------------
 namespace network {
 //---------------------------------------------------------------------------
+/// Current status of the message task
+enum class MessageState : uint8_t {
+    Init,
+    InitSending,
+    Sending,
+    InitReceiving,
+    Receiving,
+    Finished,
+    Aborted
+};
+//---------------------------------------------------------------------------
 /// This is the original request message struct
 struct OriginalMessage {
     /// The message
     std::unique_ptr<utils::DataVector<uint8_t>> message;
+    /// The result
+    std::unique_ptr<utils::DataVector<uint8_t>> result;
+
     /// The hostname
     std::string hostname;
     /// The port
     uint32_t port;
+
     /// Optional receive buffer
     uint8_t* receiveBuffer;
     /// Optional size of the receive buffer
@@ -37,28 +52,31 @@ struct OriginalMessage {
     uint64_t traceId;
 
     /// If it is a put request store the additional data
-    /// The raw data ptr
-    const uint8_t* data;
+    /// The raw data ptr for put requests
+    const uint8_t* putData;
     /// The length
-    uint64_t length;
+    uint64_t putLength;
+
+    /// The state
+    MessageState state;
 
     /// The constructor
-    OriginalMessage(std::unique_ptr<utils::DataVector<uint8_t>> message, std::string hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : message(move(message)), hostname(hostname), port(port), receiveBuffer(receiveBuffer), bufferSize(bufferSize), traceId(traceId), data(nullptr), length() {}
+    OriginalMessage(std::unique_ptr<utils::DataVector<uint8_t>> message, std::string hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : message(std::move(message)), result(), hostname(hostname), port(port), receiveBuffer(receiveBuffer), bufferSize(bufferSize), traceId(traceId), putData(nullptr), putLength(), state(MessageState::Init) {}
 
     /// The destructor
     virtual ~OriginalMessage() = default;
 
     /// Add the put request data to the message
     void setPutRequestData(const uint8_t* data, uint64_t length) {
-        this->data = data;
-        this->length = length;
+        this->putData = data;
+        this->putLength = length;
     }
 
     /// Callback required
     virtual bool requiresFinish() { return false; }
 
     /// Callback
-    virtual void finish(std::unique_ptr<utils::DataVector<uint8_t>> /*data*/) {}
+    virtual void finish() {}
 };
 //---------------------------------------------------------------------------
 /// The callback original message
@@ -68,7 +86,7 @@ struct OriginalCallbackMessage : public OriginalMessage {
     Callback callback;
 
     /// The constructor
-    OriginalCallbackMessage(Callback&& callback, std::unique_ptr<utils::DataVector<uint8_t>> message, std::string hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : OriginalMessage(move(message), hostname, port, receiveBuffer, bufferSize, traceId), callback(forward<Callback>(callback)) {}
+    OriginalCallbackMessage(Callback&& callback, std::unique_ptr<utils::DataVector<uint8_t>> message, std::string hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : OriginalMessage(move(message), hostname, port, receiveBuffer, bufferSize, traceId), callback(std::forward<Callback>(callback)) {}
 
     /// The destructor
     virtual ~OriginalCallbackMessage() override = default;
@@ -76,24 +94,15 @@ struct OriginalCallbackMessage : public OriginalMessage {
     /// Override if callback required
     bool requiresFinish() override { return true; }
 
-    void finish(std::unique_ptr<utils::DataVector<uint8_t>> data) override {
-        callback(move(data));
+    void finish() override {
+        callback(move(result));
     }
 };
 //---------------------------------------------------------------------------
 /// This implements a message task
 /// After each execute invocation a new request was added to the uring queue and requires submission
 struct MessageTask {
-    /// Current status of the message task
-    enum class Status : uint8_t {
-        Init,
-        InitSending,
-        Sending,
-        InitReceiving,
-        Receiving,
-        Finished
-    };
-    /// Current status of the message task
+    /// Type of the message task
     enum class Type : uint8_t {
         HTTP
     };
@@ -102,16 +111,12 @@ struct MessageTask {
     OriginalMessage* originalMessage;
     /// Send message
     std::unique_ptr<IOUringSocket::Request> request;
-    /// Receive message
-    std::unique_ptr<utils::DataVector<uint8_t>> receive;
     /// The reduced offset in the send buffers
     int64_t sendBufferOffset;
     /// The reduced offset in the receive buffers
     int64_t receiveBufferOffset;
     /// The message task class
     Type type;
-    /// The current status
-    Status status;
     /// The failures
     unsigned failures;
     /// The failure limit
@@ -120,7 +125,7 @@ struct MessageTask {
     /// The constructor
     MessageTask(OriginalMessage* sendingMessage, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0);
     /// The pure virtual  callback
-    virtual Status execute(IOUringSocket& socket) = 0;
+    virtual MessageState execute(IOUringSocket& socket) = 0;
     /// The pure virtual destuctor
     virtual ~MessageTask(){};
 };
@@ -136,11 +141,11 @@ struct HTTPMessage : public MessageTask {
     /// The constructor
     HTTPMessage(OriginalMessage* sendingMessage, uint64_t chunkSize, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0);
     /// The message excecute callback
-    Status execute(IOUringSocket& socket) override;
+    MessageState execute(IOUringSocket& socket) override;
     /// The destructor
     ~HTTPMessage() override = default;
     /// Reset for restart
-    void reset(IOUringSocket& socket);
+    void reset(IOUringSocket& socket, bool aborted);
 };
 //---------------------------------------------------------------------------
 } // namespace network

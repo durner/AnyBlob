@@ -33,8 +33,6 @@ static string buildXMSTimestamp()
 void Azure::initKey()
 /// Inits key if not exists
 {
-    ifstream ifs(_secret->rsaKeyFile);
-    _secret->privateKey = string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
     _secret->privateKey.erase(remove(_secret->privateKey.begin(), _secret->privateKey.end(), '\n'), _secret->privateKey.cend());
 }
 //---------------------------------------------------------------------------

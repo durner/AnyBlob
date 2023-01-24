@@ -33,7 +33,7 @@ class Resolver {
     /// The constructor
     explicit Resolver(unsigned entries);
     /// The address resolving
-    virtual unsigned resolve(std::string hostname, std::string port, bool& reuse);
+    virtual unsigned resolve(std::string hostname, std::string port, bool& oldAddress);
     /// Increment the addr ctr
     virtual void increment() { _addrCtr++; }
     /// Erase the current cache

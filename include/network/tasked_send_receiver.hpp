@@ -95,20 +95,28 @@ class TaskedSendReceiver {
     public:
     /// The constructor
     TaskedSendReceiver(TaskedSendReceiverGroup& group);
+
+    /// Get the group
+    const TaskedSendReceiverGroup* getGroup() const { return &_group; }
+
     /// Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
     void sendReceive(bool oneQueueInvocation = true);
     /// Adds a message to the submission queue
     bool send(OriginalMessage* msg);
+
     /// Receives the messages and blocks until it is received
     std::unique_ptr<utils::DataVector<uint8_t>> receive(OriginalMessage* msg);
     /// Receives the messages if available else nullptr
     std::unique_ptr<utils::DataVector<uint8_t>> receiveAsync(OriginalMessage* msg);
+
     /// Reuse memory of old message
     void reuse(std::unique_ptr<utils::DataVector<uint8_t>> message);
+
     /// Runs the deamon
     void run();
     /// Stops the deamon
     void stop() { _stopDeamon = true; }
+
     /// Update the concurrent requests
     void setConcurrentRequests(uint64_t concurrentRequests) {
         if (_group._concurrentRequests != concurrentRequests)
@@ -118,6 +126,7 @@ class TaskedSendReceiver {
     uint64_t getConcurrentRequests() {
         return _group._concurrentRequests;
     }
+
     /// Set the timings
     void setTimings(std::vector<utils::TimingHelper>* timings) {
         _timings = timings;
