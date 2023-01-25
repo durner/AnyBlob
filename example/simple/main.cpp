@@ -1,8 +1,7 @@
-#include <cstring>
-#include "cloud/aws.hpp"
 #include "cloud/provider.hpp"
-#include "network/transaction.hpp"
+#include "network/get_transaction.hpp"
 #include "network/tasked_send_receiver.hpp"
+#include <cstring>
 #include <iostream>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -28,18 +27,29 @@ int main(int /*argc*/, char** /*argv*/) {
     // Create the provider for the corresponding filename
     auto provider = anyblob::cloud::Provider::makeProvider(bucketName, "", "", &sendReceiver);
 
-    // Create the request
-    vector<unique_ptr<anyblob::network::Transaction>> requests;
-    requests.emplace_back(make_unique<anyblob::network::GetTransaction>(fileName));
+    // Create the get request
+    anyblob::network::GetTransaction getTxn(provider.get());
+    getTxn.addRequest(fileName);
 
-    // Fetch the request synchronously with the scheduler object on this thread
-    provider->retrieveObjects(sendReceiver, requests);
+    // Retrieve the request synchronously with the scheduler object on this thread
+    getTxn.processSync(sendReceiver);
 
-    // Get and print the result, note that the data lies in the data buffer but after the offset to skip the HTTP header
-    // Note that the size is already without the header, so the full request has size + offset length
-    auto& request = requests.front();
-    string_view dataString(reinterpret_cast<char*>(request->data.get()) + request->offset, request->size);
-    cout << dataString << endl;
+    // Get and print the result
+    for (const auto& it : getTxn) {
+        // Check if the request was successful
+        if (!it.success()) {
+            cout << "Request was not successful!" << endl;
+            continue;
+        }
+        // Simple string_view interface
+        cout << it.getResult() << endl;
+
+        // Advanced raw interface
+        // Note that the data lies in the data buffer but after the offset to skip the HTTP header
+        // Note that the size is already without the header, so the full request has size + offset length
+        string_view rawDataString(reinterpret_cast<const char*>(it.getData()) + it.getOffset(), it.getSize());
+        cout << rawDataString << endl;
+    }
 
     return 0;
 }

@@ -19,6 +19,10 @@ class TaskedSendReceiver;
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------
+namespace test {
+class AzureTester;
+}; // namespace test
+//---------------------------------------------------------------------------
 /// Implements the Azure logic
 class Azure : public Provider {
     public:
@@ -51,20 +55,10 @@ class Azure : public Provider {
     public:
     /// Get instance details
     Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
-    /// Builds the info http request
-    static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo();
+
     /// Get the region of the instance
     static std::string getRegion(network::TaskedSendReceiver& sendReceiver);
-    /// Get the IAM address
-    static constexpr const char* getIAMAddress() {
-        return "169.254.169.254";
-    }
-    /// Get the port of the IAM server
-    static constexpr uint32_t getIAMPort() {
-        return 80;
-    }
 
-    public:
     /// The constructor
     Azure(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket}) {
         assert(info.provider == Provider::CloudService::Azure);
@@ -74,6 +68,8 @@ class Azure : public Provider {
         _secret->privateKey = key;
         initKey();
     }
+
+    private:
     /// Get the settings
     Settings getSettings() { return _settings; }
 
@@ -86,6 +82,20 @@ class Azure : public Provider {
     std::string getAddress() const override;
     /// Get the port of the server
     uint32_t getPort() const override;
+
+    /// Builds the info http request
+    static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo();
+    /// Get the IAM address
+    static constexpr const char* getIAMAddress() {
+        return "169.254.169.254";
+    }
+    /// Get the port of the IAM server
+    static constexpr uint32_t getIAMPort() {
+        return 80;
+    }
+
+    friend Provider;
+    friend test::AzureTester;
 };
 //---------------------------------------------------------------------------
 } // namespace cloud

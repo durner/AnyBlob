@@ -19,6 +19,10 @@ class TaskedSendReceiver;
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------
+namespace test {
+class GCPTester;
+}; // namespace test
+//---------------------------------------------------------------------------
 /// Implements the GCP logic
 class GCP : public Provider {
     public:
@@ -50,20 +54,9 @@ class GCP : public Provider {
     public:
     /// Get instance details
     Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
-    /// Builds the info http request
-    static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "machine-type");
     /// Get the region of the instance
     static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
-    /// Get the IAM address
-    static constexpr const char* getIAMAddress() {
-        return "169.254.169.254";
-    }
-    /// Get the port of the IAM server
-    static constexpr uint32_t getIAMPort() {
-        return 80;
-    }
 
-    public:
     /// The constructor
     GCP(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket, info.region}) {
         assert(info.provider == Provider::CloudService::GCP);
@@ -72,6 +65,8 @@ class GCP : public Provider {
         _secret->serviceAccountEmail = clientEmail;
         _secret->privateKey = key;
     }
+
+    private:
     /// Get the settings
     Settings getSettings() { return _settings; }
 
@@ -84,6 +79,20 @@ class GCP : public Provider {
     std::string getAddress() const override;
     /// Get the port of the server
     uint32_t getPort() const override;
+
+    /// Builds the info http request
+    static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "machine-type");
+    /// Get the IAM address
+    static constexpr const char* getIAMAddress() {
+        return "169.254.169.254";
+    }
+    /// Get the port of the IAM server
+    static constexpr uint32_t getIAMPort() {
+        return 80;
+    }
+
+    friend Provider;
+    friend test::GCPTester;
 };
 //---------------------------------------------------------------------------
 } // namespace cloud

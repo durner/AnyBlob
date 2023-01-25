@@ -55,12 +55,12 @@ class Bandwidth {
     };
 
     /// Benchmark runner
-    static void run(const Settings& benchmarkSettings, anyblob::cloud::Provider& cloudProvider);
+    static void run(const Settings& benchmarkSettings, const std::string& uri);
     /// Uring benchmark runner
-    static void runUring(const Settings& benchmarkSettings, anyblob::cloud::Provider& cloudProvider);
+    static void runUring(const Settings& benchmarkSettings, const std::string& uri);
     /// S3 benchmark runner
     template <typename S3SendReceiver>
-    static void runS3(const Settings& benchmarkSettings, anyblob::cloud::Provider& cloudProvider);
+    static void runS3(const Settings& benchmarkSettings, const std::string& uri);
     /// Timestamp util
     static inline size_t systemClockToMys(const std::chrono::steady_clock::time_point& t) {
         return std::chrono::duration_cast<std::chrono::microseconds>(t.time_since_epoch()).count();

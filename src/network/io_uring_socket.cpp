@@ -25,7 +25,7 @@ namespace network {
 using namespace std;
 //---------------------------------------------------------------------------
 IOUringSocket::IOUringSocket(uint32_t entries, int32_t /*flags*/) : _resolverCache()
-/// Constructor that inits uring queue
+// Constructor that inits uring queue
 {
     // initialize io_uring
     struct io_uring_params params;
@@ -47,7 +47,7 @@ IOUringSocket::IOUringSocket(uint32_t entries, int32_t /*flags*/) : _resolverCac
 }
 //---------------------------------------------------------------------------
 int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpSettings, int retryLimit)
-/// Creates a new socket connection
+// Creates a new socket connection
 {
     if (auto it = _fdCache.find(hostname); it != _fdCache.end()) {
         auto fd = it->second;
@@ -78,8 +78,8 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
         throw runtime_error("Socket creation error!" + string(strerror(errno)));
     }
 
-    /// Settings for socket
-    /// No blocking mode
+    // Settings for socket
+    // No blocking mode
     if (tcpSettings.nonBlocking > 0) {
         int flags = fcntl(fd, F_GETFL, 0);
         flags |= O_NONBLOCK;
@@ -88,63 +88,63 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
         }
     }
 
-    /// Keep Alive
+    // Keep Alive
     if (tcpSettings.keepAlive > 0) {
         if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &tcpSettings.keepAlive, sizeof(tcpSettings.keepAlive))) {
             throw runtime_error("Socket creation error! - keep alive error");
         }
     }
 
-    /// Keep Idle
+    // Keep Idle
     if (tcpSettings.keepIdle > 0) {
         if (setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &tcpSettings.keepIdle, sizeof(tcpSettings.keepIdle))) {
             throw runtime_error("Socket creation error! - keep idle error");
         }
     }
 
-    /// Keep intvl
+    // Keep intvl
     if (tcpSettings.keepIntvl > 0) {
         if (setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &tcpSettings.keepIntvl, sizeof(tcpSettings.keepIntvl))) {
             throw runtime_error("Socket creation error! - keep intvl error");
         }
     }
 
-    /// Keep cnt
+    // Keep cnt
     if (tcpSettings.keepCnt > 0) {
         if (setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &tcpSettings.keepCnt, sizeof(tcpSettings.keepCnt))) {
             throw runtime_error("Socket creation error! - keep cnt error");
         }
     }
 
-    /// No Delay
+    // No Delay
     if (tcpSettings.noDelay > 0) {
         if (setsockopt(fd, SOL_TCP, TCP_NODELAY, &tcpSettings.noDelay, sizeof(tcpSettings.noDelay))) {
             throw runtime_error("Socket creation error! - nodelay error");
         }
     }
 
-    /// Reuse ports
+    // Reuse ports
     if (tcpSettings.reusePorts > 0) {
         if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &tcpSettings.reusePorts, sizeof(tcpSettings.reusePorts))) {
             throw runtime_error("Socket creation error! - reuse port error");
         }
     }
 
-    /// Recv buffer
+    // Recv buffer
     if (tcpSettings.recvBuffer > 0) {
         if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &tcpSettings.recvBuffer, sizeof(tcpSettings.recvBuffer))) {
             throw runtime_error("Socket creation error! - recvbuf error");
         }
     }
 
-    /// Lingering of sockets
+    // Lingering of sockets
     if (tcpSettings.linger > 0) {
         if (setsockopt(fd, SOL_TCP, TCP_LINGER2, &tcpSettings.linger, sizeof(tcpSettings.linger))) {
             throw runtime_error("Socket creation error - linger timeout error!" + string(strerror(errno)));
         }
     }
 
-    /// TCP window shift
+    // TCP window shift
 #ifdef TCP_WINSHIFT
     if (tcpSettings.windowShift && tcpSettings.recvBuffer >= (64 << 10)) {
         int windowShift = 0;
@@ -158,7 +158,7 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
     }
 #endif
 
-    /// RFC 1323 optimization
+    // RFC 1323 optimization
 #ifdef TCP_RFC1323
     if (tcpSettings.rfc1323 && tcpSettings.recvBuffer >= (64 << 10)) {
         int on = 1;
@@ -168,7 +168,7 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
     }
 #endif
 
-    /// Max segment size
+    // Max segment size
 #ifdef TCP_MAXSEG
     if (tcpSettings.mss > 0) {
         if (setsockopt(fd, SOL_TCP, TCP_MAXSEG, &tcpSettings.mss, sizeof(tcpSettings.mss))) {
@@ -178,7 +178,7 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
 #endif
 
     auto setTimeOut = [](int fd, TCPSettings& tcpSettings) {
-        /// Set timeout
+        // Set timeout
         if (tcpSettings.timeout > 0) {
             struct timeval tv;
             tv.tv_sec = tcpSettings.timeout / (1000 * 1000);
@@ -219,7 +219,7 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
         FD_SET(fd, &fdset);
         struct timeval tv;
         tv.tv_sec = 0;
-        tv.tv_usec = 50000;
+        tv.tv_usec = tcpSettings.timeout;
 
         // connection check
         auto t = select(fd + 1, NULL, &fdset, NULL, &tv);
@@ -255,7 +255,7 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
 }
 //---------------------------------------------------------------------------
 void IOUringSocket::disconnect(int32_t fd, string hostname, uint32_t port, TCPSettings* tcpSettings, uint64_t bytes, bool forceShutdown)
-/// Disconnects the socket
+// Disconnects the socket
 {
     Resolver* resCache;
     auto tldName = string(Resolver::tld(hostname));
@@ -278,13 +278,13 @@ void IOUringSocket::disconnect(int32_t fd, string hostname, uint32_t port, TCPSe
 }
 //---------------------------------------------------------------------------
 void IOUringSocket::addResolver(const string& hostname, unique_ptr<Resolver> resolver)
-/// Add resolver
+// Add resolver
 {
     _resolverCache.emplace(string(Resolver::tld(hostname)), move(resolver));
 }
 //---------------------------------------------------------------------------
 io_uring_sqe* IOUringSocket::send_prep(const Request* req, int32_t msg_flags, int32_t flags)
-/// Prepare a submission (sqe) send
+// Prepare a submission (sqe) send
 {
     auto sqe = io_uring_get_sqe(&_uring);
     io_uring_prep_send(sqe, req->fd, req->data.cdata, req->length, msg_flags);
@@ -294,7 +294,7 @@ io_uring_sqe* IOUringSocket::send_prep(const Request* req, int32_t msg_flags, in
 }
 //---------------------------------------------------------------------------
 io_uring_sqe* IOUringSocket::recv_prep(Request* req, int32_t msg_flags, int32_t flags)
-/// Prepare a submission (sqe) recv
+// Prepare a submission (sqe) recv
 {
     auto sqe = io_uring_get_sqe(&_uring);
     io_uring_prep_recv(sqe, req->fd, req->data.data, req->length, msg_flags);
@@ -304,14 +304,11 @@ io_uring_sqe* IOUringSocket::recv_prep(Request* req, int32_t msg_flags, int32_t 
 }
 //---------------------------------------------------------------------------
 IOUringSocket::Request* IOUringSocket::peek()
-/// Get a completion (cqe) event if it is available and mark it as seen; return the SQE attached Request if available else nullptr
+// Get a completion (cqe) event if it is available and mark it as seen; return the SQE attached Request if available else nullptr
 {
     io_uring_cqe* cqe;
     auto res = io_uring_peek_cqe(&_uring, &cqe);
     if (!res) {
-        if (cqe->res < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            throw runtime_error("Completion error!");
-        }
         Request* req = nullptr;
         memcpy(&req, &cqe->user_data, sizeof(cqe->user_data));
         req->length = cqe->res;
@@ -322,14 +319,11 @@ IOUringSocket::Request* IOUringSocket::peek()
 }
 //---------------------------------------------------------------------------
 IOUringSocket::Request* IOUringSocket::complete()
-/// Get a completion (cqe) event and mark it as seen; return the SQE attached Request
+// Get a completion (cqe) event and mark it as seen; return the SQE attached Request
 {
     io_uring_cqe* cqe;
     auto res = io_uring_wait_cqe(&_uring, &cqe);
     if (!res) {
-        if (cqe->res < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            throw runtime_error(string("Completion error! - ") + strerror(errno));
-        }
         Request* req = nullptr;
         memcpy(&req, &cqe->user_data, sizeof(cqe->user_data));
         req->length = cqe->res;
@@ -340,7 +334,7 @@ IOUringSocket::Request* IOUringSocket::complete()
 }
 //---------------------------------------------------------------------------
 io_uring_cqe* IOUringSocket::completion()
-/// Get a completion (cqe) event
+// Get a completion (cqe) event
 {
     io_uring_cqe* cqe;
     auto res = io_uring_wait_cqe(&_uring, &cqe);
@@ -351,7 +345,7 @@ io_uring_cqe* IOUringSocket::completion()
 }
 //---------------------------------------------------------------------------
 uint32_t IOUringSocket::submitCompleteAll(uint32_t events, vector<IOUringSocket::Request*>& completions)
-/// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests
+// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests
 {
     uint32_t count = 0;
     while (events > count) {
@@ -363,9 +357,6 @@ uint32_t IOUringSocket::submitCompleteAll(uint32_t events, vector<IOUringSocket:
         // iterate all cqes
         io_uring_for_each_cqe(&_uring, head, cqe) {
             localCount++;
-            if (cqe->res < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-                throw runtime_error(string("Completion error! - ") + strerror(errno));
-            }
             Request* req = nullptr;
             memcpy(&req, &cqe->user_data, sizeof(cqe->user_data));
             req->length = cqe->res;
@@ -378,19 +369,19 @@ uint32_t IOUringSocket::submitCompleteAll(uint32_t events, vector<IOUringSocket:
 }
 //---------------------------------------------------------------------------
 void IOUringSocket::seen(io_uring_cqe* cqe)
-/// Mark a completion (cqe) event seen to allow for new completions in the kernel
+// Mark a completion (cqe) event seen to allow for new completions in the kernel
 {
     io_uring_cqe_seen(&_uring, cqe);
 }
 //---------------------------------------------------------------------------
 int32_t IOUringSocket::submit()
-/// Submit uring to the kernel and return the number of submitted entries
+// Submit uring to the kernel and return the number of submitted entries
 {
     return io_uring_submit(&_uring);
 }
 //---------------------------------------------------------------------------
 void IOUringSocket::wait()
-/// Waits for an cqe event in the uring
+// Waits for an cqe event in the uring
 {
     eventfd_t v;
     int ret = eventfd_read(_eventId, &v);
@@ -399,7 +390,7 @@ void IOUringSocket::wait()
 }
 //---------------------------------------------------------------------------
 bool IOUringSocket::checkTimeout(int fd, TCPSettings& tcpSettings)
-/// Check for a timeout
+// Check for a timeout
 {
     pollfd p = {fd, POLLIN, 0};
     int r = poll(&p, 1, tcpSettings.timeout / 100);
@@ -410,7 +401,7 @@ bool IOUringSocket::checkTimeout(int fd, TCPSettings& tcpSettings)
 }
 //---------------------------------------------------------------------------
 IOUringSocket::~IOUringSocket()
-/// The destructor
+// The destructor
 {
     io_uring_queue_exit(&_uring);
     close(_eventId);

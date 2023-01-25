@@ -2,6 +2,7 @@
 #include "cloud/aws_resolver.hpp"
 #include "cloud/aws_signer.hpp"
 #include "network/http_helper.hpp"
+#include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
 #include <chrono>
@@ -21,7 +22,7 @@ namespace cloud {
 using namespace std;
 //---------------------------------------------------------------------------
 static string buildAMZTimestamp()
-/// Creates the AWS timestamp
+// Creates the AWS timestamp
 {
     stringstream s;
     const auto t = chrono::system_clock::to_time_t(chrono::system_clock::now());
@@ -30,7 +31,7 @@ static string buildAMZTimestamp()
 }
 //---------------------------------------------------------------------------
 static int64_t convertIAMTimestamp(string awsTimestamp)
-/// Creates the AWS timestamp
+// Creates the AWS timestamp
 {
     istringstream s(awsTimestamp);
     tm t{};
@@ -39,7 +40,7 @@ static int64_t convertIAMTimestamp(string awsTimestamp)
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::downloadInstanceInfo(const string& info)
-/// Builds the info http request
+// Builds the info http request
 {
     string protocol = "http://";
     string httpHeader = "GET /latest/meta-data/" + info + " HTTP/1.1\r\nHost: ";
@@ -49,16 +50,16 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadInstanceInfo(const string& i
 }
 //---------------------------------------------------------------------------
 Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendReceiver)
-/// Uses the send receiver to get instance details
+// Uses the send receiver to get instance details
 {
     if (_type == Provider::CloudService::AWS) {
         auto message = downloadInstanceInfo();
         auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
         sendReceiver.send(originalMsg.get());
-        sendReceiver.sendReceive();
-        auto content = sendReceiver.receive(originalMsg.get());
+        sendReceiver.process();
+        auto& content = originalMsg->result.getDataVector();
         unique_ptr<network::HTTPHelper::Info> infoPtr;
-        auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+        auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
 
         for (auto& instance : AWSInstance::getInstanceDetails())
             if (!instance.type.compare(s))
@@ -71,20 +72,20 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendRece
 }
 //---------------------------------------------------------------------------
 string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
-/// Uses the send receiver to initialize the secret
+// Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo("placement/region");
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
     sendReceiver.send(originalMsg.get());
-    sendReceiver.sendReceive();
-    auto content = sendReceiver.receive(originalMsg.get());
+    sendReceiver.process();
+    auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+    auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
     return string(s);
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::downloadIAMUser() const
-/// Builds the secret http request
+// Builds the secret http request
 {
     string protocol = "http://";
     string httpHeader = "GET /latest/meta-data/iam/security-credentials HTTP/1.1\r\nHost: ";
@@ -94,7 +95,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadIAMUser() const
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content)
-/// Builds the secret http request
+// Builds the secret http request
 {
     auto pos = content.find("\n");
     string protocol = "http://";
@@ -113,7 +114,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content)
 }
 //---------------------------------------------------------------------------
 bool AWS::updateSecret(string_view content)
-/// Update secret
+// Update secret
 {
     string needle = "\"AccessKeyId\" : \"";
     auto pos = content.find(needle);
@@ -152,7 +153,7 @@ bool AWS::updateSecret(string_view content)
 }
 //---------------------------------------------------------------------------
 bool AWS::validKeys() const
-/// Checks whether keys need to be refresehd
+// Checks whether keys need to be refresehd
 {
     if (!_secret || ((!_secret->sessionToken.empty() && _secret->experiation - 60 < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _secret->secret.empty()))
         return false;
@@ -160,29 +161,29 @@ bool AWS::validKeys() const
 }
 //---------------------------------------------------------------------------
 void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
-/// Uses the send receiver to initialize the secret
+// Uses the send receiver to initialize the secret
 {
     if (_type == Provider::CloudService::AWS) {
         auto message = downloadIAMUser();
         auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
         sendReceiver.send(originalMsg.get());
-        sendReceiver.sendReceive();
-        auto content = sendReceiver.receive(originalMsg.get());
+        sendReceiver.process();
+        auto& content = originalMsg->result.getDataVector();
         unique_ptr<network::HTTPHelper::Info> infoPtr;
-        auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+        auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
         message = downloadSecret(s);
         originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
         sendReceiver.send(originalMsg.get());
-        sendReceiver.sendReceive();
-        content = sendReceiver.receive(originalMsg.get());
+        sendReceiver.process();
+        auto& secretContent = originalMsg->result.getDataVector();
         infoPtr.reset();
-        s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+        s = network::HTTPHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
         updateSecret(s);
     }
 }
 //---------------------------------------------------------------------------
 void AWS::initResolver(network::TaskedSendReceiver& sendReceiver)
-/// Inits the resolver
+// Inits the resolver
 {
     if (_type == Provider::CloudService::AWS) {
         sendReceiver.addResolver("amazonaws.com", unique_ptr<network::Resolver>(new cloud::AWSResolver(sendReceiver.getConcurrentRequests())));
@@ -190,7 +191,7 @@ void AWS::initResolver(network::TaskedSendReceiver& sendReceiver)
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
-/// Builds the http request for downloading a blob
+// Builds the http request for downloading a blob
 {
     if (!validKeys())
         return nullptr;
@@ -227,7 +228,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, const string_view object) const
-/// Builds the http request for putting objects without the object data itself
+// Builds the http request for putting objects without the object data itself
 {
     if (!validKeys())
         return nullptr;
@@ -261,13 +262,13 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, c
 }
 //---------------------------------------------------------------------------
 uint32_t AWS::getPort() const
-/// Gets the port of AWS S3 on http
+// Gets the port of AWS S3 on http
 {
     return _settings.port;
 }
 //---------------------------------------------------------------------------
 string AWS::getAddress() const
-/// Gets the address of AWS S3
+// Gets the address of AWS S3
 {
     if (!_settings.endpoint.empty())
         return _settings.endpoint;

@@ -3,10 +3,11 @@
 #include "cloud/aws_resolver.hpp"
 #include "cloud/azure.hpp"
 #include "cloud/gcp.hpp"
-#include "network/messages.hpp"
+#include "network/get_transaction.hpp"
+#include "network/original_message.hpp"
+#include "network/put_transaction.hpp"
 #include "network/s3_send_receiver.hpp"
 #include "network/tasked_send_receiver.hpp"
-#include "network/transaction.hpp"
 #include "perfevent/PerfEvent.hpp"
 #include "utils/timer.hpp"
 #include <fstream>
@@ -27,32 +28,30 @@ namespace benchmark {
 using namespace std;
 using namespace anyblob;
 //---------------------------------------------------------------------------
-void Bandwidth::run(const Settings& benchmarkSettings, cloud::Provider& cloudProvider)
-/// The bandwith benchmark
+void Bandwidth::run(const Settings& benchmarkSettings, const string& uri)
+// The bandwith benchmark
 {
     for (auto s : benchmarkSettings.systems) {
         switch (s) {
             case Systems::Uring:
-                runUring(benchmarkSettings, cloudProvider);
+                runUring(benchmarkSettings, uri);
                 break;
             case Systems::S3Crt:
-                runS3<network::S3CrtSendReceiver>(benchmarkSettings, cloudProvider);
+                runS3<network::S3CrtSendReceiver>(benchmarkSettings, uri);
                 break;
             case Systems::S3:
-                runS3<network::S3CurlSendReceiver>(benchmarkSettings, cloudProvider);
+                runS3<network::S3CurlSendReceiver>(benchmarkSettings, uri);
                 break;
         }
     }
 }
 //---------------------------------------------------------------------------
 template <typename S3SendReceiver>
-void Bandwidth::runS3(const Settings& benchmarkSettings, cloud::Provider& cloudProvider)
-/// The bandwith benchmark for S3 interface
+void Bandwidth::runS3(const Settings& benchmarkSettings, const string& uri)
+// The bandwith benchmark for S3 interface
 {
-    auto awsPtr = dynamic_cast<cloud::AWS*>(&cloudProvider);
-    auto settings = awsPtr->getSettings();
-
-    unique_ptr<S3SendReceiver> sendReceiver = make_unique<S3SendReceiver>(benchmarkSettings.requests << 1, benchmarkSettings.concurrentRequests, settings, benchmarkSettings.concurrentThreads, benchmarkSettings.https);
+    auto remoteInfo = anyblob::cloud::Provider::getRemoteInfo(uri);
+    unique_ptr<S3SendReceiver> sendReceiver = make_unique<S3SendReceiver>(benchmarkSettings.requests << 1, benchmarkSettings.concurrentRequests, remoteInfo.region, benchmarkSettings.concurrentThreads, benchmarkSettings.https);
 
     for (auto iteration = 0u; iteration < benchmarkSettings.iterations; iteration++) {
         future<void> asyncSendReceiverThread;
@@ -78,7 +77,7 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, cloud::Provider& cloudP
                 auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
 
                 auto req = typename S3SendReceiver::GetObjectRequest()
-                               .WithBucket(settings.bucket)
+                               .WithBucket(remoteInfo.bucket)
                                .WithKey(filePath);
                 req.SetResponseStreamFactory(streamFactory);
                 requestMessages.emplace_back(make_unique<typename S3SendReceiver::template GetObjectRequestCallbackMessage<decltype(callback)>>(callback, req));
@@ -88,7 +87,7 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, cloud::Provider& cloudP
                 auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
 
                 auto req = typename S3SendReceiver::GetObjectRequest()
-                               .WithBucket(settings.bucket)
+                               .WithBucket(remoteInfo.bucket)
                                .WithKey(filePath);
                 req.SetResponseStreamFactory(streamFactory);
                 requestMessages.emplace_back(make_unique<typename S3SendReceiver::template GetObjectRequestCallbackMessage<decltype(callback)>>(callback, req));
@@ -154,8 +153,8 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, cloud::Provider& cloudP
     }
 }
 //---------------------------------------------------------------------------
-void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& cloudProvider)
-/// The bandwith benchmark for uring interface
+void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
+// The bandwith benchmark for uring interface
 {
     network::TaskedSendReceiverGroup group(benchmarkSettings.concurrentRequests, benchmarkSettings.requests << 1, benchmarkSettings.chunkSize);
     vector<unique_ptr<network::TaskedSendReceiver>> sendReceivers;
@@ -165,18 +164,18 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
         sendReceivers.push_back(make_unique<network::TaskedSendReceiver>(group));
     }
 
-    if (cloudProvider.getType() == cloud::Provider::CloudService::AWS) {
-        auto awsProvider = static_cast<cloud::AWS*>(&cloudProvider);
-        awsProvider->initSecret(*sendReceivers.back());
+    string key = "";
+    if (!benchmarkSettings.rsaKeyFile.empty())
+        key = cloud::Provider::getKey(benchmarkSettings.rsaKeyFile);
+    auto cloudProvider = cloud::Provider::makeProvider(uri, benchmarkSettings.account, key, sendReceivers.back().get());
+
+    if (cloudProvider->getType() == cloud::Provider::CloudService::AWS) {
+        auto awsProvider = static_cast<cloud::AWS*>(cloudProvider.get());
         if (!benchmarkSettings.resolver.compare("aws")) {
             for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
                 awsProvider->initResolver(*sendReceivers[i].get());
             }
         }
-    } else if (cloudProvider.getType() == cloud::Provider::CloudService::GCP) {
-        auto gcpProvider = static_cast<cloud::GCP*>(&cloudProvider);
-    } else if (cloudProvider.getType() == cloud::Provider::CloudService::Azure) {
-        auto azureProvider = static_cast<cloud::Azure*>(&cloudProvider);
     }
 
     for (auto iteration = 0u; iteration < benchmarkSettings.iterations; iteration++) {
@@ -190,46 +189,31 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
         random_device dev;
         mt19937 rng(dev());
         uniform_int_distribution<mt19937::result_type> dist(1, benchmarkSettings.blobFiles);
-        vector<unique_ptr<network::OriginalMessage>> requestMessages;
         pair<uint64_t, uint64_t> range = {0, 0};
         atomic<uint64_t> finishedMessages = 0;
 
-        auto callback = [&finishedMessages, &sendReceivers](unique_ptr<utils::DataVector<uint8_t>> data) {
+        auto callback = [&finishedMessages, &sendReceivers](network::MessageResult& result) {
+            if (!result.success())
+                cerr << "Request was not successful!" << endl;
             finishedMessages++;
-            sendReceivers.back()->reuse(move(data));
+            sendReceivers.back()->reuse(result.moveDataVector());
         };
 
-        if (benchmarkSettings.blobFiles > benchmarkSettings.requests) {
-            for (auto i = 0u; i <= benchmarkSettings.requests; i++) {
-                auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
-                network::GetTransaction txn(filePath, range);
-                requestMessages.emplace_back(cloudProvider.getRequest(txn, callback));
+        network::GetTransaction getTxn(cloudProvider.get());
 
-                //auto httpHeader = string("GET /1GB.bin HTTP/1.1\r\n") + "Host: ip-172-31-7-174.eu-central-1.compute.internal" + "\r\n\r\n";
-                //auto message = make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
-                //requestMessages.emplace_back(make_unique<network::OriginalMessage>(move(message), "ip-172-31-7-174.eu-central-1.compute.internal", cloudProvider.getPort()));
+        if (benchmarkSettings.blobFiles > benchmarkSettings.requests) {
+            for (auto i = 0u; i < benchmarkSettings.requests; i++) {
+                auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
+                getTxn.addRequest(callback, filePath, range, nullptr, 0, i + 1);
             }
         } else {
-            for (auto i = 1u; i <= benchmarkSettings.blobFiles; i++) {
-                auto filePath = benchmarkSettings.filePath + to_string(i) + ".bin";
-                network::GetTransaction txn(filePath, range);
-                requestMessages.emplace_back(cloudProvider.getRequest(txn, callback));
-
-                //auto httpHeader = string("GET /1GB.bin HTTP/1.1\r\n") + "Host: ip-172-31-7-174.eu-central-1.compute.internal" + "\r\n\r\n";
-                //auto message = make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
-                //requestMessages.emplace_back(make_unique<network::OriginalMessage>(move(message), "ip-172-31-7-174.eu-central-1.compute.internal", cloudProvider.getPort()));
-            }
-            for (auto i = benchmarkSettings.blobFiles + 1; i <= benchmarkSettings.requests; i++) {
-                auto ptr = requestMessages[i % benchmarkSettings.blobFiles]->message.get();
-                requestMessages.emplace_back(make_unique<network::OriginalCallbackMessage<decltype(callback)>>(callback, make_unique<utils::DataVector<uint8_t>>(*ptr), cloudProvider.getAddress(), cloudProvider.getPort(), nullptr, 0, i - 1));
+            for (auto i = 0u; i < benchmarkSettings.requests; i++) {
+                auto filePath = benchmarkSettings.filePath + to_string((i % benchmarkSettings.blobFiles) + 1) + ".bin";
+                getTxn.addRequest(callback, filePath, range, nullptr, 0, i + 1);
             }
         }
 
-        for (auto i = 0u; i < requestMessages.size(); i++) {
-            if (!requestMessages[i].get())
-                abort();
-            sendReceivers.front()->send(requestMessages[i].get());
-        }
+        getTxn.processAsync(*sendReceivers.back());
 
         fstream s;
         unique_ptr<utils::Timer> timer;
@@ -254,13 +238,13 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
                 asyncSendReceiverThreads.push_back(async(launch::async, perfEventThread, i));
             }
 
-            while (finishedMessages != requestMessages.size())
+            while (finishedMessages != benchmarkSettings.requests)
                 usleep(100);
         }
 
         if (benchmarkSettings.testUpload) {
             finishedMessages = 0;
-            requestMessages.clear();
+            network::PutTransaction putTxn(cloudProvider.get());
             auto blob = make_unique<utils::DataVector<uint8_t>>(1 << 24);
             {
                 uint64_t requestPerSocket = static_cast<double>(benchmarkSettings.requests) / benchmarkSettings.concurrentThreads;
@@ -269,8 +253,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
                     auto end = (i + 1) * requestPerSocket;
                     for (uint64_t j = start; j < end; j++) {
                         auto filePath = "upload_" + benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
-                        network::PutTransaction txn(filePath, reinterpret_cast<const char*>(blob->data()), blob->size());
-                        requestMessages.emplace_back(cloudProvider.putRequest(txn, callback));
+                        putTxn.addRequest(callback, filePath, reinterpret_cast<const char*>(blob->data()), blob->size(), nullptr, 0, i + 1);
                     }
                 }
 
@@ -280,13 +263,9 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, cloud::Provider& clo
                     sendReceivers[i]->setTimings(nullptr);
                 }
 
-                for (auto i = 0u; i < requestMessages.size(); i++) {
-                    if (!requestMessages[i].get())
-                        abort();
-                    sendReceivers.front()->send(requestMessages[i].get());
-                }
+                putTxn.processAsync(*sendReceivers.back());
 
-                while (finishedMessages != requestMessages.size())
+                while (finishedMessages != requestPerSocket * benchmarkSettings.concurrentThreads)
                     usleep(100);
             }
         }

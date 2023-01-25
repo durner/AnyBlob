@@ -44,11 +44,11 @@ pair<string, string> AWSSigner::createCanonicalRequest(Request& request)
     requestStream << "\n";
 
     if (request.bodyLength <= (1 << 10)) {
-        /// Step 6, create sha256 payload string, earlier because of https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+        // Step 6, create sha256 payload string, earlier because of https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
         request.payloadHash = utils::sha256Encode(request.bodyData, request.bodyLength);
         request.headers.emplace("x-amz-content-sha256", request.payloadHash);
 
-        /// Step 6a, content-md5 for put
+        // Step 6a, content-md5 for put
         if ((request.method == "PUT" || request.method == "POST")) {
             auto md5 = utils::md5Encode(request.bodyData, request.bodyLength);
             auto encodedResult = utils::base64Encode(reinterpret_cast<unsigned char*>(md5.data()), MD5_DIGEST_LENGTH);
@@ -75,7 +75,7 @@ pair<string, string> AWSSigner::createCanonicalRequest(Request& request)
     }
     requestStream << "\n";
 
-    /// Step 5, create signed headers
+    // Step 5, create signed headers
     if (sorted.size()) {
         stringstream signedRequests;
         auto it = sorted.begin();
@@ -89,10 +89,10 @@ pair<string, string> AWSSigner::createCanonicalRequest(Request& request)
     }
     requestStream << "\n";
 
-    /// Step 6 continuing
+    // Step 6 continuing
     requestStream << request.payloadHash;
 
-    /// Step 7, create sha256 request string and return both the request and the sha256 request string
+    // Step 7, create sha256 request string and return both the request and the sha256 request string
     auto requestString = requestStream.str();
     return {requestString, utils::sha256Encode(reinterpret_cast<uint8_t*>(requestString.data()), requestString.length())};
 }

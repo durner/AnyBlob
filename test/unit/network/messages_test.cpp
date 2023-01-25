@@ -1,5 +1,5 @@
-#include "network/messages.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
+#include "network/original_message.hpp"
 #include "utils/data_vector.hpp"
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library

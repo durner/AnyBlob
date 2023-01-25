@@ -1,8 +1,8 @@
 #include "catch2/single_include/catch2/catch.hpp"
-#include "cloud/aws.hpp"
 #include "cloud/provider.hpp"
+#include "network/get_transaction.hpp"
+#include "network/put_transaction.hpp"
 #include "network/tasked_send_receiver.hpp"
-#include "network/transaction.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -11,6 +11,10 @@
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
+//
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+// If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+// SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
 namespace anyblob {
 namespace test {
@@ -31,7 +35,6 @@ TEST_CASE("MinIO Integration") {
     REQUIRE(key);
     REQUIRE(secret);
 
-
     // The file to be uploaded and downloaded
     string bucketName = "minio://";
     bucketName = bucketName + endpoint + "/" + bucket + ":" + region;
@@ -46,26 +49,43 @@ TEST_CASE("MinIO Integration") {
 
     // Create the provider for the corresponding filename
     auto provider = anyblob::cloud::Provider::makeProvider(bucketName, key, secret, &sendReceiver);
+    {
+        // Create the put request
+        anyblob::network::PutTransaction putTxn(provider.get());
+        putTxn.addRequest(fileName, content.data(), content.size());
 
-    // Create the put request
-    vector<unique_ptr<anyblob::network::Transaction>> requests;
-    requests.emplace_back(make_unique<anyblob::network::PutTransaction>(fileName, content.data(), content.size()));
+        // Upload the request synchronously with the scheduler object on this thread
+        putTxn.processSync(sendReceiver);
 
-    // Upload the request synchronously with the scheduler object on this thread
-    provider->uploadObjects(sendReceiver, requests);
+        // Check the upload
+        for (const auto& it : putTxn) {
+            // Sucessful request
+            REQUIRE(it.success());
+        }
+    }
+    {
+        // Create the get request
+        anyblob::network::GetTransaction getTxn(provider.get());
+        getTxn.addRequest(fileName);
 
-    // Create the get request
-    requests.clear();
-    requests.emplace_back(make_unique<anyblob::network::GetTransaction>(fileName));
+        // Retrieve the request synchronously with the scheduler object on this thread
+        getTxn.processSync(sendReceiver);
 
-    // Retrieve the request synchronously with the scheduler object on this thread
-    provider->retrieveObjects(sendReceiver, requests);
+        // Get and print the result
+        for (const auto& it : getTxn) {
+            // Sucessful request
+            REQUIRE(it.success());
+            // Simple string_view interface
+            REQUIRE(!content.compare(it.getResult()));
 
-    // Get and print the result, note that the data lies in the data buffer but after the offset to skip the HTTP header
-    // Note that the size is already without the header, so the full request has size + offset length
-    auto& request = requests.front();
-    string_view dataString(reinterpret_cast<char*>(request->data.get()) + request->offset, request->size);
-    REQUIRE(!content.compare(dataString));
+            // Advanced raw interface
+            // Note that the data lies in the data buffer but after the offset to skip the HTTP header
+            // Note that the size is already without the header, so the full request has size + offset length
+            string_view rawDataString(reinterpret_cast<const char*>(it.getData()) + it.getOffset(), it.getSize());
+            REQUIRE(!content.compare(rawDataString));
+            REQUIRE(!rawDataString.compare(it.getResult()));
+        }
+    }
 }
 //---------------------------------------------------------------------------
 } // namespace test

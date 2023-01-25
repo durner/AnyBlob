@@ -1,6 +1,8 @@
 #include "catch2/single_include/catch2/catch.hpp"
+#include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "perfevent/PerfEvent.hpp"
+#include "utils/data_vector.hpp"
 #include <future>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -33,17 +35,28 @@ TEST_CASE("send_receiver") {
         group.send(msgs.back().get());
     }
 
-    group.sendReceive(true);
+    group.process(true);
 
-    unique_ptr<utils::DataVector<uint8_t>> currentMessage;
+    unique_ptr<uint8_t[]> currentMessage;
+    size_t size;
     for (auto i = 0; i < concurrency; i++) {
-        auto message = group.receive(msgs[i].get());
-        if (i > 0) {
-            // skip header
-            auto skip = 1024;
-            REQUIRE(!strncmp(reinterpret_cast<char*>(currentMessage->data()) + skip, reinterpret_cast<char*>(message->data()) + skip, currentMessage->size() - skip));
+        auto& original = msgs[i];
+        switch (original->result.getState()) {
+            case MessageState::Finished: {
+                auto& message = original->result;
+                if (i > 0) {
+                    // skip header
+                    auto skip = 1024;
+                    REQUIRE(!strncmp(reinterpret_cast<char*>(currentMessage.get()) + skip, reinterpret_cast<char*>(message.getData()) + skip, size - skip));
+                }
+                currentMessage = message.moveData();
+                size = message.getOffset() + message.getSize();
+                ++i;
+                break;
+            }
+            default:
+                REQUIRE(original->result.getState() != MessageState::Aborted);
         }
-        currentMessage = move(message);
     }
 }
 //---------------------------------------------------------------------------

@@ -27,7 +27,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
     // canonicalize request method
     requestStream << request.method << "\n";
 
-    /// Set the version
+    // Set the version
     request.headers.emplace("x-ms-version", "2015-02-21");
 
     auto it = request.headers.find("Content-Encoding");
@@ -129,7 +129,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
         }
     }
 
-    /// create sha256 request string
+    // create sha256 request string
     auto requestString = requestStream.str();
 
     auto signature = utils::hmacSign(decodedKey.first.get(), decodedKey.second, reinterpret_cast<uint8_t*>(requestString.data()), requestString.size());

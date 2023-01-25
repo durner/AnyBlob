@@ -95,7 +95,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
     requestStream << request.signedHeaders << "\n";
     requestStream << "UNSIGNED-PAYLOAD";
 
-    /// create sha256 request string and return both the request and the sha256 request string
+    // create sha256 request string and return both the request and the sha256 request string
     auto requestString = requestStream.str();
     auto requestHash = utils::sha256Encode(reinterpret_cast<uint8_t*>(requestString.data()), requestString.length());
 

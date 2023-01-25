@@ -1,16 +1,14 @@
 #pragma once
 #include "network/io_uring_socket.hpp"
-#include "network/messages.hpp"
-#include "utils/data_vector.hpp"
+#include "network/message_task.hpp"
 #include "utils/ring_buffer.hpp"
-#include "utils/timer.hpp"
-#include "utils/unordered_map.hpp"
 #include <atomic>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <queue>
 #include <span>
-#include <unordered_map>
+#include <vector>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -20,17 +18,24 @@
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
 namespace anyblob {
+namespace utils {
+//---------------------------------------------------------------------------
+template <typename T>
+class DataVector;
+struct TimingHelper;
+} // namespace utils
+//---------------------------------------------------------------------------
 namespace network {
 //---------------------------------------------------------------------------
 class TaskedSendReceiver;
 class TaskSendReceiverHandle;
+class Resolver;
+struct OriginalMessage;
 //---------------------------------------------------------------------------
 /// Shared submission and completions queue with multiple TaskedSendReceivers
 class TaskedSendReceiverGroup {
     /// The global submission ringbuffer
     utils::RingBuffer<network::OriginalMessage*> _submissions;
-    /// The global completion map
-    utils::UnorderedMap<uintptr_t, std::unique_ptr<utils::DataVector<uint8_t>>> _completions;
     /// Reuse elements
     utils::RingBuffer<utils::DataVector<uint8_t>*> _reuse;
 
@@ -54,7 +59,7 @@ class TaskedSendReceiverGroup {
 
     public:
     /// Initializes the global submissions and completions
-    TaskedSendReceiverGroup(uint64_t concurrentRequests, uint64_t submissions, uint64_t chunkSize = 64u * 1024, uint64_t completions = 0, uint64_t reuse = 0);
+    TaskedSendReceiverGroup(uint64_t concurrentRequests, uint64_t submissions, uint64_t chunkSize = 64u * 1024, uint64_t reuse = 0);
     /// Destructor
     ~TaskedSendReceiverGroup();
 
@@ -62,12 +67,10 @@ class TaskedSendReceiverGroup {
     bool send(OriginalMessage* msg);
     /// Adds a span of message to the submission queue
     bool send(std::span<OriginalMessage*> msgs);
-    /// Receive a message
-    std::unique_ptr<utils::DataVector<uint8_t>> receive(OriginalMessage* msg, bool async = true);
     /// Gets a tasked send receiver deamon
     TaskSendReceiverHandle getHandle();
-    /// Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
-    void sendReceive(bool oneQueueInvocation = true);
+    /// Submits group queue and waits for result
+    void process(bool oneQueueInvocation = true);
 
     friend TaskedSendReceiver;
     friend TaskSendReceiverHandle;
@@ -79,6 +82,8 @@ class TaskedSendReceiver {
     private:
     /// The shared group
     TaskedSendReceiverGroup& _group;
+    /// The local message group
+    std::queue<OriginalMessage*> _submissions;
 
     /// Implicitly handle the unused send receivers
     std::atomic<TaskedSendReceiver*> _next;
@@ -99,18 +104,18 @@ class TaskedSendReceiver {
     /// Get the group
     const TaskedSendReceiverGroup* getGroup() const { return &_group; }
 
-    /// Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
-    void sendReceive(bool oneQueueInvocation = true);
+    /// Adds a resolver
+    void addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver);
+
     /// Adds a message to the submission queue
     bool send(OriginalMessage* msg);
+    /// Adds a message to the submission queue
+    void sendSync(OriginalMessage* msg);
 
-    /// Receives the messages and blocks until it is received
-    std::unique_ptr<utils::DataVector<uint8_t>> receive(OriginalMessage* msg);
-    /// Receives the messages if available else nullptr
-    std::unique_ptr<utils::DataVector<uint8_t>> receiveAsync(OriginalMessage* msg);
-
-    /// Reuse memory of old message
-    void reuse(std::unique_ptr<utils::DataVector<uint8_t>> message);
+    /// Process group submissions (should be used for async requests)
+    inline void process(bool oneQueueInvocation = true) { sendReceive(false, oneQueueInvocation); }
+    /// Process local submissions (should be used for sync requests)
+    inline void processSync(bool oneQueueInvocation = true) { sendReceive(true, oneQueueInvocation); }
 
     /// Runs the deamon
     void run();
@@ -131,12 +136,13 @@ class TaskedSendReceiver {
     void setTimings(std::vector<utils::TimingHelper>* timings) {
         _timings = timings;
     }
+    /// Reuse memory of old message
+    void reuse(std::unique_ptr<utils::DataVector<uint8_t>> message);
     /// Adds a resolver
-    void addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver) {
-        _socketWrapper->addResolver(hostname, move(resolver));
-    }
 
     private:
+    /// Submits queue and waits for result
+    void sendReceive(bool local = false, bool oneQueueInvocation = true);
     /// Connect to the socket return fd
     int32_t connect(std::string hostname, uint32_t port);
     /// Submits the queue
@@ -163,7 +169,7 @@ class TaskSendReceiverHandle {
     /// Delete copy assignment
     TaskSendReceiverHandle& operator=(TaskSendReceiverHandle& other) = delete;
 
-    /// Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
+    /// Submits queue and waits for result
     bool sendReceive(bool oneQueueInvocation = true);
 
     public:

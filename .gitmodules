@@ -6,5 +6,5 @@
     url = https://github.com/catchorg/Catch2
     branch = v2.13.10
 [submodule "example/benchmark/thirdparty/perfevent"]
-	path = example/benchmark/thirdparty/perfevent
-	url = https://github.com/viktorleis/perfevent
+    path = example/benchmark/thirdparty/perfevent
+    url = https://github.com/viktorleis/perfevent

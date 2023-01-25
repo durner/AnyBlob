@@ -19,6 +19,10 @@ class TaskedSendReceiver;
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------
+namespace test {
+class AWSTester;
+}; // namespace test
+//---------------------------------------------------------------------------
 /// Implements the AWS S3 logic
 class AWS : public Provider {
     public:
@@ -62,14 +66,10 @@ class AWS : public Provider {
     public:
     /// Get instance details
     Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
-    /// Builds the info http request
-    static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "instance-type");
     /// Get the region of the instance
     static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
-    /// Get the IAM address
-    static constexpr const char* getIAMAddress() { return "169.254.169.254"; }
-    /// Get the port of the IAM server
-    static constexpr uint32_t getIAMPort() { return 80; }
+    /// Init the resolver
+    void initResolver(network::TaskedSendReceiver& sendReceiver) override;
 
     /// The constructor
     explicit AWS(const RemoteInfo& info) : _settings({info.bucket, info.region, info.endpoint, info.port}) {
@@ -82,6 +82,8 @@ class AWS : public Provider {
         _secret->keyId = keyId;
         _secret->secret = key;
     }
+
+    private:
     /// Initialize secret
     void initSecret(network::TaskedSendReceiver& sendReceiver) override;
     /// Builds the secret http request
@@ -94,8 +96,6 @@ class AWS : public Provider {
     bool validKeys() const;
     /// Get the settings
     Settings getSettings() { return _settings; }
-    /// Init the resolver
-    void initResolver(network::TaskedSendReceiver& sendReceiver) override;
 
     /// Builds the http request for downloading a blob or listing the directory
     std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
@@ -106,6 +106,16 @@ class AWS : public Provider {
     std::string getAddress() const override;
     /// Get the port of the server
     uint32_t getPort() const override;
+
+    /// Builds the info http request
+    static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "instance-type");
+    /// Get the IAM address
+    static constexpr const char* getIAMAddress() { return "169.254.169.254"; }
+    /// Get the port of the IAM server
+    static constexpr uint32_t getIAMPort() { return 80; }
+
+    friend Provider;
+    friend test::AWSTester;
 };
 //---------------------------------------------------------------------------
 } // namespace cloud
