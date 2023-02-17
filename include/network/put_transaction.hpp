@@ -24,7 +24,7 @@ class PutTransaction : public Transaction {
     explicit PutTransaction(const cloud::Provider* provider) : Transaction(provider) {}
 
     /// Build a new put request for synchronous calls
-    void addRequest(const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+    inline void addRequest(const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(provider);
         auto object = std::string_view(data, size);
         auto originalMsg = std::make_unique<network::OriginalMessage>(provider->putRequest(remotePath, object), provider->getAddress(), provider->getPort(), result, capacity, traceId);
@@ -34,7 +34,7 @@ class PutTransaction : public Transaction {
 
     /// Build a new put request with callback
     template <typename Callback>
-    void addRequest(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+    inline void addRequest(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(provider);
         auto object = std::string_view(data, size);
         auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback&&>(callback), provider->putRequest(remotePath, object), provider->getAddress(), provider->getPort(), result, capacity, traceId);

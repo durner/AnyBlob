@@ -46,7 +46,7 @@ class GCPSigner {
     };
 
     /// Builds the signed url
-    static std::string createSignedRequest(const std::string& serviceAccountEmail, const std::string& privateRSA, Request& request, const StringToSign& stringToSign);
+    [[nodiscard]] static std::string createSignedRequest(const std::string& serviceAccountEmail, const std::string& privateRSA, Request& request, const StringToSign& stringToSign);
 };
 //---------------------------------------------------------------------------
 }; // namespace cloud

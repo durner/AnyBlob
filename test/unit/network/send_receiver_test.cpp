@@ -12,6 +12,12 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
+#ifndef NDEBUG
+#define verify(expression) assert(expression)
+#else
+#define verify(expression) ((void)(expression))
+#endif
+//---------------------------------------------------------------------------
 namespace anyblob {
 namespace network {
 namespace test {
@@ -32,7 +38,7 @@ TEST_CASE("send_receiver") {
         memcpy(message->data(), str.data(), str.length());
         message->resize(str.length());
         msgs.emplace_back(new OriginalMessage{move(message), "db.cs.tum.edu", 80});
-        group.send(msgs.back().get());
+        verify(group.send(msgs.back().get()));
     }
 
     group.process(true);

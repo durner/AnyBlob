@@ -50,13 +50,13 @@ class AWSSigner {
     };
 
     /// Creates the canonical request from the input
-    static std::pair<std::string, std::string> createCanonicalRequest(Request& request);
+    [[nodiscard]] static std::pair<std::string, std::string> createCanonicalRequest(Request& request);
     /// Calculates the signature
-    static std::string createSignedRequest(const std::string& keyId, const std::string& secret, const StringToSign& stringToSign);
+    [[nodiscard]] static std::string createSignedRequest(const std::string& keyId, const std::string& secret, const StringToSign& stringToSign);
 
     private:
     /// Creates the string to sogn
-    static std::string createStringToSign(const StringToSign& stringToSign);
+    [[nodiscard]] static std::string createStringToSign(const StringToSign& stringToSign);
 };
 //---------------------------------------------------------------------------
 }; // namespace cloud

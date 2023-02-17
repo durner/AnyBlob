@@ -46,13 +46,13 @@ class HTTPHelper {
 
     private:
     /// Detect the protocol
-    static Info detect(const std::string_view s);
+    [[nodiscard]] static Info detect(const std::string_view s);
 
     public:
     /// Retrieve the content without http meta info, note that this changes data
-    static std::string_view retrieveContent(const uint8_t* data, uint64_t length, std::unique_ptr<Info>& info);
+    [[nodiscard]] static std::string_view retrieveContent(const uint8_t* data, uint64_t length, std::unique_ptr<Info>& info);
     /// Detect end / content
-    static bool finished(const uint8_t* data, uint64_t length, std::unique_ptr<Info>& info);
+    [[nodiscard]] static bool finished(const uint8_t* data, uint64_t length, std::unique_ptr<Info>& info);
 };
 //---------------------------------------------------------------------------
 } // namespace network

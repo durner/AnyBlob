@@ -16,6 +16,12 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
+#ifndef NDEBUG
+#define verify(expression) assert(expression)
+#else
+#define verify(expression) ((void)(expression))
+#endif
+//---------------------------------------------------------------------------
 namespace anyblob {
 namespace network {
 //---------------------------------------------------------------------------
@@ -166,7 +172,7 @@ void TaskedSendReceiver::sendSync(OriginalMessage* msg)
 void TaskedSendReceiver::reuse(unique_ptr<utils::DataVector<uint8_t>> message)
 // Reuse message
 {
-    _group._reuse.insert(message.release());
+    verify(_group._reuse.insert(message.release()));
 }
 //--------------------------------------------------------------------------
 void TaskedSendReceiver::addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver)

@@ -71,13 +71,13 @@ class Provider {
     protected:
     CloudService _type;
     /// Builds the http request for downloading a blob or listing a directory
-    virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const = 0;
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const = 0;
     /// Builds the http request for putting an object without the actual data (header only according to the data and length provided)
-    virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const = 0;
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const = 0;
     /// Get the address of the server
-    virtual std::string getAddress() const = 0;
+    [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
-    virtual uint32_t getPort() const = 0;
+    [[nodiscard]] virtual uint32_t getPort() const = 0;
     /// Initialize secret
     virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}
 
@@ -85,23 +85,23 @@ class Provider {
     /// The destructor
     virtual ~Provider() = default;
     /// Gets the cloud provider type
-    CloudService getType() { return _type; }
+    [[nodiscard]] CloudService getType() { return _type; }
     /// Is it a remote file?
-    static bool isRemoteFile(const std::string_view fileName) noexcept;
+    [[nodiscard]] static bool isRemoteFile(const std::string_view fileName) noexcept;
     /// Get the path of the parent dir without the remote info
-    static std::string getRemoteParentDirectory(std::string fileName) noexcept;
+    [[nodiscard]] static std::string getRemoteParentDirectory(std::string fileName) noexcept;
     /// Get a region and bucket name
-    static Provider::RemoteInfo getRemoteInfo(const std::string& fileName);
+    [[nodiscard]] static Provider::RemoteInfo getRemoteInfo(const std::string& fileName);
     /// Get the key from a keyFile
-    static std::string getKey(const std::string& keyFile);
+    [[nodiscard]] static std::string getKey(const std::string& keyFile);
 
     /// Create a provider (keyId is access email for GCP/Azure)
-    static std::unique_ptr<Provider> makeProvider(const std::string& filepath, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
+    [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
 
     /// Init the resolver for specific provider
     virtual void initResolver(network::TaskedSendReceiver& /*sendReceiver*/) {}
     /// Get the instance infos
-    virtual Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) = 0;
+    [[nodiscard]] virtual Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) = 0;
 
     friend network::Transaction;
     friend network::GetTransaction;

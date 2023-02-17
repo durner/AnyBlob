@@ -45,7 +45,7 @@ class Transaction {
 
     public:
     /// Set the provider
-    inline void setProvider(const cloud::Provider* provider) { this->provider = provider; }
+    constexpr void setProvider(const cloud::Provider* provider) { this->provider = provider; }
     /// Sends the request messages to the task group
     void processAsync(TaskedSendReceiver& sendReceiver);
     /// Processes the request messages
@@ -57,14 +57,14 @@ class Transaction {
     using const_iterator = ConstIterator;
 
     /// The begin it
-    iterator begin();
+    inline iterator begin() { return iterator(messages.begin()); }
     /// The end it
-    iterator end();
+    inline iterator end() { return iterator(messages.end()); }
 
     /// The begin it
-    const_iterator cbegin() const;
+    inline const_iterator cbegin() const { return const_iterator(messages.cbegin()); }
     /// The end it
-    const_iterator cend() const;
+    inline const_iterator cend() const { return const_iterator(messages.cend()); }
 
     /// The iterator
     class Iterator {
@@ -84,9 +84,9 @@ class Transaction {
         message_vector_type::iterator it;
 
         /// Constructor with iterator
-        Iterator(const message_vector_type::iterator& it);
+        constexpr Iterator(const message_vector_type::iterator& it) { this->it = it; };
         /// Copy constructor
-        Iterator(const Iterator& it);
+        constexpr Iterator(const Iterator& it) { this->it = it.it; }
         /// Delete default constructor
         Iterator() = delete;
 
@@ -97,12 +97,19 @@ class Transaction {
         pointer operator->() const;
 
         /// Inc
-        Iterator& operator++();
+        inline Iterator& operator++() {
+            ++it;
+            return *this;
+        }
         /// Post-inc
-        Iterator operator++(int);
+        inline Iterator operator++(int) {
+            Iterator prv(*this);
+            operator++();
+            return prv;
+        }
 
         /// Equality
-        bool operator==(const Iterator& other) const;
+        constexpr bool operator==(const Iterator& other) const { return it == other.it; }
 
         friend Transaction;
     };
@@ -125,9 +132,9 @@ class Transaction {
         message_vector_type::const_iterator it;
 
         /// Constructor with iterator
-        ConstIterator(const message_vector_type::const_iterator& it);
+        constexpr ConstIterator(const message_vector_type::const_iterator& it) { this->it = it; }
         /// Copy constructor
-        ConstIterator(const ConstIterator& it);
+        constexpr ConstIterator(const ConstIterator& it) { this->it = it.it; }
         /// Delete default constructor
         ConstIterator() = delete;
 
@@ -138,12 +145,19 @@ class Transaction {
         pointer operator->() const;
 
         /// Inc
-        ConstIterator& operator++();
+        inline ConstIterator& operator++() {
+            ++it;
+            return *this;
+        }
         /// Post-inc
-        ConstIterator operator++(int);
+        inline ConstIterator operator++(int) {
+            ConstIterator prv(*this);
+            operator++();
+            return prv;
+        }
 
         /// Equality
-        bool operator==(const ConstIterator& other) const;
+        constexpr bool operator==(const ConstIterator& other) const { return it == other.it; }
 
         friend Transaction;
     };

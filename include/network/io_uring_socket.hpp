@@ -101,7 +101,7 @@ class IOUringSocket {
     ~IOUringSocket();
 
     /// Creates a new socket connection
-    int32_t connect(std::string hostname, uint32_t port, TCPSettings& tcpSettings, int retryLimit = 16);
+    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port, TCPSettings& tcpSettings, int retryLimit = 16);
     /// Disconnects the socket
     void disconnect(int32_t fd, std::string hostname = "", uint32_t port = 0, TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
 
@@ -116,11 +116,11 @@ class IOUringSocket {
     /// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests
     uint32_t submitCompleteAll(uint32_t events, std::vector<IOUringSocket::Request*>& completions);
     /// Get a completion (cqe) event and mark it as seen; return the SQE attached Request
-    Request* complete();
+    [[nodiscard]] Request* complete();
     /// Get a completion (cqe) event if it is available and mark it as seen; return the SQE attached Request if available else nullptr
     Request* peek();
     /// Get a completion (cqe) event
-    io_uring_cqe* completion();
+    [[nodiscard]] io_uring_cqe* completion();
     /// Mark a completion (cqe) event seen to allow for new completions in the kernel
     void seen(io_uring_cqe* cqe);
     /// Wait for a new cqe event arriving

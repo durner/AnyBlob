@@ -53,9 +53,9 @@ class GCP : public Provider {
 
     public:
     /// Get instance details
-    Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
+    [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
     /// Get the region of the instance
-    static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
+    [[nodiscard]] static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
 
     /// The constructor
     GCP(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket, info.region}) {
@@ -68,26 +68,26 @@ class GCP : public Provider {
 
     private:
     /// Get the settings
-    Settings getSettings() { return _settings; }
+    [[nodiscard]] inline Settings getSettings() { return _settings; }
 
     /// Builds the http request for downloading a blob or listing the directory
-    std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
-    std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override;
 
     /// Get the address of the server
-    std::string getAddress() const override;
+    [[nodiscard]] std::string getAddress() const override;
     /// Get the port of the server
-    uint32_t getPort() const override;
+    [[nodiscard]] uint32_t getPort() const override;
 
     /// Builds the info http request
-    static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "machine-type");
+    [[nodiscard]] static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "machine-type");
     /// Get the IAM address
-    static constexpr const char* getIAMAddress() {
+    [[nodiscard]] static constexpr const char* getIAMAddress() {
         return "169.254.169.254";
     }
     /// Get the port of the IAM server
-    static constexpr uint32_t getIAMPort() {
+    [[nodiscard]] static constexpr uint32_t getIAMPort() {
         return 80;
     }
 
