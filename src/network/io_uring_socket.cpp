@@ -219,7 +219,7 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
         pollEvent.events = POLLIN | POLLOUT;
 
         // connection check
-        auto t = poll(&pollEvent, 1, tcpSettings.timeout);
+        auto t = poll(&pollEvent, 1, tcpSettings.timeout / 1000);
         if (t == 1) {
             int socketError;
             socklen_t socketErrorLen = sizeof(socketError);
@@ -390,9 +390,10 @@ bool IOUringSocket::checkTimeout(int fd, TCPSettings& tcpSettings)
 // Check for a timeout
 {
     pollfd p = {fd, POLLIN, 0};
-    int r = poll(&p, 1, tcpSettings.timeout / 100);
+    int r = poll(&p, 1, tcpSettings.timeout / 1000);
     if (r == 0) {
         shutdown(fd, SHUT_RDWR);
+        return true;
     }
     return false;
 }

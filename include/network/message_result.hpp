@@ -22,16 +22,37 @@ namespace network {
 //---------------------------------------------------------------------------
 struct OriginalMessage;
 struct HTTPMessage;
+struct HTTPSMessage;
+class TLSConnection;
 //---------------------------------------------------------------------------
 /// Current status of the message
 enum class MessageState : uint8_t {
     Init,
+    TLSHandshake,
     InitSending,
     Sending,
     InitReceiving,
     Receiving,
     Finished,
     Aborted
+};
+//---------------------------------------------------------------------------
+/// The failure codes
+enum class MessageFailureCode : uint16_t {
+    /// Socket creation error
+    Socket = 1,
+    /// Empty request error
+    Empty = 1 << 1,
+    /// Timeout passed
+    Timeout = 1 << 2,
+    /// Send syscall error
+    Send = 1 << 3,
+    /// Recv syscall error
+    Recv = 1 << 4,
+    /// HTTP header error
+    HTTP = 1 << 5,
+    /// TLS error
+    TLS = 1 << 6
 };
 //---------------------------------------------------------------------------
 /// The result class
@@ -43,6 +64,8 @@ class MessageResult {
     uint64_t size;
     /// The offset of the result; the start after the message header
     uint64_t offset;
+    /// The failure code
+    uint16_t failureCode;
     /// The state
     std::atomic<MessageState> state;
 
@@ -70,6 +93,8 @@ class MessageResult {
     [[nodiscard]] uint64_t getOffset() const;
     /// Get the state
     [[nodiscard]] MessageState getState() const;
+    /// Get the original message
+    [[nodiscard]] uint16_t getFailureCode() const;
     /// Is the data owned by this object
     [[nodiscard]] bool owned() const;
     /// Was the request successful
@@ -82,7 +107,9 @@ class MessageResult {
 
     /// Define the friend message and message tasks
     friend HTTPMessage;
+    friend HTTPSMessage;
     friend OriginalMessage;
+    friend TLSConnection;
 };
 //---------------------------------------------------------------------------
 } // namespace network

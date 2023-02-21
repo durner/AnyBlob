@@ -67,7 +67,7 @@ class GCPTester {
         key += "062k0eITND4bsnYSsiUliWODaittHronyQ3OFNIkjEgbmA7+ulh+Bw==\n";
         key += "-----END RSA PRIVATE KEY-----\n";
 
-        auto provider = Provider::makeProvider("gcp://test:test/", "test@test.com", key);
+        auto provider = Provider::makeProvider("gcp://test:test/", false, "test@test.com", key);
         GCP& gcp = *static_cast<GCP*>(provider.get());
         REQUIRE(!strcmp(gcp.getIAMAddress(), "169.254.169.254"));
         REQUIRE(gcp.getIAMPort() == 80);

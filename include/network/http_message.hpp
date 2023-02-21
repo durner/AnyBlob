@@ -1,4 +1,6 @@
+#pragma once
 #include "network/message_task.hpp"
+#include <memory>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -10,12 +12,25 @@
 namespace anyblob {
 namespace network {
 //---------------------------------------------------------------------------
-using namespace std;
-//---------------------------------------------------------------------------
-MessageTask::MessageTask(OriginalMessage* message) : originalMessage(message), sendBufferOffset(0), receiveBufferOffset(0), failures(0)
-// The constructor
-{
-}
+/// Implements a http message roundtrip
+struct HTTPMessage : public MessageTask {
+    /// The receive chunk size
+    uint64_t chunkSize;
+    /// The tcp settings
+    IOUringSocket::TCPSettings tcpSettings;
+    /// HTTP info header
+    std::unique_ptr<HTTPHelper::Info> info;
+
+    /// The message excecute callback
+    MessageState execute(IOUringSocket& socket) override;
+    /// The destructor
+    ~HTTPMessage() override = default;
+    /// Reset for restart
+    void reset(IOUringSocket& socket, bool aborted);
+
+    /// The constructor
+    HTTPMessage(OriginalMessage* sendingMessage, uint64_t chunkSize);
+};
 //---------------------------------------------------------------------------
 } // namespace network
 } // namespace anyblob

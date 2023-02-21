@@ -52,6 +52,9 @@ class TaskedSendReceiverGroup {
     /// The queue maximum for each TaskedSendReceiver
     uint64_t _concurrentRequests;
 
+    /// The tls context
+    std::unique_ptr<TLSContext> context;
+
     /// Condition variable to stop wasting wait cycles
     std::condition_variable _cv;
     /// Mutex for condition variable

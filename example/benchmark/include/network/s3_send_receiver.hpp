@@ -127,8 +127,8 @@ class S3SendReceiver {
     }
 
     /// Adds a message to the submission queue
-    void send(GetObjectRequestMessage* msg) {
-        _submissions.insert(msg);
+    bool send(GetObjectRequestMessage* msg) {
+        return _submissions.insert(msg);
     }
 
     /// Receives the messages and blocks until it is received

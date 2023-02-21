@@ -135,7 +135,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::putRequest(const string& filePath, c
 uint32_t GCP::getPort() const
 // Gets the port of GCP on http
 {
-    return 80;
+    return _settings.port;
 }
 //---------------------------------------------------------------------------
 string GCP::getAddress() const

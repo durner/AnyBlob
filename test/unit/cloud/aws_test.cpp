@@ -26,7 +26,7 @@ class AWSTester {
     void test() {
         Provider::testEnviornment = true;
 
-        auto provider = Provider::makeProvider("s3://test:test/", "test", "test");
+        auto provider = Provider::makeProvider("s3://test:test/", false, "test", "test");
         AWS& aws = *static_cast<AWS*>(provider.get());
         REQUIRE(!strcmp(aws.getIAMAddress(), "169.254.169.254"));
         REQUIRE(aws.getIAMPort() == 80);

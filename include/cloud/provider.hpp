@@ -96,7 +96,7 @@ class Provider {
     [[nodiscard]] static std::string getKey(const std::string& keyFile);
 
     /// Create a provider (keyId is access email for GCP/Azure)
-    [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
+    [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = true, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
 
     /// Init the resolver for specific provider
     virtual void initResolver(network::TaskedSendReceiver& /*sendReceiver*/) {}

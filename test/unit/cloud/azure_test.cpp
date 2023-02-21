@@ -27,7 +27,7 @@ class AzureTester {
     void test() {
         Provider::testEnviornment = true;
 
-        auto provider = Provider::makeProvider("azure://test/", "test", "");
+        auto provider = Provider::makeProvider("azure://test/", false, "test", "");
         Azure& azure = *static_cast<Azure*>(provider.get());
         REQUIRE(!strcmp(azure.getIAMAddress(), "169.254.169.254"));
         REQUIRE(azure.getIAMPort() == 80);

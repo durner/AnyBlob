@@ -167,7 +167,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
     string key = "";
     if (!benchmarkSettings.rsaKeyFile.empty())
         key = cloud::Provider::getKey(benchmarkSettings.rsaKeyFile);
-    auto cloudProvider = cloud::Provider::makeProvider(uri, benchmarkSettings.account, key, sendReceivers.back().get());
+    auto cloudProvider = cloud::Provider::makeProvider(uri, benchmarkSettings.https, benchmarkSettings.account, key, sendReceivers.back().get());
 
     if (cloudProvider->getType() == cloud::Provider::CloudService::AWS) {
         auto awsProvider = static_cast<cloud::AWS*>(cloudProvider.get());
@@ -180,6 +180,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
 
     for (auto iteration = 0u; iteration < benchmarkSettings.iterations; iteration++) {
         vector<future<void>> asyncSendReceiverThreads;
+        vector<future<void>> requestCreatorThreads;
         vector<utils::TimingHelper> timings;
         timings.resize(benchmarkSettings.requests);
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
@@ -194,26 +195,45 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
 
         auto callback = [&finishedMessages, &sendReceivers](network::MessageResult& result) {
             if (!result.success())
-                cerr << "Request was not successful!" << endl;
+                cerr << "Request was not successful: " << result.getFailureCode() << endl;
             finishedMessages++;
             sendReceivers.back()->reuse(result.moveDataVector());
         };
 
-        network::GetTransaction getTxn(cloudProvider.get());
+        network::GetTransaction getTxn[benchmarkSettings.concurrentThreads];
+
+        for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
+            getTxn[i].setProvider(cloudProvider.get());
 
         if (benchmarkSettings.blobFiles > benchmarkSettings.requests) {
             for (auto i = 0u; i < benchmarkSettings.requests; i++) {
                 auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
-                getTxn.addRequest(callback, filePath, range, nullptr, 0, i + 1);
+                getTxn[0].addRequest(callback, filePath, range, nullptr, 0, i + 1);
             }
         } else {
-            for (auto i = 0u; i < benchmarkSettings.requests; i++) {
-                auto filePath = benchmarkSettings.filePath + to_string((i % benchmarkSettings.blobFiles) + 1) + ".bin";
-                getTxn.addRequest(callback, filePath, range, nullptr, 0, i + 1);
+            auto createRequests = [&](uint64_t start, uint64_t end, uint64_t threadId) {
+                for (auto i = start; i < end; i++) {
+                    auto filePath = benchmarkSettings.filePath + to_string((i % benchmarkSettings.blobFiles) + 1) + ".bin";
+                    getTxn[threadId].addRequest(callback, filePath, range, nullptr, 0, i + 1);
+                }
+            };
+            auto start = 0ull;
+            auto req = benchmarkSettings.requests / benchmarkSettings.concurrentThreads;
+            for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
+                if (i != benchmarkSettings.concurrentThreads - 1) {
+                    requestCreatorThreads.push_back(async(launch::async, createRequests, start, start + req, i));
+                } else {
+                    requestCreatorThreads.push_back(async(launch::async, createRequests, start, benchmarkSettings.requests, i));
+                }
+                start += req;
             }
+
+            for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
+                requestCreatorThreads[i].get();
         }
 
-        getTxn.processAsync(*sendReceivers.back());
+        for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
+            getTxn[i].processAsync(*sendReceivers.back());
 
         fstream s;
         unique_ptr<utils::Timer> timer;

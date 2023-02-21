@@ -150,7 +150,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath,
 uint32_t Azure::getPort() const
 // Gets the port of Azure on http
 {
-    return 80;
+    return _settings.port;
 }
 //---------------------------------------------------------------------------
 string Azure::getAddress() const

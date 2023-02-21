@@ -30,6 +30,8 @@ class Azure : public Provider {
     struct Settings {
         /// The container name
         std::string container;
+        /// The port
+        int port;
     };
 
     /// The secret
@@ -59,7 +61,7 @@ class Azure : public Provider {
     [[nodiscard]] static std::string getRegion(network::TaskedSendReceiver& sendReceiver);
 
     /// The constructor
-    Azure(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket}) {
+    Azure(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket, info.port}) {
         assert(info.provider == Provider::CloudService::Azure);
         _type = info.provider;
         _secret = std::make_unique<Secret>();
