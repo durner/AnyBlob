@@ -35,7 +35,7 @@ class HTTPHelper {
 
     struct Info {
         /// The maximum length
-        uint32_t length;
+        uint64_t length;
         /// The header length
         uint32_t headerLength;
         /// The protocol
