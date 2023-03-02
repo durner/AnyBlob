@@ -176,7 +176,7 @@ void TaskedSendReceiver::sendSync(OriginalMessage* msg)
 void TaskedSendReceiver::reuse(unique_ptr<utils::DataVector<uint8_t>> message)
 // Reuse message
 {
-    verify(_group._reuse.insert(message.release()));
+    verify(_group._reuse.insert(message.release()) != ~0ull);
 }
 //--------------------------------------------------------------------------
 void TaskedSendReceiver::addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver)
@@ -263,8 +263,19 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
     while (!_stopDeamon || count) {
         if (count > 0) {
             // get cqe
-            auto req = _socketWrapper->complete();
+            IOUringSocket::Request* req;
+            try {
+                req = _socketWrapper->complete();
+            } catch (exception& e) {
+                continue;
+            }
+            // reduce count
             count--;
+
+            // nullptr in user_data if IORING_OP_LINK_TIMEOUT, skip this one
+            if (!req)
+                continue;
+
             // get the task
             auto task = reinterpret_cast<MessageTask*>(req->messageTask);
             // execute next task
@@ -293,8 +304,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
         if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests) {
             local ? emplaceLocalRequest() : emplaceNewRequest();
         }
-        if (count <= _messageTasks.size() / 2)
-            count += _socketWrapper->submit();
+        count += _socketWrapper->submit();
 
         auto empty = local ? _submissions.empty() : _group._submissions.empty();
         if (oneQueueInvocation && empty && !count) {

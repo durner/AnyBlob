@@ -48,7 +48,7 @@ class IOUringSocket {
         int keepIntvl = 1;
         /// probe count
         int keepCnt = 1;
-        /// in buffer for tcp
+        /// recv buffer for tcp
         int recvBuffer = 0;
         /// Maximum segment size
         int mss = 0;
@@ -60,6 +60,13 @@ class IOUringSocket {
         int timeout = 500 * 1000;
         /// Reuse sockets
         int reuse = 0;
+        /// The kernel timeout parameter
+        __kernel_timespec kernelTimeout;
+
+        TCPSettings() {
+            kernelTimeout.tv_sec = 0;
+            kernelTimeout.tv_nsec = timeout * 1000;
+        }
     };
 
     /// The request message
@@ -112,6 +119,10 @@ class IOUringSocket {
     io_uring_sqe* send_prep(const Request* req, int32_t msg_flags = 0, int32_t flags = 0);
     /// Prepare a submission (sqe) recv
     io_uring_sqe* recv_prep(Request* req, int32_t msg_flags = 0, int32_t flags = 0);
+    /// Prepare a submission (sqe) send with timeout
+    io_uring_sqe* send_prep_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0, int32_t flags = 0);
+    /// Prepare a submission (sqe) recv with timeout
+    io_uring_sqe* recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0, int32_t flags = 0);
 
     /// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests
     uint32_t submitCompleteAll(uint32_t events, std::vector<IOUringSocket::Request*>& completions);

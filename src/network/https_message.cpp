@@ -54,6 +54,7 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
             if (status == TLSConnection::Progress::Finished) {
                 state = MessageState::InitSending;
             } else if (status == TLSConnection::Progress::Aborted) {
+                originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
                 reset(socket, failures++ > failuresMax);
                 return execute(socket);
             } else {

@@ -45,8 +45,11 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                 fd = request->fd;
                 if (request->length > 0) {
                     sendBufferOffset += request->length;
-                } else {
-                    originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
+                } else if (request->length != -EINPROGRESS && request->length != -EAGAIN) {
+                    if (request->length == -ECANCELED || request->length == -EINTR)
+                        originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
+                    else
+                        originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
                     reset(socket, failures++ > failuresMax);
                     return execute(socket);
                 }
@@ -68,7 +71,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                     length = originalMessage->putLength + originalMessage->message->size() - sendBufferOffset;
                 }
                 request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, length, fd, IOUringSocket::EventType::write, this});
-                socket.send_prep(request.get());
+                socket.send_prep_to(request.get(), &tcpSettings.kernelTimeout);
             }
             break;
         }
@@ -101,12 +104,10 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                         return execute(socket);
                     }
                 } else if (request->length != -EINPROGRESS && request->length != -EAGAIN) {
-                    if (socket.checkTimeout(request->fd, tcpSettings)) {
+                    if (request->length == -ECANCELED || request->length == -EINTR)
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
-                        reset(socket, failures++ > failuresMax);
-                        return execute(socket);
-                    }
-                    originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Recv);
+                    else
+                        originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Recv);
                     reset(socket, failures++ > failuresMax);
                     return execute(socket);
                 } else {
@@ -119,7 +120,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
             }
             receive.resize(receive.size() + chunkSize);
             request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = receive.data() + receiveBufferOffset}, static_cast<int64_t>(chunkSize), request->fd, IOUringSocket::EventType::read, this});
-            socket.recv_prep(request.get(), tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+            socket.recv_prep_to(request.get(), &tcpSettings.kernelTimeout, tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
             state = MessageState::Receiving;
             break;
         }

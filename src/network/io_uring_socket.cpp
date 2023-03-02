@@ -300,6 +300,32 @@ io_uring_sqe* IOUringSocket::recv_prep(Request* req, int32_t msg_flags, int32_t 
     return sqe;
 }
 //---------------------------------------------------------------------------
+io_uring_sqe* IOUringSocket::send_prep_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags, int32_t flags)
+// Prepare a submission (sqe) send with relative timeout
+{
+    auto sqe = io_uring_get_sqe(&_uring);
+    io_uring_prep_send(sqe, req->fd, req->data.cdata, req->length, msg_flags);
+    sqe->flags |= flags | IOSQE_IO_LINK;
+    sqe->user_data = reinterpret_cast<uintptr_t>(req);
+    auto timeoutSqe = io_uring_get_sqe(&_uring);
+    io_uring_prep_link_timeout(timeoutSqe, timeout, 0);
+    timeoutSqe->user_data = reinterpret_cast<uintptr_t>(nullptr);
+    return sqe;
+}
+//---------------------------------------------------------------------------
+io_uring_sqe* IOUringSocket::recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags, int32_t flags)
+// Prepare a submission (sqe) recv with relative timeout
+{
+    auto sqe = io_uring_get_sqe(&_uring);
+    io_uring_prep_recv(sqe, req->fd, req->data.data, req->length, msg_flags);
+    sqe->flags |= flags | IOSQE_IO_LINK;
+    sqe->user_data = reinterpret_cast<uintptr_t>(req);
+    auto timeoutSqe = io_uring_get_sqe(&_uring);
+    io_uring_prep_link_timeout(timeoutSqe, timeout, 0);
+    timeoutSqe->user_data = reinterpret_cast<uintptr_t>(nullptr);
+    return sqe;
+}
+//---------------------------------------------------------------------------
 IOUringSocket::Request* IOUringSocket::peek()
 // Get a completion (cqe) event if it is available and mark it as seen; return the SQE attached Request if available else nullptr
 {
@@ -308,7 +334,8 @@ IOUringSocket::Request* IOUringSocket::peek()
     if (!res) {
         Request* req = nullptr;
         memcpy(&req, &cqe->user_data, sizeof(cqe->user_data));
-        req->length = cqe->res;
+        if (req)
+            req->length = cqe->res;
         seen(cqe);
         return req;
     }
@@ -323,7 +350,8 @@ IOUringSocket::Request* IOUringSocket::complete()
     if (!res) {
         Request* req = nullptr;
         memcpy(&req, &cqe->user_data, sizeof(cqe->user_data));
-        req->length = cqe->res;
+        if (req)
+            req->length = cqe->res;
         seen(cqe);
         return req;
     }
@@ -356,7 +384,8 @@ uint32_t IOUringSocket::submitCompleteAll(uint32_t events, vector<IOUringSocket:
             localCount++;
             Request* req = nullptr;
             memcpy(&req, &cqe->user_data, sizeof(cqe->user_data));
-            req->length = cqe->res;
+            if (req)
+                req->length = cqe->res;
             completions.push_back(req);
         }
         io_uring_cq_advance(&_uring, localCount);
