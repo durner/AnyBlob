@@ -99,11 +99,10 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
                 receiveBufferOffset += result;
                 try {
                     if (HTTPHelper::finished(receive.data(), receiveBufferOffset, info)) {
-                        socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, sendBufferOffset + receiveBufferOffset);
                         originalMessage->result.size = info->length;
                         originalMessage->result.offset = info->headerLength;
-                        state = MessageState::Finished;
-                        return MessageState::Finished;
+                        state = MessageState::TLSShutdown;
+                        return execute(socket);
                     } else {
                         // resize and grow capacity
                         if (receive.capacity() < receive.size() + chunkSize && info) {
@@ -123,6 +122,18 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
             }
             return state;
         }
+        case MessageState::TLSShutdown: {
+            // Shutdown procedure
+            auto status = tlsLayer->shutdown(socket);
+            // The request was successful even if the shutdown fails
+            if (status == TLSConnection::Progress::Finished || status == TLSConnection::Progress::Aborted) {
+                socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, sendBufferOffset + receiveBufferOffset);
+                state = MessageState::Finished;
+                return MessageState::Finished;
+            } else {
+                return state;
+            }
+        } // fallthrough
         case MessageState::Finished:
             break;
         case MessageState::Aborted:

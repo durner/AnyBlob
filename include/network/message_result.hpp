@@ -33,6 +33,7 @@ enum class MessageState : uint8_t {
     Sending,
     InitReceiving,
     Receiving,
+    TLSShutdown,
     Finished,
     Aborted
 };

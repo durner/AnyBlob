@@ -78,19 +78,19 @@ class TLSConnection {
         }
     };
     /// The corresponding
-    HTTPSMessage& message;
+    HTTPSMessage& _message;
     /// The SSL context
-    TLSContext& context;
+    TLSContext& _context;
     /// The SSL connection
-    SSL* ssl;
+    SSL* _ssl;
     /// The internal buffer used for communicating with SSL
-    BIO* internalBio;
+    BIO* _internalBio;
     /// The external buffer used for communicating with the socket
-    BIO* networkBio;
+    BIO* _networkBio;
     /// The buffer
-    std::unique_ptr<char[]> buffer;
+    std::unique_ptr<char[]> _buffer;
     /// The state
-    State state;
+    State _state;
 
     public:
     /// The constructor
@@ -104,7 +104,7 @@ class TLSConnection {
     // Initialze SSL
     void destroy();
     /// Get the SSL/TLS context
-    [[nodiscard]] inline TLSContext& getContext() const { return context; }
+    [[nodiscard]] inline TLSContext& getContext() const { return _context; }
 
     /// Recv a TLS encrypted message
     [[nodiscard]] Progress recv(IOUringSocket& socket, char* buffer, int64_t bufferLength, int64_t& resultLength);
@@ -112,6 +112,8 @@ class TLSConnection {
     [[nodiscard]] Progress send(IOUringSocket& socket, const char* buffer, int64_t bufferLength, int64_t& resultLength);
     /// SSL/TLS connect
     [[nodiscard]] Progress connect(IOUringSocket& socket);
+    /// SSL/TLS shutdown
+    [[nodiscard]] Progress shutdown(IOUringSocket& socket, bool failedOnce = false);
 
     private:
     /// Helper function that handles the SSL_op calls

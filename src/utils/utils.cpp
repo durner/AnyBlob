@@ -128,11 +128,7 @@ string md5Encode(const uint8_t* data, uint64_t length)
 pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t keyLength, const uint8_t* msgData, uint64_t msgLength)
 // Encodes the msg with the key with hmac-sha256
 {
-    auto libraryCtx = OSSL_LIB_CTX_new();
-    if (!libraryCtx)
-        throw runtime_error("OpenSSL Error!");
-
-    auto mac = EVP_MAC_fetch(libraryCtx, "HMAC", nullptr);
+    auto mac = EVP_MAC_fetch(nullptr, "HMAC", nullptr);
     if (!mac)
         throw runtime_error("OpenSSL Error!");
 
@@ -163,7 +159,6 @@ pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t 
 
     EVP_MAC_CTX_free(mctx);
     EVP_MAC_free(mac);
-    OSSL_LIB_CTX_free(libraryCtx);
 
     return {move(hash), SHA256_DIGEST_LENGTH};
 }

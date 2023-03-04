@@ -33,7 +33,7 @@ using namespace std;
 TaskedSendReceiverGroup::TaskedSendReceiverGroup(uint64_t concurrentRequests, uint64_t submissions, uint64_t chunkSize, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(concurrentRequests), _cv(), _mutex()
 // Initializes the global submissions and completions
 {
-    context = make_unique<TLSContext>();
+    TLSContext::initOpenSSL();
 }
 //---------------------------------------------------------------------------
 TaskedSendReceiverGroup::~TaskedSendReceiverGroup()
@@ -142,6 +142,7 @@ bool TaskSendReceiverHandle::sendReceive(bool oneQueueInvocation)
 TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _submissions(), _next(nullptr), _socketWrapper(make_unique<IOUringSocket>(group._concurrentRequests << 2)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
 // The constructor
 {
+    _context = make_unique<TLSContext>();
 }
 //---------------------------------------------------------------------------
 void TaskedSendReceiver::run()
@@ -202,7 +203,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 break;
 
             auto original = val.value();
-            auto messageTask = MessageTask::buildMessageTask(original, *_group.context, _group._chunkSize);
+            auto messageTask = MessageTask::buildMessageTask(original, *_context, _group._chunkSize);
             assert(messageTask.get());
 
             if (!original->result.getDataVector().capacity()) {
@@ -233,7 +234,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
         while (!_submissions.empty()) {
             OriginalMessage* original = _submissions.front();
             _submissions.pop();
-            auto messageTask = MessageTask::buildMessageTask(original, *_group.context, _group._chunkSize);
+            auto messageTask = MessageTask::buildMessageTask(original, *_context, _group._chunkSize);
             assert(messageTask.get());
 
             if (!original->result.getDataVector().capacity()) {
