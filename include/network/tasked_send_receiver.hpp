@@ -141,7 +141,8 @@ class TaskedSendReceiver {
     }
     /// Reuse memory of old message
     void reuse(std::unique_ptr<utils::DataVector<uint8_t>> message);
-    /// Adds a resolver
+    /// Get reused memory
+    std::unique_ptr<utils::DataVector<uint8_t>> getReused();
 
     private:
     /// Submits queue and waits for result

@@ -195,5 +195,53 @@ pair<unique_ptr<uint8_t[]>, uint64_t> rsaSign(const uint8_t* keyData, uint64_t k
     return {move(hash), msgLenghtEnc};
 }
 //---------------------------------------------------------------------------
+uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* encData, uint64_t encLength, uint8_t* plainData)
+// Decrypt with AES
+{
+    int len;
+    uint64_t plainLength;
+
+    unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+    if (!ctx.get())
+        throw runtime_error("OpenSSL Cipher Error!");
+
+    if (EVP_DecryptInit(ctx.get(), EVP_aes_256_cbc(), key, iv) <= 0)
+        throw runtime_error("OpenSSL Decrypt Init Error!");
+
+    if (EVP_DecryptUpdate(ctx.get(), plainData, &len, reinterpret_cast<const unsigned char*>(encData), encLength) <= 0)
+        throw runtime_error("OpenSSL Decrypt Error!");
+    plainLength = len;
+
+    if (EVP_DecryptFinal(ctx.get(), plainData + len, &len) <= 0)
+        throw runtime_error("OpenSSL Decrypt Final Error!");
+    plainLength += len;
+
+    return plainLength;
+}
+//---------------------------------------------------------------------------
+uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* plainData, uint64_t plainLength, uint8_t* encData)
+// Encrypt with AES
+{
+    int len;
+    uint64_t encLength;
+
+    unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
+    if (!ctx.get())
+        throw runtime_error("OpenSSL Cipher Error!");
+
+    if (EVP_EncryptInit(ctx.get(), EVP_aes_256_cbc(), key, iv) <= 0)
+        throw runtime_error("OpenSSL Encrypt Init Error!");
+
+    if (EVP_EncryptUpdate(ctx.get(), encData, &len, reinterpret_cast<const unsigned char*>(plainData), plainLength) <= 0)
+        throw runtime_error("OpenSSL Encrypt Error!");
+    encLength = len;
+
+    if (EVP_EncryptFinal(ctx.get(), encData + len, &len) <= 0)
+        throw runtime_error("OpenSSL Encrypt Final Error!");
+    encLength += len;
+
+    return encLength;
+}
+//---------------------------------------------------------------------------
 }; // namespace utils
 }; // namespace anyblob

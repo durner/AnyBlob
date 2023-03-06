@@ -10,6 +10,7 @@
 #include "network/tasked_send_receiver.hpp"
 #include "perfevent/PerfEvent.hpp"
 #include "utils/timer.hpp"
+#include "utils/utils.hpp"
 #include <fstream>
 #include <future>
 #include <iostream>
@@ -129,8 +130,8 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, const string& uri)
         auto totalSize = 0ull;
         for (const auto& t : timings)
             totalSize += t.size;
-        string header = ",Algorithm,Resolver,Iteration,Threads,Concurrency,Requests,Datasize,HTTPS";
-        string content = "," + to_string(iteration) + "," + to_string(benchmarkSettings.concurrentThreads) + "," + to_string(benchmarkSettings.concurrentRequests) + "," + to_string(benchmarkSettings.requests) + "," + to_string(totalSize) + "," + to_string(benchmarkSettings.https);
+        string header = ",Algorithm,Resolver,Iteration,Threads,Concurrency,Requests,Datasize,HTTPS,Encryption";
+        string content = "," + to_string(iteration) + "," + to_string(benchmarkSettings.concurrentThreads) + "," + to_string(benchmarkSettings.concurrentRequests) + "," + to_string(benchmarkSettings.requests) + "," + to_string(totalSize) + "," + to_string(benchmarkSettings.https) + "," + to_string(benchmarkSettings.encryption);
         if constexpr (is_same<S3SendReceiver, network::S3CurlSendReceiver>::value)
             content = ",S3," + content;
         else
@@ -178,6 +179,9 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         }
     }
 
+    unsigned char aesKey[] = "01234567890123456789012345678901";
+    unsigned char aesIv[] = "0123456789012345";
+
     for (auto iteration = 0u; iteration < benchmarkSettings.iterations; iteration++) {
         vector<future<void>> asyncSendReceiverThreads;
         vector<future<void>> requestCreatorThreads;
@@ -192,10 +196,25 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         uniform_int_distribution<mt19937::result_type> dist(1, benchmarkSettings.blobFiles);
         pair<uint64_t, uint64_t> range = {0, 0};
         atomic<uint64_t> finishedMessages = 0;
+        auto enc = benchmarkSettings.encryption;
 
-        auto callback = [&finishedMessages, &sendReceivers](network::MessageResult& result) {
-            if (!result.success())
+        auto callback = [&finishedMessages, &sendReceivers, &enc, aesKey, aesIv](network::MessageResult& result) {
+            if (!result.success()) {
                 cerr << "Request was not successful: " << result.getFailureCode() << endl;
+            } else if (enc) {
+                auto plain = sendReceivers.back()->getReused();
+                if (!plain)
+                    plain = make_unique<utils::DataVector<uint8_t>>(result.getSize() + result.getOffset());
+                else
+                    plain->resize(result.getSize() + result.getOffset());
+                try {
+                    auto len = utils::aesDecrypt(aesKey, aesIv, result.getData() + result.getOffset(), result.getSize(), plain->data());
+                    plain->resize(len);
+                } catch (exception& e) {
+                    cerr << "Request was not successful: " << e.what() << endl;
+                }
+                sendReceivers.back()->reuse(move(plain));
+            }
             finishedMessages++;
             sendReceivers.back()->reuse(result.moveDataVector());
         };
@@ -208,13 +227,13 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         if (benchmarkSettings.blobFiles > benchmarkSettings.requests) {
             for (auto i = 0u; i < benchmarkSettings.requests; i++) {
                 auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
-                getTxn[0].addRequest(callback, filePath, range, nullptr, 0, i + 1);
+                getTxn[0].addRequest(callback, filePath, range, nullptr, 0, i);
             }
         } else {
             auto createRequests = [&](uint64_t start, uint64_t end, uint64_t threadId) {
                 for (auto i = start; i < end; i++) {
                     auto filePath = benchmarkSettings.filePath + to_string((i % benchmarkSettings.blobFiles) + 1) + ".bin";
-                    getTxn[threadId].addRequest(callback, filePath, range, nullptr, 0, i + 1);
+                    getTxn[threadId].addRequest(callback, filePath, range, nullptr, 0, i);
                 }
             };
             auto start = 0ull;
@@ -264,16 +283,34 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
 
         if (benchmarkSettings.testUpload) {
             finishedMessages = 0;
+
+            auto callbackUpload = [&finishedMessages](network::MessageResult& result) {
+                if (!result.success())
+                    cerr << "Request was not successful: " << result.getFailureCode() << endl;
+                finishedMessages++;
+            };
+
             network::PutTransaction putTxn(cloudProvider.get());
             auto blob = make_unique<utils::DataVector<uint8_t>>(1 << 24);
+            if (benchmarkSettings.encryption) {
+                auto plainBlob = make_unique<utils::DataVector<uint8_t>>((1 << 24) - 16);
+                try {
+                    auto len = utils::aesEncrypt(aesKey, aesIv, plainBlob->cdata(), plainBlob->size(), blob->data());
+                    blob->resize(len);
+                } catch (exception& e) {
+                    cerr << "Encryption unsuccessfult: " << e.what() << endl;
+                }
+            }
             {
                 uint64_t requestPerSocket = static_cast<double>(benchmarkSettings.requests) / benchmarkSettings.concurrentThreads;
                 for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
                     auto start = i * requestPerSocket;
                     auto end = (i + 1) * requestPerSocket;
+                    if (i == benchmarkSettings.concurrentThreads - 1)
+                        end = benchmarkSettings.requests;
                     for (uint64_t j = start; j < end; j++) {
-                        auto filePath = "upload_" + benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
-                        putTxn.addRequest(callback, filePath, reinterpret_cast<const char*>(blob->data()), blob->size(), nullptr, 0, i + 1);
+                        auto filePath = "upload_" + benchmarkSettings.filePath + to_string(j + 1) + ".bin";
+                        putTxn.addRequest(callbackUpload, filePath, reinterpret_cast<const char*>(blob->data()), blob->size(), nullptr, 0, i);
                     }
                 }
 
@@ -294,8 +331,8 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         for (const auto& t : timings)
             totalSize += t.size;
 
-        string header = ",Algorithm,Resolver,Iteration,Threads,Concurrency,Requests,Datasize,HTTPS";
-        string content = ",Uring," + string(benchmarkSettings.resolver) + "," + to_string(iteration) + "," + to_string(benchmarkSettings.concurrentThreads) + "," + to_string(benchmarkSettings.concurrentRequests) + "," + to_string(benchmarkSettings.requests) + "," + to_string(totalSize) + "," + to_string(benchmarkSettings.https);
+        string header = ",Algorithm,Resolver,Iteration,Threads,Concurrency,Requests,Datasize,HTTPS,Encryption";
+        string content = ",Uring," + string(benchmarkSettings.resolver) + "," + to_string(iteration) + "," + to_string(benchmarkSettings.concurrentThreads) + "," + to_string(benchmarkSettings.concurrentRequests) + "," + to_string(benchmarkSettings.requests) + "," + to_string(totalSize) + "," + to_string(benchmarkSettings.https) + "," + to_string(benchmarkSettings.encryption);
         timer->setInfo(header, content);
 
         if (benchmarkSettings.report.size()) {
