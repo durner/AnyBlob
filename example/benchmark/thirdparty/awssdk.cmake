@@ -18,6 +18,7 @@ set(AWS_REQUIRED_LIBS
   aws-c-cal
   aws-c-compression
   aws-c-mqtt
+  aws-c-sdkutils
   s2n
   aws-checksums
   aws-c-common
@@ -33,7 +34,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=deprecated-declarations -Wno-stri
 
 ExternalProject_Add(awssdk
   GIT_REPOSITORY      https://github.com/aws/aws-sdk-cpp.git
-  GIT_TAG             "1.9.140"
+  GIT_TAG             "1.11.31"
   PREFIX              "thirdparty/awssdk"
   INSTALL_DIR         ${AWS_INSTALL_DIR}
   CMAKE_ARGS

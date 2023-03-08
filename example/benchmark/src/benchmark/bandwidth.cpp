@@ -52,21 +52,21 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, const string& uri)
 // The bandwith benchmark for S3 interface
 {
     auto remoteInfo = anyblob::cloud::Provider::getRemoteInfo(uri);
-    unique_ptr<S3SendReceiver> sendReceiver = make_unique<S3SendReceiver>(benchmarkSettings.requests << 1, benchmarkSettings.concurrentRequests, remoteInfo.region, benchmarkSettings.concurrentThreads, benchmarkSettings.https);
-
     for (auto iteration = 0u; iteration < benchmarkSettings.iterations; iteration++) {
+        unique_ptr<S3SendReceiver> sendReceiver = make_unique<S3SendReceiver>(benchmarkSettings.requests << 1, benchmarkSettings.concurrentRequests, remoteInfo.region, benchmarkSettings.concurrentThreads, benchmarkSettings.https);
+
+        for (uint64_t i = 0; i < benchmarkSettings.concurrentRequests << 1; i++) {
+            sendReceiver->reuse(make_unique<utils::DataVector<uint8_t>>(64 << 20));
+        }
         future<void> asyncSendReceiverThread;
         vector<utils::TimingHelper> timings;
         timings.resize(benchmarkSettings.requests);
         sendReceiver->setTimings(&timings);
 
-        Aws::IOStreamFactory streamFactory([]() {
-            return Aws::New<Aws::FStream>("S3Client", "/dev/null", ios_base::out);
-        });
-
         atomic<uint64_t> finishedMessages = 0;
-        auto callback = [&finishedMessages](unique_ptr<utils::DataVector<uint8_t>> /*data*/) {
+        auto callback = [&finishedMessages, &sendReceiver](std::unique_ptr<utils::DataVector<uint8_t>> data) {
             finishedMessages++;
+            sendReceiver->reuse(move(data));
         };
 
         random_device dev;
@@ -80,7 +80,6 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, const string& uri)
                 auto req = typename S3SendReceiver::GetObjectRequest()
                                .WithBucket(remoteInfo.bucket)
                                .WithKey(filePath);
-                req.SetResponseStreamFactory(streamFactory);
                 requestMessages.emplace_back(make_unique<typename S3SendReceiver::template GetObjectRequestCallbackMessage<decltype(callback)>>(callback, req));
             }
         } else {
@@ -90,7 +89,6 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, const string& uri)
                 auto req = typename S3SendReceiver::GetObjectRequest()
                                .WithBucket(remoteInfo.bucket)
                                .WithKey(filePath);
-                req.SetResponseStreamFactory(streamFactory);
                 requestMessages.emplace_back(make_unique<typename S3SendReceiver::template GetObjectRequestCallbackMessage<decltype(callback)>>(callback, req));
             }
             for (auto i = benchmarkSettings.blobFiles; i < benchmarkSettings.requests; i++) {
