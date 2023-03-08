@@ -35,7 +35,7 @@ class ThroughputResolver : public network::Resolver {
     /// The seconds vector iterator
     uint64_t _throughputIterator;
     /// The maximum history
-    const unsigned _maxHistory = 1024;
+    const unsigned _maxHistory = 128;
 
     public:
     /// The constructor

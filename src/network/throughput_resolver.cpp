@@ -43,7 +43,7 @@ unsigned ThroughputResolver::resolve(string hostname, string port, bool& reuse)
             throw runtime_error("hostname getaddrinfo error");
         }
         _addr[addrPos].reset(temp);
-        _addrString[addrPos] = {hostString, 4};
+        _addrString[addrPos] = {hostString, 2};
         reuse = false;
     }
     reuse = true;
@@ -71,25 +71,19 @@ void ThroughputResolver::stopSocket(int fd, uint64_t bytes)
         _throughputTree.insert(throughput);
         auto maxElem = _throughputIterator < _maxHistory ? _throughputIterator : _maxHistory;
         bool possible = true;
-        if (maxElem > 2) {
-            auto percentile16 = _throughputTree.find_by_order(maxElem / 2);
-            if (percentile16.m_p_nd->m_value <= throughput)
+        if (maxElem > 3) {
+            auto percentile = _throughputTree.find_by_order(maxElem / 3);
+            if (percentile.m_p_nd->m_value <= throughput)
                 _addrString[it->second.first].second += 1;
             else
                 possible = false;
         }
-        if (possible && maxElem > 4) {
-            auto percentile16 = _throughputTree.find_by_order(maxElem / 4);
-            if (percentile16.m_p_nd->m_value <= throughput)
+        if (possible && maxElem > 6) {
+            auto percentile = _throughputTree.find_by_order(maxElem / 6);
+            if (percentile.m_p_nd->m_value <= throughput)
                 _addrString[it->second.first].second += 2;
             else
                 possible = false;
-        }
-        if (possible && maxElem > 8) {
-            auto percentile8 = _throughputTree.find_by_order(maxElem / 8);
-            if (percentile8.m_p_nd->m_value <= throughput) {
-                _addrString[it->second.first].second += 4;
-            }
         }
     }
 }

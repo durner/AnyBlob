@@ -141,6 +141,7 @@ void HTTPMessage::reset(IOUringSocket& socket, bool aborted)
         originalMessage->result.getDataVector().clear();
         receiveBufferOffset = 0;
         sendBufferOffset = 0;
+        info.reset();
         originalMessage->result.state = MessageState::Init;
     } else {
         originalMessage->result.state = MessageState::Aborted;
