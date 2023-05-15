@@ -105,20 +105,20 @@ int main(int argc, char* argv[]) {
         Aws::SDKOptions options;
         Aws::InitAPI(options);
 
-        anyblob::cloud::AWS aws(awsSettings);
-        anyblob::benchmark::Bandwidth::run(bandwithSettings, aws);
+        string uri = "s3://" + awsSettings.bucket + ":" + awsSettings.region + "/";
+        anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
 
         Aws::ShutdownAPI(options);
     }
 
     if (!strcmp(argv[1], "gcp") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
-        anyblob::cloud::GCP gcp(gcpSettings, bandwithSettings.account, bandwithSettings.rsaKeyFile);
-        anyblob::benchmark::Bandwidth::run(bandwithSettings, gcp);
+        string uri = "gcp://" + gcpSettings.bucket + ":" + gcpSettings.region + "/";
+        anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
     }
 
     if (!strcmp(argv[1], "azure") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
-        anyblob::cloud::Azure azure(azureSettings, bandwithSettings.account, bandwithSettings.rsaKeyFile);
-        anyblob::benchmark::Bandwidth::run(bandwithSettings, azure);
+        string uri = "azure://" + azureSettings.container + "/";
+        anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
     }
 
     return 0;

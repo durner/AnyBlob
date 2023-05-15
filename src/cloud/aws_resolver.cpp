@@ -19,17 +19,17 @@ namespace cloud {
 using namespace std;
 //---------------------------------------------------------------------------
 AWSResolver::AWSResolver(unsigned entries) : Resolver(entries), _mtuCache()
-/// Constructor
+// Constructor
 {
 }
 //---------------------------------------------------------------------------
 unsigned AWSResolver::resolve(string hostname, string port, bool& oldAddress)
-/// Resolve the request
+// Resolve the request
 {
     auto addrPos = _addrCtr % _addrString.size();
     auto curCtr = _addrString[addrPos].second--;
     auto hostString = hostname + ":" + port;
-    /// Reuses old address
+    // Reuses old address
     oldAddress = true;
     if (_addrString[addrPos].first.compare(hostString) || curCtr == 0) {
         struct addrinfo hints = {};
@@ -72,7 +72,6 @@ unsigned AWSResolver::resolve(string hostname, string port, bool& oldAddress)
         oldAddress = false;
     }
     return addrPos;
-
 }
 //---------------------------------------------------------------------------
 }; // namespace cloud

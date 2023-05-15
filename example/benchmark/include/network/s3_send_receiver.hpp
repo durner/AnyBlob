@@ -1,6 +1,6 @@
 #pragma once
 #include "cloud/aws.hpp"
-#include "network/messages.hpp"
+#include "network/original_message.hpp"
 #include "utils/data_vector.hpp"
 #include "utils/ring_buffer.hpp"
 #include "utils/timer.hpp"
@@ -105,11 +105,11 @@ class S3SendReceiver {
 
     public:
     /// The constructor
-    S3SendReceiver(uint64_t submissions, uint64_t concurrentRequests, cloud::AWS::Settings settings, uint64_t threadsOrThroughput = 1, bool https = false) : _submissions(submissions), _completions(0.2 * submissions), _timings(nullptr), _concurrentRequests(concurrentRequests), _stopDeamon(false)
+    S3SendReceiver(uint64_t submissions, uint64_t concurrentRequests, const std::string& region, uint64_t threadsOrThroughput = 1, bool https = false) : _submissions(submissions), _completions(0.2 * submissions), _timings(nullptr), _concurrentRequests(concurrentRequests), _stopDeamon(false)
     /// The constructor
     {
         _config = std::make_unique<ClientConfiguration>();
-        _config->region = settings.region;
+        _config->region = region;
         if (https)
             _config->scheme = Aws::Http::Scheme::HTTPS;
         else

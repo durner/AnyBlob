@@ -19,13 +19,13 @@ namespace network {
 using namespace std;
 //---------------------------------------------------------------------------
 ThroughputResolver::ThroughputResolver(unsigned entries) : Resolver(entries), _throughputTree(), _throughput(), _throughputIterator()
-/// Constructor
+// Constructor
 {
     _throughput.resize(_maxHistory);
 }
 //---------------------------------------------------------------------------
 unsigned ThroughputResolver::resolve(string hostname, string port, bool& reuse)
-/// Resolve the request
+// Resolve the request
 {
     auto modulo = _addrString.size() < 8 ? _addrString.size() : 8;
     auto addrPos = _addrCtr % modulo;

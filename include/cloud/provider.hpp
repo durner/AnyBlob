@@ -1,6 +1,4 @@
 #pragma once
-#include "network/transaction.hpp"
-#include "utils/data_vector.hpp"
 #include <memory>
 #include <vector>
 //---------------------------------------------------------------------------
@@ -15,8 +13,15 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace network {
 class TaskedSendReceiver;
+class Transaction;
+class GetTransaction;
+class PutTransaction;
 struct OriginalMessage;
 }; // namespace network
+namespace utils {
+template <typename T>
+class DataVector;
+}; // namespace utils
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------
@@ -65,44 +70,22 @@ class Provider {
 
     protected:
     CloudService _type;
-
-    public:
-    /// The destructor
-    virtual ~Provider() = default;
     /// Builds the http request for downloading a blob or listing a directory
     virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const = 0;
     /// Builds the http request for putting an object without the actual data (header only according to the data and length provided)
     virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const = 0;
-    /// Builds the http request and transform it to an OriginalMessage for downloading a blob or listing a directory
-    std::unique_ptr<network::OriginalMessage> getRequest(const network::Transaction& transaction) const;
-    /// Builds the http request and transform it to an OriginalMessage for putting an object without the actual data (header only according to the data and length provided)
-    std::unique_ptr<network::OriginalMessage> putRequest(const network::Transaction& transaction) const;
-    /// Builds the http request and transform it to an OriginalMessage for downloading a blob or listing a directory
-    template <typename Callback>
-    std::unique_ptr<network::OriginalMessage> getRequest(const network::Transaction& transaction, Callback&& callback) const;
-    /// Builds the http request and transform it to an OriginalMessage for putting an object without the actual data (header only according to the data and length provided)
-    template <typename Callback>
-    std::unique_ptr<network::OriginalMessage> putRequest(const network::Transaction& transaction, Callback&& callback) const;
-
-    /// Downloads an with the calling thread, changes transaction vector
-    bool retrieveObject(network::TaskedSendReceiver& sendReceiver, network::Transaction& transaction) const;
-    /// Uploads an object with the calling thread, changes blobs vector
-    bool uploadObject(network::TaskedSendReceiver& sendReceiver, network::Transaction& transaction) const;
-
-    /// Downloads a multiple objects with the calling thread, changes transaction vector
-    bool retrieveObjects(network::TaskedSendReceiver& sendReceiver, std::vector<std::unique_ptr<network::Transaction>>& transactions) const;
-    /// Uploads a multiple objects with the calling thread, changes blobs vector
-    bool uploadObjects(network::TaskedSendReceiver& sendReceiver, std::vector<std::unique_ptr<network::Transaction>>& transactions) const;
-
-    /// Get the instance infos
-    virtual Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) = 0;
     /// Get the address of the server
     virtual std::string getAddress() const = 0;
     /// Get the port of the server
     virtual uint32_t getPort() const = 0;
+    /// Initialize secret
+    virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}
+
+    public:
+    /// The destructor
+    virtual ~Provider() = default;
     /// Gets the cloud provider type
     CloudService getType() { return _type; }
-
     /// Is it a remote file?
     static bool isRemoteFile(const std::string_view fileName) noexcept;
     /// Get the path of the parent dir without the remote info
@@ -112,13 +95,17 @@ class Provider {
     /// Get the key from a keyFile
     static std::string getKey(const std::string& keyFile);
 
-    /// Initialize secret
-    virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}
-    /// Init the resolver for specific provider
-    virtual void initResolver(network::TaskedSendReceiver& /*sendReceiver*/) {}
-
     /// Create a provider (keyId is access email for GCP/Azure)
     static std::unique_ptr<Provider> makeProvider(const std::string& filepath, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
+
+    /// Init the resolver for specific provider
+    virtual void initResolver(network::TaskedSendReceiver& /*sendReceiver*/) {}
+    /// Get the instance infos
+    virtual Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) = 0;
+
+    friend network::Transaction;
+    friend network::GetTransaction;
+    friend network::PutTransaction;
 };
 //---------------------------------------------------------------------------
 } // namespace cloud

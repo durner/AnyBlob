@@ -1,6 +1,7 @@
 #include "cloud/azure.hpp"
 #include "cloud/azure_signer.hpp"
 #include "network/http_helper.hpp"
+#include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "network/throughput_resolver.hpp"
 #include "utils/data_vector.hpp"
@@ -22,7 +23,7 @@ namespace cloud {
 using namespace std;
 //---------------------------------------------------------------------------
 static string buildXMSTimestamp()
-/// Creates the X-MS timestamp
+// Creates the X-MS timestamp
 {
     stringstream s;
     const auto t = chrono::system_clock::to_time_t(chrono::system_clock::now());
@@ -31,13 +32,13 @@ static string buildXMSTimestamp()
 }
 //---------------------------------------------------------------------------
 void Azure::initKey()
-/// Inits key if not exists
+// Inits key if not exists
 {
     _secret->privateKey.erase(remove(_secret->privateKey.begin(), _secret->privateKey.end(), '\n'), _secret->privateKey.cend());
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Azure::downloadInstanceInfo()
-/// Builds the info http request
+// Builds the info http request
 {
     string httpHeader = "GET /metadata/instance?api-version=2021-02-01 HTTP/1.1\r\nHost: ";
     httpHeader += getIAMAddress();
@@ -46,15 +47,15 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::downloadInstanceInfo()
 }
 //---------------------------------------------------------------------------
 Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiver& sendReceiver)
-/// Uses the send receiver to initialize the secret
+// Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo();
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
     sendReceiver.send(originalMsg.get());
-    sendReceiver.sendReceive();
-    auto content = sendReceiver.receive(originalMsg.get());
+    sendReceiver.process();
+    auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+    auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
 
     string needle = "\"vmSize\" : \"";
     auto pos = s.find(needle);
@@ -71,15 +72,15 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiver& sendRe
 }
 //---------------------------------------------------------------------------
 string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
-/// Uses the send receiver to initialize the secret
+// Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo();
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
     sendReceiver.send(originalMsg.get());
-    sendReceiver.sendReceive();
-    auto content = sendReceiver.receive(originalMsg.get());
+    sendReceiver.process();
+    auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+    auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
 
     string needle = "\"location\" : \"";
     auto pos = s.find(needle);
@@ -93,7 +94,7 @@ string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
-/// Builds the http request for downloading a blob
+// Builds the http request for downloading a blob
 {
     AzureSigner::Request request;
     request.method = "GET";
@@ -121,7 +122,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath, const string_view object) const
-/// Builds the http request for putting objects without the object data itself
+// Builds the http request for putting objects without the object data itself
 {
     AzureSigner::Request request;
     request.method = "PUT";
@@ -147,13 +148,13 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath,
 }
 //---------------------------------------------------------------------------
 uint32_t Azure::getPort() const
-/// Gets the port of Azure on http
+// Gets the port of Azure on http
 {
     return 80;
 }
 //---------------------------------------------------------------------------
 string Azure::getAddress() const
-/// Gets the address of Azure
+// Gets the address of Azure
 {
     return _secret->accountName + ".blob.core.windows.net";
 }

@@ -39,7 +39,7 @@ class IOUringSocket {
         /// flag for noDelay
         int noDelay = 0;
         /// flag for recv no wait
-        int recvNoWait = 1;
+        int recvNoWait = 0;
         /// flag for keepAlive
         int keepAlive = 1;
         /// time for tcp keepIdle
@@ -57,7 +57,7 @@ class IOUringSocket {
         /// Lingering of tcp packets
         int linger = 1;
         /// The timeout in usec
-        int timeout = 1000 * 1000;
+        int timeout = 250 * 1000;
         /// Reuse sockets
         int reuse = 0;
     };

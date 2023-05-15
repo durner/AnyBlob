@@ -18,7 +18,7 @@ namespace network {
 using namespace std;
 //---------------------------------------------------------------------------
 string_view Resolver::tld(const string& domain)
-/// String prefix
+// String prefix
 {
     auto pos = domain.find_last_of('.');
     if (pos != string::npos) {
@@ -32,7 +32,7 @@ string_view Resolver::tld(const string& domain)
 }
 //---------------------------------------------------------------------------
 Resolver::Resolver(unsigned entries)
-/// Constructor
+// Constructor
 {
     _addr.reserve(entries);
     for (auto i = 0u; i < entries; i++) {
@@ -43,7 +43,7 @@ Resolver::Resolver(unsigned entries)
 }
 //---------------------------------------------------------------------------
 unsigned Resolver::resolve(string hostname, string port, bool& oldAddress)
-/// Resolve the request
+// Resolve the request
 {
     auto addrPos = _addrCtr % _addrString.size();
     auto curCtr = _addrString[addrPos].second--;

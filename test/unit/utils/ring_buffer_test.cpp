@@ -14,16 +14,16 @@ namespace test {
 //---------------------------------------------------------------------------
 TEST_CASE("ring_buffer") {
     RingBuffer<uint64_t> rb(2);
-    REQUIRE(rb.insert<false>(1) == 0);
-    REQUIRE(rb.insert<false>(2) == 1);
-    REQUIRE(rb.insert<false>(2) == ~0ull);
-    REQUIRE(rb.consume<false>().value() == 1);
-    REQUIRE(rb.consume<false>().value() == 2);
-    REQUIRE(!rb.consume<false>().has_value());
+    REQUIRE(rb.insert(1) == 0);
+    REQUIRE(rb.insert(2) == 1);
+    REQUIRE(rb.insert(2) == ~0ull);
+    REQUIRE(rb.consume().value() == 1);
+    REQUIRE(rb.consume().value() == 2);
+    REQUIRE(!rb.consume().has_value());
     uint64_t a[] = {3, 4};
-    REQUIRE(rb.insert<false>(a) == 2);
-    REQUIRE(rb.consume<false>().value() == 3);
-    REQUIRE(rb.consume<false>().value() == 4);
+    REQUIRE(rb.insertAll(a) == 2);
+    REQUIRE(rb.consume().value() == 3);
+    REQUIRE(rb.consume().value() == 4);
     REQUIRE(rb.empty());
 }
 //---------------------------------------------------------------------------

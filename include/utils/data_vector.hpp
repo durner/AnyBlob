@@ -79,6 +79,11 @@ class DataVector {
         _size = 0;
     }
 
+    /// Is the data owned
+    inline bool owned() {
+        return _dataOwned || !_capacity;
+    }
+
     /// Increase the capacity
     inline void reserve(uint64_t cap) {
         if (_capacity < cap) {

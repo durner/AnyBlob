@@ -3,6 +3,9 @@
 #include "cloud/azure.hpp"
 #include "cloud/gcp.hpp"
 #include "network/tasked_send_receiver.hpp"
+#include "utils/data_vector.hpp"
+#include <fstream>
+#include <istream>
 #include <string>
 #include <assert.h>
 //---------------------------------------------------------------------------
@@ -20,7 +23,7 @@ using namespace std;
 //---------------------------------------------------------------------------
 bool Provider::testEnviornment = false;
 //---------------------------------------------------------------------------
-/// Get the dir name without the path
+// Get the dir name without the path
 string Provider::getRemoteParentDirectory(string fileName) noexcept {
     for (auto i = 0u; i < remoteFileCount; i++) {
         if (fileName.starts_with(remoteFile[i])) {
@@ -34,156 +37,6 @@ string Provider::getRemoteParentDirectory(string fileName) noexcept {
     return fileName.substr(0, pos + 1);
 }
 //---------------------------------------------------------------------------
-unique_ptr<network::OriginalMessage> Provider::getRequest(const network::Transaction& transaction) const
-// Builds the http request and transform it to an OriginalMessage for downloading a blob or listing a directory
-{
-    return make_unique<network::OriginalMessage>(getRequest(transaction.remotePath, transaction.info.range), getAddress(), getPort(), transaction.data.get(), transaction.capacity);
-}
-//---------------------------------------------------------------------------
-unique_ptr<network::OriginalMessage> Provider::putRequest(const network::Transaction& transaction) const
-/// Builds the http request and transform it to an OriginalMessage for putting an object without the actual data (header only according to the data and length provided)
-{
-    auto originalMsg = make_unique<network::OriginalMessage>(putRequest(transaction.remotePath, transaction.info.object), getAddress(), getPort(), transaction.data.get(), transaction.capacity);
-    originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(transaction.info.object.data()), transaction.info.object.size());
-    return originalMsg;
-}
-//---------------------------------------------------------------------------
-template <typename Callback>
-unique_ptr<network::OriginalMessage> Provider::getRequest(const network::Transaction& transaction, Callback&& callback) const
-// Builds the http request and transform it to an OriginalMessage for downloading a blob or listing a directory
-{
-    return make_unique<network::OriginalCallbackMessage<Callback>>(forward<Callback&&>(callback), getRequest(transaction.remotePath, transaction.info.range), getAddress(), getPort(), transaction.data.get(), transaction.capacity);
-}
-//---------------------------------------------------------------------------
-template <typename Callback>
-unique_ptr<network::OriginalMessage> Provider::putRequest(const network::Transaction& transaction, Callback&& callback) const
-/// Builds the http request and transform it to an OriginalMessage for putting an object without the actual data (header only according to the data and length provided)
-{
-    auto originalMsg = make_unique<network::OriginalCallbackMessage<Callback>>(forward<Callback&&>(callback), putRequest(transaction.remotePath, transaction.info.object), getAddress(), getPort(), transaction.data.get(), transaction.capacity);
-    originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(transaction.info.object.data()), transaction.info.object.size());
-    return originalMsg;
-}
-//---------------------------------------------------------------------------
-bool Provider::retrieveObject(network::TaskedSendReceiver& sendReceiver, network::Transaction& transaction) const
-// Downloads a multiple objects with the calling thread, changes transaction vector
-{
-    // Create the original request message and send it
-    auto originalMessage = getRequest(transaction);
-    sendReceiver.send(originalMessage.get());
-
-    // do the download work
-    sendReceiver.sendReceive();
-
-    // retrieve the results
-    auto content = sendReceiver.receive(originalMessage.get());
-    unique_ptr<network::HTTPHelper::Info> infoPtr;
-    network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
-    transaction.size = infoPtr->length;
-    transaction.offset = infoPtr->headerLength;
-
-    // move the datavector data to the transaction if the transaction is not used as buffer
-    if (!transaction.data.get()) {
-        transaction.data = content->transferBuffer();
-        transaction.capacity = content->capacity();
-    }
-
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Provider::uploadObject(network::TaskedSendReceiver& sendReceiver, network::Transaction& transaction) const
-// Uploads a multiple objects with the calling thread, changes blobs vector
-{
-    // Create the original message and send it
-    auto originalMessage = putRequest(transaction);
-    sendReceiver.send(originalMessage.get());
-
-    // do the download work
-    sendReceiver.sendReceive();
-
-    // retrieve the results
-    auto content = sendReceiver.receive(originalMessage.get());
-    unique_ptr<network::HTTPHelper::Info> infoPtr;
-    network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
-    transaction.size = infoPtr->length;
-    transaction.offset = infoPtr->headerLength;
-
-    // move the datavector data to the transaction if the transaction is not used as buffer
-    if (!transaction.data.get()) {
-        transaction.data = content->transferBuffer();
-        transaction.capacity = content->capacity();
-    }
-
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Provider::retrieveObjects(network::TaskedSendReceiver& sendReceiver, vector<unique_ptr<network::Transaction>>& transactions) const
-// Downloads a multiple objects with the calling thread, changes transaction vector
-{
-    vector<unique_ptr<network::OriginalMessage>> originalMessages;
-    originalMessages.reserve(transactions.size());
-
-    // create the original request message
-    for (auto& txn : transactions) {
-        auto originalMsg = getRequest(*txn);
-        sendReceiver.send(originalMsg.get());
-        originalMessages.push_back(move(originalMsg));
-    }
-
-    // do the download work
-    sendReceiver.sendReceive();
-
-    // retrieve the results
-    for (auto i = 0u; i < transactions.size(); i++) {
-        auto content = sendReceiver.receive(originalMessages[i].get());
-        unique_ptr<network::HTTPHelper::Info> infoPtr;
-        network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
-        transactions[i]->size = infoPtr->length;
-        transactions[i]->offset = infoPtr->headerLength;
-
-        // move the datavector data to the transaction if the transaction is not used as buffer
-        if (!transactions[i]->data.get()) {
-            transactions[i]->data = content->transferBuffer();
-            transactions[i]->capacity = content->capacity();
-        }
-    }
-
-    return true;
-}
-//---------------------------------------------------------------------------
-bool Provider::uploadObjects(network::TaskedSendReceiver& sendReceiver, vector<unique_ptr<network::Transaction>>& transactions) const
-// Uploads a multiple objects with the calling thread, changes blobs vector
-{
-    vector<unique_ptr<network::OriginalMessage>> originalMessages;
-    originalMessages.reserve(transactions.size());
-
-    // create the original request message
-    for (auto& txn : transactions) {
-        auto originalMsg = putRequest(*txn);
-        sendReceiver.send(originalMsg.get());
-        originalMessages.push_back(move(originalMsg));
-    }
-
-    // do the download work
-    sendReceiver.sendReceive();
-
-    // retrieve the results
-    for (auto i = 0u; i < transactions.size(); i++) {
-        auto content = sendReceiver.receive(originalMessages[i].get());
-        unique_ptr<network::HTTPHelper::Info> infoPtr;
-        network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
-        transactions[i]->size = infoPtr->length;
-        transactions[i]->offset = infoPtr->headerLength;
-
-        // move the datavector data to the transaction if the transaction is not used as buffer
-        if (!transactions[i]->data.get()) {
-            transactions[i]->data = content->transferBuffer();
-            transactions[i]->capacity = content->capacity();
-        }
-    }
-
-    return true;
-}
-//---------------------------------------------------------------------------
 bool Provider::isRemoteFile(const string_view fileName) noexcept
 // Is it a remote file?
 {
@@ -194,14 +47,14 @@ bool Provider::isRemoteFile(const string_view fileName) noexcept
     return false;
 }
 //---------------------------------------------------------------------------
-/// Get a region and bucket name
+// Get a region and bucket name
 Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
     assert(isRemoteFile(fileName));
     Provider::RemoteInfo info;
     info.provider = CloudService::Local;
     for (auto i = 0u; i < remoteFileCount; i++) {
         if (fileName.starts_with(remoteFile[i])) {
-            /// Handle cloud provider the same except MinIO includes endpoint
+            // Handle cloud provider the same except MinIO includes endpoint
             auto sub = fileName.substr(remoteFile[i].size());
             if (!remoteFile[i].compare("minio://")) {
                 auto pos = sub.find('/');
@@ -231,14 +84,14 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
 }
 //---------------------------------------------------------------------------
 string Provider::getKey(const string& keyFile)
-/// Gets the key from the kefile
+// Gets the key from the kefile
 {
     ifstream ifs(keyFile);
     return string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
 }
 //---------------------------------------------------------------------------
 unique_ptr<Provider> Provider::makeProvider(const string& filepath, const string& keyId, const string& secret, network::TaskedSendReceiver* sendReceiver)
-/// Create a provider
+// Create a provider
 {
     auto info = anyblob::cloud::Provider::getRemoteInfo(filepath);
     switch (info.provider) {

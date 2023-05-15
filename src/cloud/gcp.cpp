@@ -1,6 +1,7 @@
 #include "cloud/gcp.hpp"
 #include "cloud/gcp_signer.hpp"
 #include "network/http_helper.hpp"
+#include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "network/throughput_resolver.hpp"
 #include "utils/data_vector.hpp"
@@ -22,7 +23,7 @@ namespace cloud {
 using namespace std;
 //---------------------------------------------------------------------------
 static string buildAMZTimestamp()
-/// Creates the AMZ timestamp
+// Creates the AMZ timestamp
 {
     stringstream s;
     const auto t = chrono::system_clock::to_time_t(chrono::system_clock::now());
@@ -31,7 +32,7 @@ static string buildAMZTimestamp()
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> GCP::downloadInstanceInfo(const string& info)
-/// Builds the info http request
+// Builds the info http request
 {
     string protocol = "http://";
     string httpHeader = "GET /computeMetadata/v1/instance/" + info + " HTTP/1.1\r\nHost: ";
@@ -41,15 +42,15 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::downloadInstanceInfo(const string& i
 }
 //---------------------------------------------------------------------------
 Provider::Instance GCP::getInstanceDetails(network::TaskedSendReceiver& sendReceiver)
-/// Uses the send receiver to initialize the secret
+// Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo();
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
     sendReceiver.send(originalMsg.get());
-    sendReceiver.sendReceive();
-    auto content = sendReceiver.receive(originalMsg.get());
+    sendReceiver.process();
+    auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+    auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
 
     auto machineType = s.substr(s.find("machineTypes/"));
     for (auto& instance : GCPInstance::getInstanceDetails())
@@ -60,22 +61,22 @@ Provider::Instance GCP::getInstanceDetails(network::TaskedSendReceiver& sendRece
 }
 //---------------------------------------------------------------------------
 string GCP::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
-/// Uses the send receiver to initialize the secret
+// Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo("zone");
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
     sendReceiver.send(originalMsg.get());
-    sendReceiver.sendReceive();
-    auto content = sendReceiver.receive(originalMsg.get());
+    sendReceiver.process();
+    auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+    auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
     auto region = s.substr(s.find("zones/"));
     region = region.substr(0, region.size() - 2);
     return string(region);
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
-/// Builds the http request for downloading a blob
+// Builds the http request for downloading a blob
 {
     GCPSigner::Request request;
     request.method = "GET";
@@ -104,7 +105,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, c
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> GCP::putRequest(const string& filePath, const string_view object) const
-/// Builds the http request for putting objects without the object data itself
+// Builds the http request for putting objects without the object data itself
 {
     GCPSigner::Request request;
     request.method = "PUT";
@@ -132,13 +133,13 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::putRequest(const string& filePath, c
 }
 //---------------------------------------------------------------------------
 uint32_t GCP::getPort() const
-/// Gets the port of GCP on http
+// Gets the port of GCP on http
 {
     return 80;
 }
 //---------------------------------------------------------------------------
 string GCP::getAddress() const
-/// Gets the address of GCP
+// Gets the address of GCP
 {
     return _settings.bucket + ".storage.googleapis.com";
 }

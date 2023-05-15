@@ -1,4 +1,5 @@
-#include "network/messages.hpp"
+#include "network/message_task.hpp"
+#include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
 #include "utils/timer.hpp"
 #include <memory>
@@ -15,14 +16,12 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-MessageTask::MessageTask(OriginalMessage* message, uint8_t* receiveBuffer, uint64_t bufferSize) : originalMessage(message), sendBufferOffset(0), receiveBufferOffset(0), failures(0)
+MessageTask::MessageTask(OriginalMessage* message) : originalMessage(message), sendBufferOffset(0), receiveBufferOffset(0), failures(0)
 // The constructor
 {
-    if (receiveBuffer)
-        originalMessage->result = make_unique<utils::DataVector<uint8_t>>(receiveBuffer, bufferSize);
 }
 //---------------------------------------------------------------------------
-HTTPMessage::HTTPMessage(OriginalMessage* message, uint64_t chunkSize, uint8_t* receiveBuffer, uint64_t bufferSize) : MessageTask(message, receiveBuffer, bufferSize), chunkSize(chunkSize), info()
+HTTPMessage::HTTPMessage(OriginalMessage* message, uint64_t chunkSize) : MessageTask(message), chunkSize(chunkSize), info()
 // The constructor
 {
     type = Type::HTTP;
@@ -32,14 +31,15 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
 // executes the task
 {
     int32_t fd = -1;
-    auto& state = originalMessage->state;
+    auto& state = originalMessage->result.state;
     switch (state) {
         case MessageState::Init: {
             try {
                 fd = socket.connect(originalMessage->hostname, originalMessage->port, tcpSettings);
             } catch (exception& /*e*/) {
+                failureCode |= static_cast<uint16_t>(FailureCode::Socket);
                 state = MessageState::Aborted;
-                return execute(socket);
+                return state;
             }
             state = MessageState::InitSending;
             sendBufferOffset = 0;
@@ -51,16 +51,15 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                 if (request->length > 0) {
                     sendBufferOffset += request->length;
                 } else {
+                    failureCode |= static_cast<uint16_t>(FailureCode::Send);
                     reset(socket, failures++ > failuresMax);
                     return execute(socket);
                 }
 
                 if (sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size() + originalMessage->putLength)) {
                     state = MessageState::InitReceiving;
-                    if (!originalMessage->result)
-                        originalMessage->result = make_unique<utils::DataVector<uint8_t>>();
                     receiveBufferOffset = 0;
-                    originalMessage->result->clear();
+                    originalMessage->result.getDataVector().clear();
                     return execute(socket);
                 }
             }
@@ -80,58 +79,57 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
         }
         case MessageState::InitReceiving: // fallhrough
         case MessageState::Receiving: {
-            auto& receive = originalMessage->result;
+            auto& receive = originalMessage->result.getDataVector();
             // check after first successful receiving if we are finished
             if (state != MessageState::InitReceiving) {
-                if (request->length >= 0) {
+                if (request->length == 0) {
+                    failureCode |= static_cast<uint16_t>(FailureCode::Empty);
+                    reset(socket, failures++ > failuresMax);
+                    return execute(socket);
+                } else if (request->length > 0) {
                     // resize according to real downloaded size
-                    receive->resize(receive->size() - (chunkSize - request->length));
+                    receive.resize(receive.size() - (chunkSize - request->length));
                     receiveBufferOffset += request->length;
 
                     try {
                         // check whether finished http
-                        if (HTTPHelper::finished(receive->data(), receiveBufferOffset, info)) {
-                            state = MessageState::Finished;
+                        if (HTTPHelper::finished(receive.data(), receiveBufferOffset, info)) {
                             socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, sendBufferOffset + receiveBufferOffset);
-                            return originalMessage->state;
+                            originalMessage->result.size = info->length;
+                            originalMessage->result.offset = info->headerLength;
+                            state = MessageState::Finished;
+                            return MessageState::Finished;
                         }
                     } catch (exception&) {
-                        string header(reinterpret_cast<char*>(receive->data()), receive->size());
-                        reset(socket, failures++ > failuresMax);
-                        return execute(socket);
-                    }
-
-                    if (!request->length) {
-                        string header(reinterpret_cast<char*>(receive->data()), receive->size());
-                        cerr << "Empty request - restart!" << endl;
+                        failureCode |= static_cast<uint16_t>(FailureCode::HTTP);
                         reset(socket, failures++ > failuresMax);
                         return execute(socket);
                     }
                 } else if (errno != EINPROGRESS) {
                     if (socket.checkTimeout(request->fd, tcpSettings)) {
-                        string header(reinterpret_cast<char*>(receive->data()), receive->size());
-                        cerr << "Timeout error! Error code: " << strerror(errno) << endl;
+                        failureCode |= static_cast<uint16_t>(FailureCode::Timeout);
                         reset(socket, failures++ > failuresMax);
                         return execute(socket);
                     }
-                    string header(reinterpret_cast<char*>(receive->data()), receive->size());
-                    cerr << "Request error! Error code: " << strerror(errno) << endl;
+                    failureCode |= static_cast<uint16_t>(FailureCode::Recv);
                     reset(socket, failures++ > failuresMax);
                     return execute(socket);
                 } else {
-                    receive->resize(receive->size() - chunkSize);
+                    receive.resize(receive.size() - chunkSize);
                 }
                 // resize and grow capacity
-                if (receive->capacity() < receive->size() + chunkSize && info) {
-                    receive->reserve(max(info->length + info->headerLength + chunkSize, static_cast<uint64_t>(receive->capacity() * 1.5)));
+                if (receive.capacity() < receive.size() + chunkSize && info) {
+                    receive.reserve(max(info->length + info->headerLength + chunkSize, static_cast<uint64_t>(receive.capacity() * 1.5)));
                 }
             }
-            receive->resize(receive->size() + chunkSize);
-            request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = receive->data() + receiveBufferOffset}, static_cast<int64_t>(chunkSize), request->fd, IOUringSocket::EventType::read, this});
+            receive.resize(receive.size() + chunkSize);
+            request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = receive.data() + receiveBufferOffset}, static_cast<int64_t>(chunkSize), request->fd, IOUringSocket::EventType::read, this});
             socket.recv_prep(request.get(), tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
             state = MessageState::Receiving;
             break;
         }
+        case MessageState::Finished:
+            break;
         case MessageState::Aborted:
             break;
         default:
@@ -144,12 +142,12 @@ void HTTPMessage::reset(IOUringSocket& socket, bool aborted)
 // Reset for restart
 {
     if (!aborted) {
-        originalMessage->result->clear();
+        originalMessage->result.getDataVector().clear();
         receiveBufferOffset = 0;
         sendBufferOffset = 0;
-        originalMessage->state = MessageState::Init;
+        originalMessage->result.state = MessageState::Init;
     } else {
-        originalMessage->state = MessageState::Aborted;
+        originalMessage->result.state = MessageState::Aborted;
     }
     socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, true);
 }

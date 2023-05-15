@@ -1,5 +1,8 @@
 #include "network/tasked_send_receiver.hpp"
-#include "network/http_helper.hpp"
+#include "network/message_result.hpp"
+#include "network/original_message.hpp"
+#include "utils/data_vector.hpp"
+#include "utils/timer.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -18,52 +21,34 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TaskedSendReceiverGroup::TaskedSendReceiverGroup(uint64_t concurrentRequests, uint64_t submissions, uint64_t chunkSize, uint64_t completions, uint64_t reuse) : _submissions(submissions), _completions(!completions ? 0.2 * submissions : completions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(concurrentRequests), _cv(), _mutex()
+TaskedSendReceiverGroup::TaskedSendReceiverGroup(uint64_t concurrentRequests, uint64_t submissions, uint64_t chunkSize, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(concurrentRequests), _cv(), _mutex()
 // Initializes the global submissions and completions
 {
 }
 //---------------------------------------------------------------------------
 TaskedSendReceiverGroup::~TaskedSendReceiverGroup()
-/// The destructor
+// The destructor
 {
-    while (auto val = _reuse.consume<false>()) {
+    while (auto val = _reuse.consume()) {
         if (val.has_value())
             delete val.value();
     }
 }
 //---------------------------------------------------------------------------
 bool TaskedSendReceiverGroup::send(OriginalMessage* msg)
-/// Adds a message to the submission queue
+// Adds a message to the submission queue
 {
-    return (_submissions.insert<false>(msg) != ~0ull);
+    return (_submissions.insert(msg) != ~0ull);
 }
 //---------------------------------------------------------------------------
 bool TaskedSendReceiverGroup::send(span<OriginalMessage*> msgs)
-/// Adds a message to the submission queue
+// Adds a message to the submission queue
 {
-    return (_submissions.insert<false>(msgs) != ~0ull);
-}
-//---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> TaskedSendReceiverGroup::receive(OriginalMessage* msg, bool async)
-/// Receives the messages and blocks until it is received
-{
-    do {
-        auto it = _completions.find(reinterpret_cast<uintptr_t>(msg));
-        if (it != _completions.end()) {
-            auto res = move(it->second);
-            _completions.erase(it);
-            return res;
-        } else {
-            if (async)
-                return nullptr;
-            unique_lock<mutex> lock(_mutex);
-            _cv.wait(lock);
-        }
-    } while (true);
+    return (_submissions.insertAll(msgs) != ~0ull);
 }
 //---------------------------------------------------------------------------
 TaskSendReceiverHandle TaskedSendReceiverGroup::getHandle()
-/// Runs a new tasked send receiver deamon
+// Runs a new tasked send receiver deamon
 {
     for (auto head = _head.load(); head;) {
         if (_head.compare_exchange_weak(head, head->_next)) {
@@ -80,20 +65,20 @@ TaskSendReceiverHandle TaskedSendReceiverGroup::getHandle()
     return handle;
 }
 //---------------------------------------------------------------------------
-void TaskedSendReceiverGroup::sendReceive(bool oneQueueInvocation)
-/// Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
+void TaskedSendReceiverGroup::process(bool oneQueueInvocation)
+// Submits queue and waits for result
 {
     auto handle = getHandle();
     handle.sendReceive(oneQueueInvocation);
 }
 //---------------------------------------------------------------------------
 TaskSendReceiverHandle::TaskSendReceiverHandle(TaskedSendReceiverGroup* group) : _group(group)
-/// The constructor
+// The constructor
 {
 }
 //---------------------------------------------------------------------------
 TaskSendReceiverHandle::TaskSendReceiverHandle(TaskSendReceiverHandle&& other)
-/// Move constructor
+// Move constructor
 {
     _group = other._group;
     _sendReceiver = other._sendReceiver;
@@ -101,7 +86,7 @@ TaskSendReceiverHandle::TaskSendReceiverHandle(TaskSendReceiverHandle&& other)
 }
 //---------------------------------------------------------------------------
 TaskSendReceiverHandle& TaskSendReceiverHandle::operator=(TaskSendReceiverHandle&& other)
-/// Move assignment
+// Move assignment
 {
     if (other._group == _group) {
         _sendReceiver = other._sendReceiver;
@@ -111,7 +96,7 @@ TaskSendReceiverHandle& TaskSendReceiverHandle::operator=(TaskSendReceiverHandle
 }
 //---------------------------------------------------------------------------
 bool TaskSendReceiverHandle::run()
-/// Starts the deamon
+// Starts the deamon
 {
     if (!_sendReceiver)
         return false;
@@ -120,7 +105,7 @@ bool TaskSendReceiverHandle::run()
 }
 //---------------------------------------------------------------------------
 void TaskSendReceiverHandle::stop()
-/// Stops the deamon
+// Stops the deamon
 {
     if (!_sendReceiver)
         return;
@@ -136,21 +121,21 @@ void TaskSendReceiverHandle::stop()
 }
 //---------------------------------------------------------------------------
 bool TaskSendReceiverHandle::sendReceive(bool oneQueueInvocation)
-/// Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
+// Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
 {
     if (!_sendReceiver)
         return false;
-    _sendReceiver->sendReceive(oneQueueInvocation);
+    _sendReceiver->sendReceive(false, oneQueueInvocation);
     return true;
 }
 //---------------------------------------------------------------------------
-TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _next(nullptr), _socketWrapper(make_unique<IOUringSocket>(group._concurrentRequests << 2)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
-/// The constructor
+TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _submissions(), _next(nullptr), _socketWrapper(make_unique<IOUringSocket>(group._concurrentRequests << 2)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
+// The constructor
 {
 }
 //---------------------------------------------------------------------------
 void TaskedSendReceiver::run()
-/// Deamon
+// Deamon
 {
     try {
         sendReceive(false);
@@ -160,68 +145,104 @@ void TaskedSendReceiver::run()
 }
 //---------------------------------------------------------------------------
 int32_t TaskedSendReceiver::connect(string hostname, uint32_t port)
-/// Connect to the socket
+// Connect to the socket
 {
     IOUringSocket::TCPSettings tcpSettings;
     return _socketWrapper->connect(hostname, port, tcpSettings);
 }
 //---------------------------------------------------------------------------
 bool TaskedSendReceiver::send(OriginalMessage* msg)
-/// Adds a message to the submission queue
+// Adds a message to the group submission queue
 {
-    return _group._submissions.insert<false>(msg);
+    return (_group._submissions.insert(msg) != ~0ull);
+}
+//---------------------------------------------------------------------------
+void TaskedSendReceiver::sendSync(OriginalMessage* msg)
+// Adds a message to the local submission queue
+{
+    _submissions.emplace(msg);
 }
 //---------------------------------------------------------------------------
 void TaskedSendReceiver::reuse(unique_ptr<utils::DataVector<uint8_t>> message)
-/// Reuse message
+// Reuse message
 {
-    _group._reuse.insert<false>(message.release());
-}
-//---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> TaskedSendReceiver::receive(OriginalMessage* msg)
-/// Receives the messages and blocks until it is received
-{
-    return _group.receive(msg, false);
-}
-//---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> TaskedSendReceiver::receiveAsync(OriginalMessage* msg)
-/// Receives the messages if available else nullptr
-{
-    return _group.receive(msg, true);
+    _group._reuse.insert(message.release());
 }
 //--------------------------------------------------------------------------
-void TaskedSendReceiver::sendReceive(bool oneQueueInvocation)
-/// Creates a sending message chaining IOSQE_IO_LINK, creates a receiving message, and waits for result
+void TaskedSendReceiver::addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver)
+// Adds a resolver
+{
+    _socketWrapper->addResolver(hostname, move(resolver));
+}
+//--------------------------------------------------------------------------
+void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
+// Creates a sending message chaining IOSQE_IO_LINK, creates a receiving message, and waits for result
 {
     // Reset the stop
     _stopDeamon = false;
 
     // Current requests in flight
-    auto submissions = 0u;
+    auto count = 0u;
 
     // Send new requests
     auto emplaceNewRequest = [&] {
-        while (auto val = _group._submissions.consume<false>()) {
-            /// Create new submission requests if within concurrency
+        while (auto val = _group._submissions.consume()) {
+            // Create new submission requests if within concurrency
             if (!val.has_value())
                 break;
 
             auto original = val.value();
-            _messageTasks.emplace_back(make_unique<HTTPMessage>(original, _group._chunkSize, original->receiveBuffer, original->bufferSize));
+            auto messageTask = MessageTask::buildMessageTask(original, _group._chunkSize);
+            assert(messageTask.get());
 
-            if (!original->result) {
-                if (auto mem = _group._reuse.consume<false>()) {
-                    if (mem.has_value()) {
-                        original->result = unique_ptr<utils::DataVector<uint8_t>>(mem.value());
-                    }
-                }
+            if (!original->result.getDataVector().capacity()) {
+                auto mem = _group._reuse.consume();
+                if (mem.has_value())
+                    original->setResultVector(mem.value());
             }
 
             if (_timings)
                 (*_timings)[original->traceId].start = chrono::steady_clock::now();
 
             // Start the message process
-            _messageTasks.back()->execute(*_socketWrapper);
+            if (messageTask->execute(*_socketWrapper) == MessageState::Aborted) {
+                if (messageTask->originalMessage->requiresFinish())
+                    messageTask->originalMessage->finish();
+                continue;
+            }
+            // Insert into the task vector
+            _messageTasks.emplace_back(move(messageTask));
+
+            if (_messageTasks.size() >= _group._concurrentRequests)
+                break;
+        }
+    };
+
+    // Send new requests
+    auto emplaceLocalRequest = [&] {
+        while (!_submissions.empty()) {
+            OriginalMessage* original = _submissions.front();
+            _submissions.pop();
+            auto messageTask = MessageTask::buildMessageTask(original, _group._chunkSize);
+            assert(messageTask.get());
+
+            if (!original->result.getDataVector().capacity()) {
+                auto mem = _group._reuse.consume();
+                if (mem.has_value())
+                    original->setResultVector(mem.value());
+            }
+
+            if (_timings)
+                (*_timings)[original->traceId].start = chrono::steady_clock::now();
+
+            // Start the message process
+            if (messageTask->execute(*_socketWrapper) == MessageState::Aborted) {
+                if (messageTask->originalMessage->requiresFinish())
+                    messageTask->originalMessage->finish();
+                continue;
+            }
+            // Insert into the task vector
+            _messageTasks.emplace_back(move(messageTask));
 
             if (_messageTasks.size() >= _group._concurrentRequests)
                 break;
@@ -229,29 +250,26 @@ void TaskedSendReceiver::sendReceive(bool oneQueueInvocation)
     };
 
     // iterate over all messages
-    while (!_stopDeamon || submissions) {
-        if (submissions > 0) {
+    while (!_stopDeamon || count) {
+        if (count > 0) {
             // get cqe
             auto req = _socketWrapper->complete();
-            submissions--;
+            count--;
             // get the task
             auto task = reinterpret_cast<MessageTask*>(req->messageTask);
             // execute next task
             auto status = task->execute(*_socketWrapper);
             // check if finished
-            if (status == MessageState::Finished) {
+            if (status == MessageState::Finished || status == MessageState::Aborted) {
                 for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
                     if (it->get() == task) {
                         // Remove the second param with the real data
                         if (_timings) {
-                            auto sv = HTTPHelper::retrieveContent(task->originalMessage->result->data(), task->originalMessage->result->size(), static_cast<HTTPMessage*>(it->get())->info);
-                            (*_timings)[task->originalMessage->traceId].size = sv.size();
+                            (*_timings)[task->originalMessage->traceId].size = task->originalMessage->result.getSize();
                             (*_timings)[task->originalMessage->traceId].finish = chrono::steady_clock::now();
                         }
 
-                        if (!task->originalMessage->requiresFinish())
-                            _group._completions.push(reinterpret_cast<uintptr_t>(task->originalMessage), move(task->originalMessage->result));
-                        else
+                        if (task->originalMessage->requiresFinish())
                             task->originalMessage->finish();
                         _messageTasks.erase(it);
                         _group._cv.notify_all();
@@ -263,12 +281,13 @@ void TaskedSendReceiver::sendReceive(bool oneQueueInvocation)
             }
         }
         if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests) {
-            emplaceNewRequest();
+            local ? emplaceLocalRequest() : emplaceNewRequest();
         }
-        if (submissions <= _messageTasks.size() / 2)
-            submissions += _socketWrapper->submit();
+        if (count <= _messageTasks.size() / 2)
+            count += _socketWrapper->submit();
 
-        if (oneQueueInvocation && _group._submissions.empty() && !submissions) {
+        auto empty = local ? _submissions.empty() : _group._submissions.empty();
+        if (oneQueueInvocation && empty && !count) {
             _stopDeamon = true;
             continue;
         }
@@ -278,7 +297,7 @@ void TaskedSendReceiver::sendReceive(bool oneQueueInvocation)
 }
 //---------------------------------------------------------------------------
 int32_t TaskedSendReceiver::submitRequests()
-/// Submits the queue
+// Submits the queue
 {
     return _socketWrapper->submit();
 }
