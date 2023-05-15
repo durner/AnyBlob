@@ -39,14 +39,14 @@ TEST_CASE("send_receiver") {
 
     unique_ptr<uint8_t[]> currentMessage;
     size_t size;
-    for (auto i = 0; i < concurrency; i++) {
+    for (auto i = 0; i < concurrency;) {
         auto& original = msgs[i];
         switch (original->result.getState()) {
             case MessageState::Finished: {
                 auto& message = original->result;
                 if (i > 0) {
                     // skip header
-                    auto skip = 1024;
+                    size_t skip = 1024;
                     REQUIRE(!strncmp(reinterpret_cast<char*>(currentMessage.get()) + skip, reinterpret_cast<char*>(message.getData()) + skip, size - skip));
                 }
                 currentMessage = message.moveData();

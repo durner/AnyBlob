@@ -38,6 +38,7 @@ HTTPHelper::Info HTTPHelper::detect(const string_view header)
     if (info.protocol != Protocol::Unknown) {
         if (header.npos != header.find("Transfer-Encoding: chunked")) {
             info.encoding = Encoding::ChunkedEncoding;
+            info.headerLength = header.find("\r\n\r\n"sv) + 4;
         } else {
             string contentLength = "Content-Length: ";
             auto pos = header.find(contentLength);
@@ -78,7 +79,12 @@ bool HTTPHelper::finished(const uint8_t* data, uint64_t length, unique_ptr<Info>
                 return length >= info->headerLength + info->length;
             case Encoding::ChunkedEncoding: {
                 string_view sv(reinterpret_cast<const char*>(data), length);
-                return sv.find("0\r\n\r\n"sv) != sv.npos;
+                info->length = sv.find("0\r\n\r\n"sv);
+                bool ret = info->length != sv.npos;
+                if (ret)
+                    info->length -= info->headerLength;
+                return ret;
+
             }
             default: {
                 info = nullptr;

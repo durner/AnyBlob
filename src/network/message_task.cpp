@@ -98,7 +98,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                             originalMessage->result.size = info->length;
                             originalMessage->result.offset = info->headerLength;
                             state = MessageState::Finished;
-                            return MessageState::Finished;
+                            return state;
                         }
                     } catch (exception&) {
                         failureCode |= static_cast<uint16_t>(FailureCode::HTTP);
