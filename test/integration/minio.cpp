@@ -88,13 +88,18 @@ TEST_CASE("MinIO Integration") {
             REQUIRE(it.success());
             // Simple string_view interface
             REQUIRE(!content[i].compare(it.getResult()));
+            // Check from the other side too
+            REQUIRE(!it.getResult().compare(content[i]));
+            // Check the size
+            REQUIRE(it.getSize() == content[i].size());
 
             // Advanced raw interface
             // Note that the data lies in the data buffer but after the offset to skip the HTTP header
             // Note that the size is already without the header, so the full request has size + offset length
             string_view rawDataString(reinterpret_cast<const char*>(it.getData()) + it.getOffset(), it.getSize());
-            REQUIRE(!content[i++].compare(rawDataString));
+            REQUIRE(!content[i].compare(rawDataString));
             REQUIRE(!rawDataString.compare(it.getResult()));
+            REQUIRE(!rawDataString.compare(content[i++]));
         }
     }
 }
