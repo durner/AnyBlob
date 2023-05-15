@@ -3,11 +3,9 @@
 #include "cloud/aws_signer.hpp"
 #include "network/http_helper.hpp"
 #include "network/tasked_send_receiver.hpp"
-#include "network/throughput_resolver.hpp"
 #include "utils/data_vector.hpp"
 #include <chrono>
 #include <iomanip>
-#include <sstream>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -53,19 +51,23 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadInstanceInfo(const string& i
 Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendReceiver)
 /// Uses the send receiver to get instance details
 {
-    auto message = downloadInstanceInfo();
-    auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
-    sendReceiver.send(originalMsg.get());
-    sendReceiver.sendReceive();
-    auto content = sendReceiver.receive(originalMsg.get());
-    unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+    if (_type == Provider::CloudService::AWS) {
+        auto message = downloadInstanceInfo();
+        auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+        sendReceiver.send(originalMsg.get());
+        sendReceiver.sendReceive();
+        auto content = sendReceiver.receive(originalMsg.get());
+        unique_ptr<network::HTTPHelper::Info> infoPtr;
+        auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
 
-    for (auto& instance : AWSInstance::getInstanceDetails())
-        if (!instance.type.compare(s))
-            return instance;
+        for (auto& instance : AWSInstance::getInstanceDetails())
+            if (!instance.type.compare(s))
+                return instance;
 
-    return AWSInstance{string(s), 0, 0, ""};
+        return AWSInstance{string(s), 0, 0, ""};
+    } else {
+        return AWSInstance{"minio", 0, 0, "10"};
+    }
 }
 //---------------------------------------------------------------------------
 string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
@@ -149,13 +151,6 @@ bool AWS::updateSecret(string_view content)
     return true;
 }
 //---------------------------------------------------------------------------
-void AWS::initKey()
-/// Inits key
-{
-    ifstream ifs(_secret->keyFile);
-    _secret->secret = string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
-}
-//---------------------------------------------------------------------------
 bool AWS::validKeys() const
 /// Checks whether keys need to be refresehd
 {
@@ -167,27 +162,31 @@ bool AWS::validKeys() const
 void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
 /// Uses the send receiver to initialize the secret
 {
-    auto message = downloadIAMUser();
-    auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
-    sendReceiver.send(originalMsg.get());
-    sendReceiver.sendReceive();
-    auto content = sendReceiver.receive(originalMsg.get());
-    unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
-    message = downloadSecret(s);
-    originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
-    sendReceiver.send(originalMsg.get());
-    sendReceiver.sendReceive();
-    content = sendReceiver.receive(originalMsg.get());
-    infoPtr.reset();
-    s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
-    updateSecret(s);
+    if (_type == Provider::CloudService::AWS) {
+        auto message = downloadIAMUser();
+        auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+        sendReceiver.send(originalMsg.get());
+        sendReceiver.sendReceive();
+        auto content = sendReceiver.receive(originalMsg.get());
+        unique_ptr<network::HTTPHelper::Info> infoPtr;
+        auto s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+        message = downloadSecret(s);
+        originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+        sendReceiver.send(originalMsg.get());
+        sendReceiver.sendReceive();
+        content = sendReceiver.receive(originalMsg.get());
+        infoPtr.reset();
+        s = network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+        updateSecret(s);
+    }
 }
 //---------------------------------------------------------------------------
 void AWS::initResolver(network::TaskedSendReceiver& sendReceiver)
 /// Inits the resolver
 {
-    sendReceiver.addResolver("amazonaws.com", unique_ptr<network::Resolver>(new cloud::AWSResolver(sendReceiver.getConcurrentRequests())));
+    if (_type == Provider::CloudService::AWS) {
+        sendReceiver.addResolver("amazonaws.com", unique_ptr<network::Resolver>(new cloud::AWSResolver(sendReceiver.getConcurrentRequests())));
+    }
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const

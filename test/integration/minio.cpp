@@ -31,11 +31,6 @@ TEST_CASE("MinIO Integration") {
     REQUIRE(key);
     REQUIRE(secret);
 
-    char keyFile[] = "/tmp/tmp.aws.key";
-    {
-        ofstream outfile(keyFile);
-        outfile << secret;
-    }
 
     // The file to be uploaded and downloaded
     string bucketName = "minio://";
@@ -50,7 +45,7 @@ TEST_CASE("MinIO Integration") {
     anyblob::network::TaskedSendReceiver sendReceiver(group);
 
     // Create the provider for the corresponding filename
-    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, key, keyFile, &sendReceiver);
+    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, key, secret, &sendReceiver);
 
     // Create the put request
     vector<unique_ptr<anyblob::network::Transaction>> requests;

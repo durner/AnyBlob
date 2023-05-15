@@ -22,7 +22,8 @@ using namespace std;
 TEST_CASE("azure") {
     Provider::testEnviornment = true;
 
-    Azure azure("test", "test", "");
+    auto provider = Provider::makeProvider("azure://test/", "test", "");
+    Azure& azure = *static_cast<Azure*>(provider.get());
     REQUIRE(!strcmp(azure.getIAMAddress(), "169.254.169.254"));
     REQUIRE(azure.getIAMPort() == 80);
 

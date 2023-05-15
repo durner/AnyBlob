@@ -42,12 +42,13 @@ Resolver::Resolver(unsigned entries)
     _addrCtr = 0;
 }
 //---------------------------------------------------------------------------
-unsigned Resolver::resolve(string hostname, string port, bool& reuse)
+unsigned Resolver::resolve(string hostname, string port, bool& oldAddress)
 /// Resolve the request
 {
     auto addrPos = _addrCtr % _addrString.size();
     auto curCtr = _addrString[addrPos].second--;
     auto hostString = hostname + ":" + port;
+    oldAddress = true;
     if (_addrString[addrPos].first.compare(hostString) || curCtr == 0) {
         struct addrinfo hints = {};
         memset(&hints, 0, sizeof hints);
@@ -61,9 +62,8 @@ unsigned Resolver::resolve(string hostname, string port, bool& reuse)
         }
         _addr[addrPos].reset(temp);
         _addrString[addrPos] = {hostString, 12};
-        reuse = false;
+        oldAddress = false;
     }
-    reuse = true;
     return addrPos;
 }
 //---------------------------------------------------------------------------

@@ -21,7 +21,8 @@ using namespace std;
 TEST_CASE("aws") {
     Provider::testEnviornment = true;
 
-    AWS aws("test", "test");
+    auto provider = Provider::makeProvider("s3://test:test/", "test", "test");
+    AWS& aws = *static_cast<AWS*>(provider.get());
     REQUIRE(!strcmp(aws.getIAMAddress(), "169.254.169.254"));
     REQUIRE(aws.getIAMPort() == 80);
 

@@ -209,10 +209,10 @@ void TaskedSendReceiver::sendReceive(bool oneQueueInvocation)
             auto original = val.value();
             _messageTasks.emplace_back(make_unique<HTTPMessage>(original, _group._chunkSize, original->receiveBuffer, original->bufferSize));
 
-            if (!_messageTasks.back()->receive) {
+            if (!original->result) {
                 if (auto mem = _group._reuse.consume<false>()) {
                     if (mem.has_value()) {
-                        _messageTasks.back()->receive = unique_ptr<utils::DataVector<uint8_t>>(mem.value());
+                        original->result = unique_ptr<utils::DataVector<uint8_t>>(mem.value());
                     }
                 }
             }
@@ -239,26 +239,26 @@ void TaskedSendReceiver::sendReceive(bool oneQueueInvocation)
             // execute next task
             auto status = task->execute(*_socketWrapper);
             // check if finished
-            if (status == MessageTask::Status::Finished) {
+            if (status == MessageState::Finished) {
                 for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
                     if (it->get() == task) {
                         // Remove the second param with the real data
                         if (_timings) {
-                            auto sv = HTTPHelper::retrieveContent(it->get()->receive->data(), it->get()->receive->size(), static_cast<HTTPMessage*>(it->get())->info);
+                            auto sv = HTTPHelper::retrieveContent(task->originalMessage->result->data(), task->originalMessage->result->size(), static_cast<HTTPMessage*>(it->get())->info);
                             (*_timings)[task->originalMessage->traceId].size = sv.size();
                             (*_timings)[task->originalMessage->traceId].finish = chrono::steady_clock::now();
                         }
 
                         if (!task->originalMessage->requiresFinish())
-                            _group._completions.push(reinterpret_cast<uintptr_t>(task->originalMessage), move(it->get()->receive));
+                            _group._completions.push(reinterpret_cast<uintptr_t>(task->originalMessage), move(task->originalMessage->result));
                         else
-                            task->originalMessage->finish(move(it->get()->receive));
+                            task->originalMessage->finish();
                         _messageTasks.erase(it);
                         _group._cv.notify_all();
                         break;
                     }
                 }
-            } else if (_timings && status == MessageTask::Status::Receiving && !task->receiveBufferOffset) {
+            } else if (_timings && status == MessageState::Receiving && !task->receiveBufferOffset) {
                 (*_timings)[task->originalMessage->traceId].recieve = chrono::steady_clock::now();
             }
         }

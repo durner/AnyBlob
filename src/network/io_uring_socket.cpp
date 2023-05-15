@@ -46,7 +46,7 @@ IOUringSocket::IOUringSocket(uint32_t entries, int32_t /*flags*/) : _resolverCac
     _resolverCache.emplace("", make_unique<ThroughputResolver>(entries));
 }
 //---------------------------------------------------------------------------
-int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpSettings)
+int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpSettings, int retryLimit)
 /// Creates a new socket connection
 {
     if (auto it = _fdCache.find(hostname); it != _fdCache.end()) {
@@ -68,8 +68,9 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
         resCache = _resolverCache.find("")->second.get();
     }
 
-    bool reuse = false;
-    auto pos = resCache->resolve(hostname, port_str, reuse);
+    // Did we use
+    bool oldAddress = false;
+    auto pos = resCache->resolve(hostname, port_str, oldAddress);
 
     // Build socket
     auto fd = socket(resCache->_addr[pos]->ai_family, resCache->_addr[pos]->ai_socktype, resCache->_addr[pos]->ai_protocol);
@@ -198,12 +199,14 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
     // Connect to remote
     auto connectRes = ::connect(fd, resCache->_addr[pos]->ai_addr, resCache->_addr[pos]->ai_addrlen);
     if (connectRes < 0 && errno != EINPROGRESS) {
-        if (reuse) {
+        close(fd);
+        if (oldAddress && retryLimit > 0) {
+            // Retry with a new address
             resCache->erase();
-            close(fd);
-            return connect(hostname, port, tcpSettings);
+            return connect(hostname, port, tcpSettings, retryLimit - 1);
+        } else {
+            throw runtime_error("Socket creation error! " + string(strerror(errno)));
         }
-        throw runtime_error("Socket connection error! " + string(strerror(errno)));
     }
 
     resCache->startSocket(fd, pos);
@@ -219,20 +222,32 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
         tv.tv_usec = 50000;
 
         // connection check
-        if (select(fd + 1, NULL, &fdset, NULL, &tv) == 1) {
+        auto t = select(fd + 1, NULL, &fdset, NULL, &tv);
+        if (t == 1) {
             int socketError;
             socklen_t socketErrorLen = sizeof(socketError);
-            getsockopt(fd, SOL_SOCKET, SO_ERROR, &socketError, &socketErrorLen);
+            if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &socketError, &socketErrorLen)) {
+                throw runtime_error("Socket creation error! Could not retrieve socket options!");
+            }
+
             if (!socketError) {
                 // sucessful
                 setTimeOut(fd, tcpSettings);
                 _fdSockets.insert(fd);
                 return fd;
+            } else {
+                close(fd);
+                throw runtime_error("Socket creation error! " + string(strerror(socketError)));
+            }
+        } else {
+            // Reached timeout
+            close(fd);
+            if (retryLimit > 0) {
+                return connect(hostname, port, tcpSettings, retryLimit - 1);
+            } else {
+                throw runtime_error("Socket creation error! Timeout reached");
             }
         }
-        // retry
-        close(fd);
-        return connect(hostname, port, tcpSettings);
     }
     setTimeOut(fd, tcpSettings);
     _fdSockets.insert(fd);

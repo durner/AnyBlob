@@ -101,7 +101,7 @@ class IOUringSocket {
     ~IOUringSocket();
 
     /// Creates a new socket connection
-    int32_t connect(std::string hostname, uint32_t port, TCPSettings& tcpSettings);
+    int32_t connect(std::string hostname, uint32_t port, TCPSettings& tcpSettings, int retryLimit = 16);
     /// Disconnects the socket
     void disconnect(int32_t fd, std::string hostname = "", uint32_t port = 0, TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
 

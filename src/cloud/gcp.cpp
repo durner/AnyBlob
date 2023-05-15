@@ -30,13 +30,6 @@ static string buildAMZTimestamp()
     return s.str();
 }
 //---------------------------------------------------------------------------
-void GCP::initKey()
-/// Inits key if not exists
-{
-    ifstream ifs(_secret->rsaKeyFile);
-    _secret->privateKey = string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
-}
-//---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> GCP::downloadInstanceInfo(const string& info)
 /// Builds the info http request
 {

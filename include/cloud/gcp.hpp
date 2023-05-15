@@ -1,6 +1,7 @@
 #pragma once
 #include "cloud/gcp_instances.hpp"
 #include "cloud/provider.hpp"
+#include <cassert>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -33,8 +34,6 @@ class GCP : public Provider {
     struct Secret {
         /// The IAM user
         std::string serviceAccountEmail;
-        /// The key file
-        std::string rsaKeyFile;
         /// The private key
         std::string privateKey;
     };
@@ -47,9 +46,6 @@ class GCP : public Provider {
     Settings _settings;
     /// The secret
     std::unique_ptr<Secret> _secret;
-
-    /// Inits key from file
-    void initKey();
 
     public:
     /// Get instance details
@@ -69,20 +65,12 @@ class GCP : public Provider {
 
     public:
     /// The constructor
-    explicit GCP(Settings settings, const std::string& clientEmail, const std::string& keyFile) : _settings(settings) {
-        _type = Provider::CloudService::GCP;
+    GCP(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket, info.region}) {
+        assert(info.provider == Provider::CloudService::GCP);
+        _type = info.provider;
         _secret = std::make_unique<Secret>();
         _secret->serviceAccountEmail = clientEmail;
-        _secret->rsaKeyFile = keyFile;
-        initKey();
-    }
-    /// The constructor
-    GCP(const std::string& bucket, const std::string& region, const std::string& clientEmail, const std::string& keyFile) : _settings({bucket, region}) {
-        _type = Provider::CloudService::GCP;
-        _secret = std::make_unique<Secret>();
-        _secret->serviceAccountEmail = clientEmail;
-        _secret->rsaKeyFile = keyFile;
-        initKey();
+        _secret->privateKey = key;
     }
     /// Get the settings
     Settings getSettings() { return _settings; }

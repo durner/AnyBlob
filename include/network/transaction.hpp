@@ -13,7 +13,7 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace network {
 //---------------------------------------------------------------------------
-class OriginalMessage;
+struct OriginalMessage;
 //---------------------------------------------------------------------------
 /// The request/response transaction handler used to transfer data from and to remote storage
 /// Rewrites the DataVector<uint8_t> to data, capacity and size

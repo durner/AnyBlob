@@ -1,6 +1,7 @@
 #pragma once
 #include "cloud/azure_instances.hpp"
 #include "cloud/provider.hpp"
+#include <cassert>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -31,8 +32,6 @@ class Azure : public Provider {
     struct Secret {
         /// The IAM user
         std::string accountName;
-        /// The key file
-        std::string rsaKeyFile;
         /// The private key
         std::string privateKey;
     };
@@ -67,19 +66,12 @@ class Azure : public Provider {
 
     public:
     /// The constructor
-    explicit Azure(Settings settings, const std::string& clientEmail, const std::string& keyFile) : _settings(settings) {
-        _type = Provider::CloudService::Azure;
+    Azure(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket}) {
+        assert(info.provider == Provider::CloudService::Azure);
+        _type = info.provider;
         _secret = std::make_unique<Secret>();
         _secret->accountName = clientEmail;
-        _secret->rsaKeyFile = keyFile;
-        initKey();
-    }
-    /// The constructor
-    Azure(const std::string& bucket, const std::string& clientEmail, const std::string& keyFile) : _settings({bucket}) {
-        _type = Provider::CloudService::Azure;
-        _secret = std::make_unique<Secret>();
-        _secret->accountName = clientEmail;
-        _secret->rsaKeyFile = keyFile;
+        _secret->privateKey = key;
         initKey();
     }
     /// Get the settings
