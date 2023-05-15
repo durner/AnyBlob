@@ -17,7 +17,7 @@ threadsS3 = [128]
 throughputGoal = [100]
 concurrentRequestsS3Crt = [256]
 concurrentRequestsS3 = [256]
-concurrentRequestsUring = [18]
+concurrentRequestsUring = [20]
 dnsresolver = ["throughput"]
 iterations = 10
 

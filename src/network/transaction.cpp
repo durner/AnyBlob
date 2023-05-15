@@ -32,7 +32,7 @@ void Transaction::processAsync(TaskedSendReceiver& sendReceiver)
 {
     // send the original request message
     for (auto& msg : messages) {
-        sendReceiver.send(msg.get());
+        while (!sendReceiver.send(msg.get())) {}
     }
 }
 //---------------------------------------------------------------------------

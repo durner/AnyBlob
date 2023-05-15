@@ -21,15 +21,14 @@ struct HTTPMessage : public MessageTask {
     /// HTTP info header
     std::unique_ptr<HTTPHelper::Info> info;
 
-    /// The message excecute callback
-    MessageState execute(IOUringSocket& socket) override;
-    /// The destructor
-    ~HTTPMessage() override = default;
-    /// Reset for restart
-    void reset(IOUringSocket& socket, bool aborted);
-
     /// The constructor
     HTTPMessage(OriginalMessage* sendingMessage, uint64_t chunkSize);
+    /// The destructor
+    ~HTTPMessage() override = default;
+    /// The message excecute callback
+    MessageState execute(IOUringSocket& socket) override;
+    /// Reset for restart
+    void reset(IOUringSocket& socket, bool aborted);
 };
 //---------------------------------------------------------------------------
 } // namespace network

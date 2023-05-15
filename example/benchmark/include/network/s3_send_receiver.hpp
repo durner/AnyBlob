@@ -150,12 +150,12 @@ class S3SendReceiver {
 
     /// Reuse message
     uint64_t reuse(std::unique_ptr<utils::DataVector<uint8_t>> message) {
-        return _reuse.insert<false>(message.release());
+        return _reuse.insert<false>(message.release()) != ~0ull;
     }
 
     /// Adds a message to the submission queue
     uint64_t send(GetObjectRequestMessage* msg) {
-        return _submissions.insert(msg);
+        return _submissions.insert(msg) != ~0ull;
     }
 
     /// Receives the messages and blocks until it is received

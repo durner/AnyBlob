@@ -139,12 +139,12 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, const string& uri)
         if (benchmarkSettings.report.size()) {
             auto report = fstream(benchmarkSettings.report, s.app | s.in | s.out);
             if (headerNeeded)
-                report << "Algorithm,Resolver,Iteration,Threads,Concurrency,Start,Finish,Diff,Size" << endl;
+                report << "Algorithm,Resolver,Iteration,Threads,Concurrency,HTTPS,Encryption,Start,Finish,Diff,ReceiveLatency,Size" << endl;
             for (const auto& t : timings)
                 if constexpr (is_same<S3SendReceiver, network::S3CurlSendReceiver>::value)
-                    report << "S3,," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << t.size << endl;
+                    report << "S3,," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << to_string(benchmarkSettings.https) << "," << to_string(benchmarkSettings.encryption) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << ",0," << t.size << endl;
                 else
-                    report << "S3Crt,," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << t.size << endl;
+                    report << "S3Crt,," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << to_string(benchmarkSettings.https) << "," << to_string(benchmarkSettings.encryption) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << ",0," << t.size << endl;
         }
 
         sendReceiver->stop();
@@ -336,10 +336,10 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         if (benchmarkSettings.report.size()) {
             auto report = fstream(benchmarkSettings.report, s.app | s.in | s.out);
             if (headerNeeded)
-                report << "Algorithm,Resolver,Iteration,Threads,Concurrency,Start,Finish,Diff,ReceiveLatency,Size" << endl;
+                report << "Algorithm,Resolver,Iteration,Threads,Concurrency,HTTPS,Encryption,Start,Finish,Diff,ReceiveLatency,Size" << endl;
             for (const auto& t : timings)
                 if (t.size > 0)
-                    report << "Uring," + string(benchmarkSettings.resolver) << "," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << chrono::duration_cast<chrono::microseconds>(t.recieve - t.start).count() << "," << t.size << endl;
+                    report << "Uring," + string(benchmarkSettings.resolver) << "," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << to_string(benchmarkSettings.https) << "," << to_string(benchmarkSettings.encryption) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << chrono::duration_cast<chrono::microseconds>(t.recieve - t.start).count() << "," << t.size << endl;
         }
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
             sendReceivers[i]->stop();

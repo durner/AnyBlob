@@ -22,15 +22,14 @@ struct HTTPSMessage : public HTTPMessage {
     /// The TLSLayer
     std::unique_ptr<TLSConnection> tlsLayer;
 
-    /// The message excecute callback
-    MessageState execute(IOUringSocket& socket) override;
-    /// The destructor
-    ~HTTPSMessage() override = default;
-    /// Reset for restart
-    void reset(IOUringSocket& socket, bool aborted);
-
     /// The constructor
     HTTPSMessage(OriginalMessage* sendingMessage, TLSContext& context, uint64_t chunkSize);
+    /// The destructor
+    ~HTTPSMessage() override = default;
+    /// The message excecute callback
+    MessageState execute(IOUringSocket& socket) override;
+    /// Reset for restart
+    void reset(IOUringSocket& socket, bool aborted);
 };
 //---------------------------------------------------------------------------
 } // namespace network
