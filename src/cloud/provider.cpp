@@ -34,15 +34,45 @@ string Provider::getRemoteParentDirectory(string fileName) noexcept {
     return fileName.substr(0, pos + 1);
 }
 //---------------------------------------------------------------------------
-bool Provider::retrieveBlobs(network::TaskedSendReceiver& sendReceiver, vector<unique_ptr<Blob>>& blobs) const
-// Downloads a number of blobs with the calling thread, changes blobs vector
+unique_ptr<network::OriginalMessage> Provider::getRequest(const network::Transaction& transaction) const
+// Builds the http request and transform it to an OriginalMessage for downloading a blob or listing a directory
+{
+    return make_unique<network::OriginalMessage>(getRequest(transaction.remotePath, transaction.info.range), getAddress(), getPort(), transaction.data.get(), transaction.capacity);
+}
+//---------------------------------------------------------------------------
+unique_ptr<network::OriginalMessage> Provider::putRequest(const network::Transaction& transaction) const
+/// Builds the http request and transform it to an OriginalMessage for putting an object without the actual data (header only according to the data and length provided)
+{
+    auto originalMsg = make_unique<network::OriginalMessage>(putRequest(transaction.remotePath, transaction.info.object), getAddress(), getPort(), transaction.data.get(), transaction.capacity);
+    originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(transaction.info.object.data()), transaction.info.object.size());
+    return originalMsg;
+}
+//---------------------------------------------------------------------------
+template <typename Callback>
+unique_ptr<network::OriginalMessage> Provider::getRequest(const network::Transaction& transaction, Callback&& callback) const
+// Builds the http request and transform it to an OriginalMessage for downloading a blob or listing a directory
+{
+    return make_unique<network::OriginalCallbackMessage<Callback>>(forward<Callback&&>(callback), getRequest(transaction.remotePath, transaction.info.range), getAddress(), getPort(), transaction.data.get(), transaction.capacity);
+}
+//---------------------------------------------------------------------------
+template <typename Callback>
+unique_ptr<network::OriginalMessage> Provider::putRequest(const network::Transaction& transaction, Callback&& callback) const
+/// Builds the http request and transform it to an OriginalMessage for putting an object without the actual data (header only according to the data and length provided)
+{
+    auto originalMsg = make_unique<network::OriginalCallbackMessage<Callback>>(forward<Callback&&>(callback), putRequest(transaction.remotePath, transaction.info.object), getAddress(), getPort(), transaction.data.get(), transaction.capacity);
+    originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(transaction.info.object.data()), transaction.info.object.size());
+    return originalMsg;
+}
+//---------------------------------------------------------------------------
+bool Provider::retrieveObjects(network::TaskedSendReceiver& sendReceiver, vector<unique_ptr<network::Transaction>>& transactions) const
+// Downloads a number of blobs with the calling thread, changes transactions vector
 {
     vector<unique_ptr<network::OriginalMessage>> originalMessages;
-    originalMessages.reserve(blobs.size());
+    originalMessages.reserve(transactions.size());
 
     // create the original request message
-    for (auto& blob : blobs) {
-        auto originalMsg = make_unique<network::OriginalMessage>(getRequest(blob->remotePath, blob->range), getAddress(), getPort(), blob->data.get(), blob->capacity);
+    for (auto& txn : transactions) {
+        auto originalMsg = getRequest(*txn);
         sendReceiver.send(originalMsg.get());
         originalMessages.push_back(move(originalMsg));
     }
@@ -51,24 +81,58 @@ bool Provider::retrieveBlobs(network::TaskedSendReceiver& sendReceiver, vector<u
     sendReceiver.sendReceive();
 
     // retrieve the results
-    for (auto i = 0u; i < blobs.size(); i++) {
+    for (auto i = 0u; i < transactions.size(); i++) {
         auto content = sendReceiver.receive(originalMessages[i].get());
         unique_ptr<network::HTTPHelper::Info> infoPtr;
         network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
-        blobs[i]->size = infoPtr->length;
-        blobs[i]->offset = infoPtr->headerLength;
+        transactions[i]->size = infoPtr->length;
+        transactions[i]->offset = infoPtr->headerLength;
 
-        // move the datavector data to the blob if the blob is not used as buffer
-        if (!blobs[i]->data.get()) {
-            blobs[i]->data = content->transferBuffer();
-            blobs[i]->capacity = content->capacity();
+        // move the datavector data to the transaction if the transaction is not used as buffer
+        if (!transactions[i]->data.get()) {
+            transactions[i]->data = content->transferBuffer();
+            transactions[i]->capacity = content->capacity();
         }
     }
 
     return true;
 }
 //---------------------------------------------------------------------------
-bool Provider::isRemoteFile(const std::string_view fileName) noexcept
+bool Provider::uploadObjects(network::TaskedSendReceiver& sendReceiver, vector<unique_ptr<network::Transaction>>& transactions) const
+// Downloads a number of blobs with the calling thread, changes transactions vector
+{
+    vector<unique_ptr<network::OriginalMessage>> originalMessages;
+    originalMessages.reserve(transactions.size());
+
+    // create the original request message
+    for (auto& txn : transactions) {
+        auto originalMsg = putRequest(*txn);
+        sendReceiver.send(originalMsg.get());
+        originalMessages.push_back(move(originalMsg));
+    }
+
+    // do the download work
+    sendReceiver.sendReceive();
+
+    // retrieve the results
+    for (auto i = 0u; i < transactions.size(); i++) {
+        auto content = sendReceiver.receive(originalMessages[i].get());
+        unique_ptr<network::HTTPHelper::Info> infoPtr;
+        network::HTTPHelper::retrieveContent(content->cdata(), content->size(), infoPtr);
+        transactions[i]->size = infoPtr->length;
+        transactions[i]->offset = infoPtr->headerLength;
+
+        // move the datavector data to the transaction if the transaction is not used as buffer
+        if (!transactions[i]->data.get()) {
+            transactions[i]->data = content->transferBuffer();
+            transactions[i]->capacity = content->capacity();
+        }
+    }
+
+    return true;
+}
+//---------------------------------------------------------------------------
+bool Provider::isRemoteFile(const string_view fileName) noexcept
 // Is it a remote file?
 {
     for (auto i = 0u; i < remoteFileCount; i++)
@@ -79,16 +143,29 @@ bool Provider::isRemoteFile(const std::string_view fileName) noexcept
 }
 //---------------------------------------------------------------------------
 /// Get a region and bucket name
-Provider::RemoteInfo Provider::getRemoteInfo(const std::string& fileName) {
+Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
     assert(isRemoteFile(fileName));
     Provider::RemoteInfo info;
     info.provider = CloudService::Local;
     for (auto i = 0u; i < remoteFileCount; i++) {
         if (fileName.starts_with(remoteFile[i])) {
+            /// Handle cloud provider the same except MinIO includes endpoint
             auto sub = fileName.substr(remoteFile[i].size());
+            if (!remoteFile[i].compare("minio://")) {
+                auto pos = sub.find('/');
+                auto addressPort = sub.substr(0, pos);
+                if (auto colonPos = addressPort.find(':'); colonPos != string::npos) {
+                    info.endpoint = addressPort.substr(0, colonPos);
+                    info.port = atoi(addressPort.substr(colonPos + 1).c_str());
+                } else {
+                    info.endpoint = addressPort;
+                    info.port = 80;
+                }
+                sub = sub.substr(pos+1);
+            }
             auto pos = sub.find('/');
             auto bucketRegion = sub.substr(0, pos);
-            if (auto colonPos = bucketRegion.find(':'); colonPos != std::string::npos) {
+            if (auto colonPos = bucketRegion.find(':'); colonPos != string::npos) {
                 info.bucket = bucketRegion.substr(0, colonPos);
                 info.region = bucketRegion.substr(colonPos + 1);
             } else {
@@ -102,32 +179,39 @@ Provider::RemoteInfo Provider::getRemoteInfo(const std::string& fileName) {
 }
 
 //---------------------------------------------------------------------------
-unique_ptr<Provider> Provider::makeProvider(const string& filepath, const string& clientEmail, const string& keyFile, network::TaskedSendReceiver* sendReceiver)
+unique_ptr<Provider> Provider::makeProvider(const string& filepath, const string& keyId, const string& keyFile, network::TaskedSendReceiver* sendReceiver)
 /// Create a provider
 {
     auto info = anyblob::cloud::Provider::getRemoteInfo(filepath);
     switch (info.provider) {
         case anyblob::cloud::Provider::CloudService::AWS: {
             if (sendReceiver && info.region.empty())
-                info.region = anyblob::cloud::AWS::getRegion(*sendReceiver);
-            auto aws = make_unique<anyblob::cloud::AWS>(info.bucket, info.region);
-            aws->initSecret(*sendReceiver);
+                info.region = anyblob::cloud::AWS::getInstanceRegion(*sendReceiver);
+
+            if (keyId.empty()) {
+                auto aws = make_unique<anyblob::cloud::AWS>(info.bucket, info.region);
+                aws->initSecret(*sendReceiver);
+                return aws;
+            }
+            auto aws = make_unique<anyblob::cloud::AWS>(info.bucket, info.region, keyId, keyFile);
             return aws;
         }
         case anyblob::cloud::Provider::CloudService::GCP: {
             if (sendReceiver && info.region.empty())
-                info.region = anyblob::cloud::GCP::getRegion(*sendReceiver);
-            auto gcp = make_unique<anyblob::cloud::GCP>(info.bucket, info.region, clientEmail, keyFile);
-            gcp->initKey();
+                info.region = anyblob::cloud::GCP::getInstanceRegion(*sendReceiver);
+            auto gcp = make_unique<anyblob::cloud::GCP>(info.bucket, info.region, keyId, keyFile);
             return gcp;
         }
         case anyblob::cloud::Provider::CloudService::Azure: {
-            auto azure = make_unique<anyblob::cloud::Azure>(info.bucket, clientEmail, keyFile);
-            azure->initKey();
+            auto azure = make_unique<anyblob::cloud::Azure>(info.bucket, keyId, keyFile);
             return azure;
         }
+        case anyblob::cloud::Provider::CloudService::MinIO: {
+            auto minio = make_unique<anyblob::cloud::AWS>(info.bucket, info.region, keyId, keyFile, info.endpoint, info.port);
+            return minio;
+        }
         default: {
-            throw std::runtime_error("Local requests are still unsupported!");
+            throw runtime_error("Local requests are still unsupported!");
         }
     }
 }

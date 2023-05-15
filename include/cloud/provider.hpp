@@ -1,5 +1,5 @@
 #pragma once
-#include "cloud/blob.hpp"
+#include "network/transaction.hpp"
 #include "utils/data_vector.hpp"
 #include <memory>
 #include <vector>
@@ -24,9 +24,9 @@ namespace cloud {
 class Provider {
     public:
     /// The remote prefixes count
-    static constexpr unsigned remoteFileCount = 3;
+    static constexpr unsigned remoteFileCount = 4;
     /// The remote prefixes
-    static constexpr std::string_view remoteFile[] = {"s3://", "azure://", "gcp://"};
+    static constexpr std::string_view remoteFile[] = {"s3://", "azure://", "gcp://", "minio://"};
     /// Are we currently testing the provdiers
     static bool testEnviornment;
 
@@ -35,6 +35,7 @@ class Provider {
         AWS = 0,
         Azure = 1,
         GCP = 2,
+        MinIO = 3,
         Local = 255
     };
 
@@ -45,6 +46,10 @@ class Provider {
         std::string bucket;
         /// The region name
         std::string region;
+        /// The endpoint
+        std::string endpoint;
+        /// The port
+        int port;
     };
 
     struct Instance {
@@ -65,11 +70,23 @@ class Provider {
     /// The destructor
     virtual ~Provider() = default;
     /// Builds the http request for downloading a blob or listing a directory
-    virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, std::pair<uint64_t, uint64_t>& range) const = 0;
+    virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const = 0;
     /// Builds the http request for putting an object without the actual data (header only according to the data and length provided)
-    virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const uint8_t* data, const uint64_t length) const = 0;
-    /// Downloads a number of blobs with the calling thread, changes blobs vector
-    bool retrieveBlobs(network::TaskedSendReceiver& sendReceiver, std::vector<std::unique_ptr<Blob>>& blobs) const;
+    virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const = 0;
+    /// Builds the http request and transform it to an OriginalMessage for downloading a blob or listing a directory
+    std::unique_ptr<network::OriginalMessage> getRequest(const network::Transaction& transaction) const;
+    /// Builds the http request and transform it to an OriginalMessage for putting an object without the actual data (header only according to the data and length provided)
+    std::unique_ptr<network::OriginalMessage> putRequest(const network::Transaction& transaction) const;
+    /// Builds the http request and transform it to an OriginalMessage for downloading a blob or listing a directory
+    template <typename Callback>
+    std::unique_ptr<network::OriginalMessage> getRequest(const network::Transaction& transaction, Callback&& callback) const;
+    /// Builds the http request and transform it to an OriginalMessage for putting an object without the actual data (header only according to the data and length provided)
+    template <typename Callback>
+    std::unique_ptr<network::OriginalMessage> putRequest(const network::Transaction& transaction, Callback&& callback) const;
+    /// Downloads a number of blobs with the calling thread, changes transaction vector
+    bool retrieveObjects(network::TaskedSendReceiver& sendReceiver, std::vector<std::unique_ptr<network::Transaction>>& transactions) const;
+    /// Upload a number of blobs with the calling thread, changes blobs vector
+    bool uploadObjects(network::TaskedSendReceiver& sendReceiver, std::vector<std::unique_ptr<network::Transaction>>& transactions) const;
     /// Get the instance infos
     virtual Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) = 0;
     /// Get the address of the server
@@ -88,8 +105,8 @@ class Provider {
     virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}
     /// Init the resolver for specific provider
     virtual void initResolver(network::TaskedSendReceiver& /*sendReceiver*/) {}
-    /// Create a provider
-    static std::unique_ptr<Provider> makeProvider(const std::string& filepath, const std::string& clientEmail = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
+    /// Create a provider (keyId is access email for GCP/Azure)
+    static std::unique_ptr<Provider> makeProvider(const std::string& filepath, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
 };
 //---------------------------------------------------------------------------
 } // namespace cloud

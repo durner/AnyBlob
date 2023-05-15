@@ -1,5 +1,5 @@
-#include "network/tasked_send_receiver.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
+#include "network/tasked_send_receiver.hpp"
 #include "perfevent/PerfEvent.hpp"
 #include <future>
 //---------------------------------------------------------------------------
@@ -14,6 +14,8 @@ namespace anyblob {
 namespace network {
 namespace test {
 //---------------------------------------------------------------------------
+using namespace std;
+//---------------------------------------------------------------------------
 TEST_CASE("send_receiver") {
     PerfEventBlock e;
     auto concurrency = 10;
@@ -21,25 +23,25 @@ TEST_CASE("send_receiver") {
 
     TaskedSendReceiverGroup group(concurrency << 1, concurrency << 1);
 
-    std::vector<std::unique_ptr<OriginalMessage>> msgs;
+    vector<unique_ptr<OriginalMessage>> msgs;
     for (auto i = 0; i < concurrency; i++) {
-        auto message = std::make_unique<utils::DataVector<uint8_t>>(length);
-        std::string str = "GET / HTTP/1.1\r\nHost: db.cs.tum.edu\r\nConnection: keep-alive\r\n\r\n";
+        auto message = make_unique<utils::DataVector<uint8_t>>(length);
+        string str = "GET / HTTP/1.1\r\nHost: db.cs.tum.edu\r\nConnection: keep-alive\r\n\r\n";
         memcpy(message->data(), str.data(), str.length());
         message->resize(str.length());
-        msgs.emplace_back(new OriginalMessage {move(message), "db.cs.tum.edu", 80});
+        msgs.emplace_back(new OriginalMessage{move(message), "db.cs.tum.edu", 80});
         group.send(msgs.back().get());
     }
 
     group.sendReceive(true);
 
-    std::unique_ptr<utils::DataVector<uint8_t>> currentMessage;
+    unique_ptr<utils::DataVector<uint8_t>> currentMessage;
     for (auto i = 0; i < concurrency; i++) {
         auto message = group.receive(msgs[i].get());
         if (i > 0) {
             // skip header
             auto skip = 1024;
-            REQUIRE(!std::strncmp(reinterpret_cast<char*>(currentMessage->data()) + skip, reinterpret_cast<char*>(message->data()) + skip, currentMessage->size() - skip));
+            REQUIRE(!strncmp(reinterpret_cast<char*>(currentMessage->data()) + skip, reinterpret_cast<char*>(message->data()) + skip, currentMessage->size() - skip));
         }
         currentMessage = move(message);
     }

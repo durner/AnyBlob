@@ -40,7 +40,7 @@ unsigned ThroughputResolver::resolve(string hostname, string port, bool& reuse)
 
         addrinfo* temp;
         if (getaddrinfo(hostname.c_str(), port.c_str(), &hints, &temp)) {
-            throw std::runtime_error("hostname getaddrinfo error");
+            throw runtime_error("hostname getaddrinfo error");
         }
         _addr[addrPos].reset(temp);
         _addrString[addrPos] = {hostString, 4};
@@ -63,7 +63,7 @@ void ThroughputResolver::stopSocket(int fd, uint64_t bytes)
     auto it = _fdMap.find(fd);
     if (it != _fdMap.end()) {
         auto timeNs = chrono::duration_cast<chrono::nanoseconds>(now - it->second.second).count();
-        auto throughput = static_cast<double>(bytes) / std::chrono::duration<double>(timeNs).count();
+        auto throughput = static_cast<double>(bytes) / chrono::duration<double>(timeNs).count();
         auto curThroughput = _throughputIterator++;
         auto del = _throughput[curThroughput % _maxHistory];
         _throughput[curThroughput % _maxHistory] = throughput;

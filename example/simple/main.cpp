@@ -1,7 +1,7 @@
 #include <cstring>
 #include "cloud/aws.hpp"
 #include "cloud/provider.hpp"
-#include "cloud/blob.hpp"
+#include "network/transaction.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include <iostream>
 //---------------------------------------------------------------------------
@@ -29,19 +29,17 @@ int main(int /*argc*/, char** /*argv*/) {
     auto provider = anyblob::cloud::Provider::makeProvider(bucketName, "", "", &sendReceiver);
 
     // Create the request
-    std::vector<std::unique_ptr<anyblob::cloud::Blob>> requests;
-    requests.emplace_back(make_unique<anyblob::cloud::Blob>());
-    auto& request = requests.front();
-    request->range = {0, 0};
-    request->remotePath = fileName;
+    vector<unique_ptr<anyblob::network::Transaction>> requests;
+    requests.emplace_back(make_unique<anyblob::network::GetTransaction>(fileName));
 
     // Fetch the request synchronously with the scheduler object on this thread
-    provider->retrieveBlobs(sendReceiver, requests);
+    provider->retrieveObjects(sendReceiver, requests);
 
     // Get and print the result, note that the data lies in the data buffer but after the offset to skip the HTTP header
     // Note that the size is already without the header, so the full request has size + offset length
+    auto& request = requests.front();
     string_view dataString(reinterpret_cast<char*>(request->data.get()) + request->offset, request->size);
-    std::cout << dataString << std::endl;
+    cout << dataString << endl;
 
     return 0;
 }

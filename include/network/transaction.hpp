@@ -12,22 +12,30 @@
 namespace anyblob {
 //---------------------------------------------------------------------------
 namespace network {
+//---------------------------------------------------------------------------
 class OriginalMessage;
-}; // namespace network
 //---------------------------------------------------------------------------
-namespace cloud {
-//---------------------------------------------------------------------------
-/// The blob handler used to transfer data from remote storage
+/// The request/response transaction handler used to transfer data from and to remote storage
 /// Rewrites the DataVector<uint8_t> to data, capacity and size
 /// to reduce dependencies between AnyBlob and external callers
-struct Blob {
+struct Transaction {
+    /// Unions the specific infos
+    union Info {
+        /// The range to be accessed
+        std::pair<uint64_t, uint64_t> range;
+        /// The put object
+        std::string_view object;
+        /// Constructor
+        Info() : range() {}
+    };
+
     /// The path to be accessed
     std::string remotePath;
-    /// The range to be accessed
-    std::pair<uint64_t, uint64_t> range;
+    /// Holds the specific infos
+    Info info;
 
     /// The original message
-    std::unique_ptr<anyblob::network::OriginalMessage> originalMsg;
+    std::unique_ptr<OriginalMessage> originalMsg;
 
     /// The data buffer pointer which needs to hold data + transfer data (e.g. HTTP Header)
     std::unique_ptr<uint8_t[]> data;
@@ -40,10 +48,28 @@ struct Blob {
     uint64_t size;
 
     /// The constructor
-    Blob();
+    Transaction();
     /// The destructor
-    ~Blob();
+    ~Transaction();
 };
 //---------------------------------------------------------------------------
-} // namespace cloud
+/// Specialization of a get request
+struct GetTransaction : public Transaction {
+    /// The constructor
+    GetTransaction(const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}) : Transaction() {
+        this->remotePath = remotePath;
+        this->info.range = move(range);
+    }
+};
+//---------------------------------------------------------------------------
+/// Specialization of a put request
+struct PutTransaction : public Transaction {
+    /// The constructor
+    PutTransaction(const std::string& remotePath, const char* data, uint64_t size) : Transaction() {
+        this->remotePath = remotePath;
+        this->info.object = std::string_view(data, size);
+    }
+};
+//---------------------------------------------------------------------------
+} // namespace network
 } // namespace anyblob

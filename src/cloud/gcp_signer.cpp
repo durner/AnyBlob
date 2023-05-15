@@ -21,7 +21,7 @@ using namespace std;
 string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const string& privateRSA, Request& request, const StringToSign& stringToSign)
 // Creates the canonical request
 {
-    std::stringstream requestStream;
+    stringstream requestStream;
     // canonicalize request method
     requestStream << request.method << "\n";
 
@@ -38,7 +38,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
         auto it = request.headers.begin();
         while (it != request.headers.end()) {
             string key = it->first;
-            std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return std::tolower(c); });
+            transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return tolower(c); });
             sorted.emplace(key, it->second);
             ++it;
         }

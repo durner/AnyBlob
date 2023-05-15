@@ -38,7 +38,7 @@ unsigned AWSResolver::resolve(string hostname, string port, bool& reuse)
 
         addrinfo* temp;
         if (getaddrinfo(hostname.c_str(), port.c_str(), &hints, &temp)) {
-            throw std::runtime_error("hostname getaddrinfo error");
+            throw runtime_error("hostname getaddrinfo error");
         }
         _addr[addrPos].reset(temp);
         if (!Resolver::tld(hostname).compare("amazonaws.com")) {

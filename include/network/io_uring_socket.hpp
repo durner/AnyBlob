@@ -64,8 +64,14 @@ class IOUringSocket {
 
     /// The request message
     struct Request {
-        /// The recv data
-        uint8_t* data;
+        union Data {
+            /// The recv data
+            uint8_t* data;
+            /// The send data
+            const uint8_t* cdata;
+        };
+        /// The data
+        Data data;
         /// The length
         int64_t length;
         /// The file descriptor

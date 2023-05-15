@@ -65,7 +65,7 @@ void Timer::printResult(ostream& s)
         s << reverseSteps[it.first] << "," << static_cast<double>(it.second) / total << "," << static_cast<double>(it.second) / (1000 * 1000);
         auto elem = _totalLoad.find(it.first);
         if (elem != _totalLoad.end())
-            s << "," << elem->second->at(0)->userTime << "," << elem->second->at(0)->sysTime <<  "," << elem->second->at(0)->elapsedTime <<  "," << elem->second->at(0)->activeTimeAllProcesses << "," << elem->second->at(0)->idleTimeAllProcesses;
+            s << "," << elem->second->at(0)->userTime << "," << elem->second->at(0)->sysTime << "," << elem->second->at(0)->elapsedTime << "," << elem->second->at(0)->activeTimeAllProcesses << "," << elem->second->at(0)->idleTimeAllProcesses;
         else
             s << ",-1,-1,-1,-1,-1";
         s << _contentInfo << endl;

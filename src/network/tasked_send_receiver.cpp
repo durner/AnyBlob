@@ -138,7 +138,7 @@ void TaskSendReceiverHandle::stop()
 bool TaskSendReceiverHandle::sendReceive(bool oneQueueInvocation)
 /// Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
 {
-     if (!_sendReceiver)
+    if (!_sendReceiver)
         return false;
     _sendReceiver->sendReceive(oneQueueInvocation);
     return true;
@@ -172,7 +172,7 @@ bool TaskedSendReceiver::send(OriginalMessage* msg)
     return _group._submissions.insert<false>(msg);
 }
 //---------------------------------------------------------------------------
-void TaskedSendReceiver::reuse(std::unique_ptr<utils::DataVector<uint8_t>> message)
+void TaskedSendReceiver::reuse(unique_ptr<utils::DataVector<uint8_t>> message)
 /// Reuse message
 {
     _group._reuse.insert<false>(message.release());

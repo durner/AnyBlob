@@ -1,5 +1,6 @@
-#include "cloud/provider.hpp"
+#include "network/resolver.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
+#include "network/throughput_resolver.hpp"
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -9,23 +10,12 @@
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
 namespace anyblob {
-namespace cloud {
+namespace network {
 namespace test {
 //---------------------------------------------------------------------------
-TEST_CASE("provider") {
-    REQUIRE(Provider::isRemoteFile("s3://a/b/c"));
-    REQUIRE(!Provider::isRemoteFile("a/b/c"));
-    REQUIRE(Provider::getRemoteParentDirectory("s3://bucket/b/c") == "b/");
-    auto info = Provider::getRemoteInfo("s3://x:y/b");
-    REQUIRE(info.bucket == "x");
-    REQUIRE(info.region == "y");
-    info = Provider::getRemoteInfo("s3://x/b");
-    REQUIRE(info.bucket == "x");
-    REQUIRE(info.region == "");
-    auto aws = Provider::makeProvider("s3://x:y");
-    REQUIRE(aws->getType() == Provider::CloudService::AWS);
+TEST_CASE("resolver") {
 }
 //---------------------------------------------------------------------------
 } // namespace test
-} // namespace cloud
+} // namespace network
 } // namespace anyblob

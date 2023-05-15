@@ -1,0 +1,64 @@
+name: MinIO Integration Test
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+  pull_request:
+    branches:
+      - master
+      - dev
+
+env:
+  BUILD_TYPE: Debug
+
+jobs:
+  integration-test:
+    # Run on ubuntu
+    runs-on: ubuntu-latest
+
+    # Define the steps
+    steps:
+      # Install MinIO Docker
+      - name: Install MinIO Docker
+        run: |
+          docker run -d -p 9000:9000 --name minio \
+          -e "MINIO_ACCESS_KEY=test" -e "MINIO_SECRET_KEY=testtest" \
+          -v /tmp/buckets:/buckets -v /tmp/.minio:/root/.minio \
+          minio/minio server /buckets
+
+          export AWS_ACCESS_KEY_ID=test
+          export AWS_SECRET_ACCESS_KEY=testtest
+          export AWS_EC2_METADATA_DISABLED=true
+
+          aws --endpoint-url http://127.0.0.1:9000/ s3 mb s3://test
+
+      # Checkout repo
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      # Install dependencies
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install liburing-dev openssl libssl-dev libjemalloc-dev lld
+
+      # CMake configuration
+      - name: Configure CMake
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+      # Build library and integration tester
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+
+      # Run the integration test
+      - name: Integration Test
+        working-directory: ${{github.workspace}}/build
+        run: |
+          export AWS_S3_BUCKET=test
+          export AWS_S3_REGION=us-east-1
+          export AWS_S3_ENDPOINT=127.0.0.1:9000
+          export AWS_S3_ACCESS_KEY=test
+          export AWS_S3_SECRET_ACCESS_KEY=testtest
+
+          ./integration

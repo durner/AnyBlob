@@ -57,7 +57,7 @@ unsigned Resolver::resolve(string hostname, string port, bool& reuse)
 
         addrinfo* temp;
         if (getaddrinfo(hostname.c_str(), port.c_str(), &hints, &temp) != 0) {
-            throw std::runtime_error("hostname getaddrinfo error");
+            throw runtime_error("hostname getaddrinfo error");
         }
         _addr[addrPos].reset(temp);
         _addrString[addrPos] = {hostString, 12};

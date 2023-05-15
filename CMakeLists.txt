@@ -3,12 +3,25 @@ cmake_minimum_required(VERSION 3.8)
 project(AnyBlob)
 
 # ---------------------------------------------------------------------------
-# Environment
+# OS
 # ---------------------------------------------------------------------------
 
 if (NOT UNIX)
     message(STATUS FATAL_ERROR "Unsupported OS")
 endif (NOT UNIX)
+
+
+# ---------------------------------------------------------------------------
+# Configure OpenSSL and Threads
+# ---------------------------------------------------------------------------
+
+find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
+
+# ---------------------------------------------------------------------------
+# Environment
+# ---------------------------------------------------------------------------
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -54,13 +67,6 @@ if(CMAKE_BUILD_TYPE MATCHES "Coverage")
 endif()
 
 # ---------------------------------------------------------------------------
-# Configure OpenSSL and Threads
-# ---------------------------------------------------------------------------
-
-find_package(Threads REQUIRED)
-find_package(OpenSSL REQUIRED)
-
-# ---------------------------------------------------------------------------
 # Uring
 # ---------------------------------------------------------------------------
 
@@ -87,7 +93,8 @@ endif()
 include("${PROJECT_SOURCE_DIR}/include/local.cmake")
 include_directories(
     ${PROJECT_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/test
+    ${PROJECT_SOURCE_DIR}/test/unit
+    ${PROJECT_SOURCE_DIR}/test/integration
     ${PROJECT_SOURCE_DIR}/thirdparty
 )
 
@@ -96,7 +103,8 @@ include_directories(
 # ---------------------------------------------------------------------------
 
 include("${PROJECT_SOURCE_DIR}/src/local.cmake")
-include("${PROJECT_SOURCE_DIR}/test/local.cmake")
+include("${PROJECT_SOURCE_DIR}/test/unit/local.cmake")
+include("${PROJECT_SOURCE_DIR}/test/integration/local.cmake")
 
 # ---------------------------------------------------------------------------
 # Library
@@ -110,5 +118,12 @@ target_include_directories(AnyBlob PUBLIC ${PROJECT_SOURCE_DIR}/include)
 # Unit tests
 # ---------------------------------------------------------------------------
 
-add_executable(tester test/test.cpp ${TEST_CPP})
+add_executable(tester test/unit/test.cpp ${TEST_CPP})
 target_link_libraries(tester AnyBlob)
+
+# ---------------------------------------------------------------------------
+# Integration tests
+# ---------------------------------------------------------------------------
+
+add_executable(integration test/integration/test.cpp ${INTEGRATION_CPP})
+target_link_libraries(integration AnyBlob)

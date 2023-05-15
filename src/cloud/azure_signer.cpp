@@ -23,7 +23,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
 {
     auto decodedKey = utils::base64Decode(reinterpret_cast<const uint8_t*>(privateRSA.data()), privateRSA.size());
 
-    std::stringstream requestStream;
+    stringstream requestStream;
     // canonicalize request method
     requestStream << request.method << "\n";
 
@@ -102,7 +102,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
         auto it = request.headers.begin();
         while (it != request.headers.end()) {
             string key = it->first;
-            std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return std::tolower(c); });
+            transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return tolower(c); });
             string& val = it->second;
             sorted.emplace(key, val);
             ++it;

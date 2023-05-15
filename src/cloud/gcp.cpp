@@ -33,8 +33,8 @@ static string buildAMZTimestamp()
 void GCP::initKey()
 /// Inits key if not exists
 {
-    std::ifstream ifs(_secret->rsaKeyFile);
-    _secret->privateKey = string((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
+    ifstream ifs(_secret->rsaKeyFile);
+    _secret->privateKey = string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> GCP::downloadInstanceInfo(const string& info)
@@ -66,7 +66,7 @@ Provider::Instance GCP::getInstanceDetails(network::TaskedSendReceiver& sendRece
     return GCPInstance{string(s), 0, 0, ""};
 }
 //---------------------------------------------------------------------------
-string GCP::getRegion(network::TaskedSendReceiver& sendReceiver)
+string GCP::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
 /// Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo("zone");
@@ -81,7 +81,7 @@ string GCP::getRegion(network::TaskedSendReceiver& sendReceiver)
     return string(region);
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, pair<uint64_t, uint64_t>& range) const
+unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
 /// Builds the http request for downloading a blob
 {
     GCPSigner::Request request;
@@ -110,22 +110,22 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, p
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> GCP::putRequest(const string& filePath, const uint8_t* data, const uint64_t length) const
+unique_ptr<utils::DataVector<uint8_t>> GCP::putRequest(const string& filePath, const string_view object) const
 /// Builds the http request for putting objects without the object data itself
 {
     GCPSigner::Request request;
     request.method = "PUT";
     request.type = "HTTP/1.1";
     request.path = "/" + filePath;
-    request.bodyData = data;
-    request.bodyLength = length;
+    request.bodyData = reinterpret_cast<const uint8_t*>(object.data());
+    request.bodyLength = object.size();
 
     auto date = testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp();
     request.queries.emplace("X-Goog-Date", date);
 
     request.headers.emplace("Host", getAddress());
     request.headers.emplace("Date", date);
-    request.headers.emplace("Content-Length", to_string(length));
+    request.headers.emplace("Content-Length", to_string(request.bodyLength));
 
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage"};
     request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);

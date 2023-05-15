@@ -33,9 +33,9 @@ static string buildXMSTimestamp()
 void Azure::initKey()
 /// Inits key if not exists
 {
-    std::ifstream ifs(_secret->rsaKeyFile);
-    _secret->privateKey = string((std::istreambuf_iterator<char>(ifs)), (std::istreambuf_iterator<char>()));
-    _secret->privateKey.erase(std::remove(_secret->privateKey.begin(), _secret->privateKey.end(), '\n'), _secret->privateKey.cend());
+    ifstream ifs(_secret->rsaKeyFile);
+    _secret->privateKey = string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
+    _secret->privateKey.erase(remove(_secret->privateKey.begin(), _secret->privateKey.end(), '\n'), _secret->privateKey.cend());
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Azure::downloadInstanceInfo()
@@ -94,7 +94,7 @@ string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
     return string(region);
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath, pair<uint64_t, uint64_t>& range) const
+unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
 /// Builds the http request for downloading a blob
 {
     AzureSigner::Request request;
@@ -122,21 +122,21 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath, const uint8_t* data, const uint64_t length) const
+unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath, const string_view object) const
 /// Builds the http request for putting objects without the object data itself
 {
     AzureSigner::Request request;
     request.method = "PUT";
     request.type = "HTTP/1.1";
     request.path = "/" + _settings.container + "/" + filePath;
-    request.bodyData = data;
-    request.bodyLength = length;
+    request.bodyData = reinterpret_cast<const uint8_t*>(object.data());
+    request.bodyLength = object.size();
 
     auto date = testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp();
     request.headers.emplace("x-ms-date", date);
     request.headers.emplace("x-ms-blob-type", "BlockBlob");
     request.headers.emplace("Host", getAddress());
-    request.headers.emplace("Content-Length", to_string(length));
+    request.headers.emplace("Content-Length", to_string(request.bodyLength));
 
     request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
 
