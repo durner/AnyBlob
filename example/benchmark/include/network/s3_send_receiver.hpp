@@ -91,6 +91,18 @@ class S3SendReceiver {
         }
     };
 
+    // Preallocated stream for zero-copy AWS requests
+    class PreallocatedStream : public Aws::IOStream {
+        public:
+        // The constructor
+        PreallocatedStream(unsigned char* memory, uint64_t size) : Aws::IOStream(new Aws::Utils::Stream::PreallocatedStreamBuf(memory, size)) {}
+
+        // To be iostream conform we require the deletion of the rdbuf
+        ~PreallocatedStream() {
+            delete rdbuf();
+        }
+    };
+
     private:
     /// The submission buffer
     utils::RingBuffer<GetObjectRequestMessage*> _submissions;
@@ -217,8 +229,11 @@ class S3SendReceiver {
                     if (auto mem = _reuse.consume<false>()) {
                         if (mem.has_value()) {
                             original->data = std::unique_ptr<utils::DataVector<uint8_t>>(mem.value());
-                            original->streamBuf = std::make_unique<Aws::Utils::Stream::PreallocatedStreamBuf>(reinterpret_cast<unsigned char*>(original->data->data()), original->data->capacity());
-                            original->objectRequest.SetResponseStreamFactory([original]() { return Aws::New<Aws::IOStream>("", original->streamBuf.get()); });
+                            auto bufCapacity = original->data->capacity();
+                            auto bufData = original->data->data();
+                            original->objectRequest.SetResponseStreamFactory([bufData, bufCapacity]() {
+                                return Aws::New<PreallocatedStream>("", bufData, bufCapacity);
+                            });
                         }
                     }
                 }
