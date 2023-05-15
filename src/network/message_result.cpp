@@ -13,13 +13,13 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-MessageResult::MessageResult() : size(), offset(), state(MessageState::Init)
+MessageResult::MessageResult() : size(), offset(), failureCode(), state(MessageState::Init)
 // The default constructor
 {
     dataVector = make_unique<utils::DataVector<uint8_t>>();
 }
 //---------------------------------------------------------------------------
-MessageResult::MessageResult(uint8_t* data, uint64_t size) : size(), offset(), state(MessageState::Init)
+MessageResult::MessageResult(uint8_t* data, uint64_t size) : size(), offset(), failureCode(), state(MessageState::Init)
 // The constructor with buffer input
 {
     if (data)
@@ -28,7 +28,7 @@ MessageResult::MessageResult(uint8_t* data, uint64_t size) : size(), offset(), s
         dataVector = make_unique<utils::DataVector<uint8_t>>();
 }
 //---------------------------------------------------------------------------
-MessageResult::MessageResult(utils::DataVector<uint8_t>* dataVector) : size(), offset(), state(MessageState::Init)
+MessageResult::MessageResult(utils::DataVector<uint8_t>* dataVector) : size(), offset(), failureCode(), state(MessageState::Init)
 // The constructor with buffer input
 {
     this->dataVector = unique_ptr<utils::DataVector<uint8_t>>(dataVector);
@@ -80,6 +80,12 @@ MessageState MessageResult::getState() const
 // Get the state
 {
     return state;
+}
+//---------------------------------------------------------------------------
+uint16_t MessageResult::getFailureCode() const
+// Get the original message
+{
+    return failureCode;
 }
 //---------------------------------------------------------------------------
 bool MessageResult::owned() const

@@ -25,7 +25,7 @@ int main(int /*argc*/, char** /*argv*/) {
     anyblob::network::TaskedSendReceiver sendReceiver(group);
 
     // Create the provider for the corresponding filename
-    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, "", "", &sendReceiver);
+    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, "", "", &sendReceiver);
 
     // Create the get request
     anyblob::network::GetTransaction getTxn(provider.get());

@@ -15,7 +15,7 @@
 #ifndef NDEBUG
 #define verify(expression) assert(expression)
 #else
-#define verify(expression) ((void)(expression))
+#define verify(expression) ((void) (expression))
 #endif
 //---------------------------------------------------------------------------
 namespace anyblob {
@@ -26,10 +26,10 @@ using namespace std;
 //---------------------------------------------------------------------------
 TEST_CASE("send_receiver") {
     PerfEventBlock e;
-    auto concurrency = 10;
+    auto concurrency = 4;
     uint64_t length = 4096u;
 
-    TaskedSendReceiverGroup group(concurrency << 1, concurrency << 1);
+    TaskedSendReceiverGroup group(concurrency << 2, concurrency << 2);
 
     vector<unique_ptr<OriginalMessage>> msgs;
     for (auto i = 0; i < concurrency; i++) {
@@ -39,13 +39,20 @@ TEST_CASE("send_receiver") {
         message->resize(str.length());
         msgs.emplace_back(new OriginalMessage{move(message), "db.cs.tum.edu", 80});
         verify(group.send(msgs.back().get()));
+
+        message = make_unique<utils::DataVector<uint8_t>>(length);
+        str = "GET / HTTP/1.1\r\nHost: db.in.tum.de\r\nConnection: keep-alive\r\n\r\n";
+        memcpy(message->data(), str.data(), str.length());
+        message->resize(str.length());
+        msgs.emplace_back(new OriginalMessage{move(message), "db.in.tum.de", 443});
+        verify(group.send(msgs.back().get()));
     }
 
     group.process(true);
 
     unique_ptr<uint8_t[]> currentMessage;
     size_t size;
-    for (auto i = 0; i < concurrency;) {
+    for (auto i = 0u; i < msgs.size();) {
         auto& original = msgs[i];
         switch (original->result.getState()) {
             case MessageState::Finished: {
@@ -53,6 +60,7 @@ TEST_CASE("send_receiver") {
                 if (i > 0) {
                     // skip header
                     size_t skip = 1024;
+                    REQUIRE(size > skip);
                     REQUIRE(!strncmp(reinterpret_cast<char*>(currentMessage.get()) + skip, reinterpret_cast<char*>(message.getData()) + skip, size - skip));
                 }
                 currentMessage = message.moveData();

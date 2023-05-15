@@ -35,11 +35,19 @@ TEST_CASE("MinIO Integration") {
     REQUIRE(key);
     REQUIRE(secret);
 
+    auto stringGen = [](auto len) {
+        static constexpr auto chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+        auto resultString = string(len, '\0');
+        generate_n(begin(resultString), len, [&]() { return chars[rand() % strlen(chars)]; });
+        return resultString;
+    };
+
     // The file to be uploaded and downloaded
     string bucketName = "minio://";
     bucketName = bucketName + endpoint + "/" + bucket + ":" + region;
-    auto fileName = "test.txt";
-    string content = "Hello World!";
+    string fileName[] {"test.txt", "long.txt"};
+    string longText = stringGen(1 << 24);
+    string content[] {"Hello World!", longText};
 
     // Create a new task group (18 concurrent request maximum, and up to 1024 outstanding submissions)
     anyblob::network::TaskedSendReceiverGroup group(18, 1024);
@@ -48,11 +56,12 @@ TEST_CASE("MinIO Integration") {
     anyblob::network::TaskedSendReceiver sendReceiver(group);
 
     // Create the provider for the corresponding filename
-    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, key, secret, &sendReceiver);
+    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, key, secret, &sendReceiver);
     {
         // Create the put request
         anyblob::network::PutTransaction putTxn(provider.get());
-        putTxn.addRequest(fileName, content.data(), content.size());
+        for (auto i = 0u; i < 2; i++)
+            putTxn.addRequest(fileName[i], content[i].data(), content[i].size());
 
         // Upload the request synchronously with the scheduler object on this thread
         putTxn.processSync(sendReceiver);
@@ -66,23 +75,25 @@ TEST_CASE("MinIO Integration") {
     {
         // Create the get request
         anyblob::network::GetTransaction getTxn(provider.get());
-        getTxn.addRequest(fileName);
+        for (auto i = 0u; i < 2; i++)
+            getTxn.addRequest(fileName[i]);
 
         // Retrieve the request synchronously with the scheduler object on this thread
         getTxn.processSync(sendReceiver);
 
         // Get and print the result
+        auto i = 0u;
         for (const auto& it : getTxn) {
             // Sucessful request
             REQUIRE(it.success());
             // Simple string_view interface
-            REQUIRE(!content.compare(it.getResult()));
+            REQUIRE(!content[i].compare(it.getResult()));
 
             // Advanced raw interface
             // Note that the data lies in the data buffer but after the offset to skip the HTTP header
             // Note that the size is already without the header, so the full request has size + offset length
             string_view rawDataString(reinterpret_cast<const char*>(it.getData()) + it.getOffset(), it.getSize());
-            REQUIRE(!content.compare(rawDataString));
+            REQUIRE(!content[i++].compare(rawDataString));
             REQUIRE(!rawDataString.compare(it.getResult()));
         }
     }

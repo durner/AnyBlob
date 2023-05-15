@@ -57,7 +57,7 @@ class IOUringSocket {
         /// Lingering of tcp packets
         int linger = 1;
         /// The timeout in usec
-        int timeout = 250 * 1000;
+        int timeout = 500 * 1000;
         /// Reuse sockets
         int reuse = 0;
     };

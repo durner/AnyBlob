@@ -90,10 +90,12 @@ string Provider::getKey(const string& keyFile)
     return string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<Provider> Provider::makeProvider(const string& filepath, const string& keyId, const string& secret, network::TaskedSendReceiver* sendReceiver)
+unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, const string& keyId, const string& secret, network::TaskedSendReceiver* sendReceiver)
 // Create a provider
 {
     auto info = anyblob::cloud::Provider::getRemoteInfo(filepath);
+    if (https && info.port == 80)
+        info.port = 443;
     switch (info.provider) {
         case anyblob::cloud::Provider::CloudService::AWS: {
             if (sendReceiver && info.region.empty())

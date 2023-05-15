@@ -32,6 +32,8 @@ class GCP : public Provider {
         std::string bucket;
         /// The gcp region
         std::string region;
+        /// The gcp port
+        int port;
     };
 
     /// The secret
@@ -58,7 +60,7 @@ class GCP : public Provider {
     [[nodiscard]] static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
 
     /// The constructor
-    GCP(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket, info.region}) {
+    GCP(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket, info.region, info.port}) {
         assert(info.provider == Provider::CloudService::GCP);
         _type = info.provider;
         _secret = std::make_unique<Secret>();
