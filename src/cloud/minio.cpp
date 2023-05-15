@@ -1,7 +1,8 @@
-#include "cloud/gcp_instances.hpp"
+#include "cloud/minio.hpp"
+#include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
-// Dominik Durner, 2022
+// Dominik Durner, 2021
 //
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -12,13 +13,19 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-vector<GCPInstance> GCPInstance::getInstanceDetails()
-// Gets a vector of instance type infos
+Provider::Instance MinIO::getInstanceDetails(network::TaskedSendReceiver& /*sendReceiver*/)
+// No real information for MinIO
 {
-    // TODO: add instances
-    vector<GCPInstance> instances = {};
-    return instances;
+    return AWSInstance{"minio", 0, 0, ""};
 }
 //---------------------------------------------------------------------------
-}; // namespace cloud
-}; // namespace anyblob
+string MinIO::getAddress() const
+// Gets the address of MinIO
+{
+    // MinIO does not support virtual-hosted adresses, thus we use path-style requests
+    assert(!_settings.endpoint.empty());
+    return _settings.endpoint;
+}
+//---------------------------------------------------------------------------
+} // namespace cloud
+} // namespace anyblob

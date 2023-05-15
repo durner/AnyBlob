@@ -1,7 +1,9 @@
-#include "cloud/gcp_instances.hpp"
+#include "cloud/oracle.hpp"
+#include "cloud/oracle_instances.hpp"
+#include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
-// Dominik Durner, 2022
+// Dominik Durner, 2021
 //
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -12,13 +14,18 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-vector<GCPInstance> GCPInstance::getInstanceDetails()
-// Gets a vector of instance type infos
+Provider::Instance Oracle::getInstanceDetails(network::TaskedSendReceiver& /*sendReceiver*/)
+// Get the instance details
 {
-    // TODO: add instances
-    vector<GCPInstance> instances = {};
-    return instances;
+    // TODO: add instances and retrieve shape information
+    return OracleInstance{"oracle", 0, 0, ""};
 }
 //---------------------------------------------------------------------------
-}; // namespace cloud
-}; // namespace anyblob
+string Oracle::getAddress() const
+// Gets the address of the Oracle Cloud Storage
+{
+    return _settings.bucket + ".compat.objectstorage." + _settings.region + ".oraclecloud.com";
+}
+//---------------------------------------------------------------------------
+} // namespace cloud
+} // namespace anyblob

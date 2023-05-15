@@ -57,7 +57,7 @@ class AWS : public Provider {
     /// The fake IAM timestamp
     const char* fakeIAMTimestamp = "2100-01-01T00:00:00Z";
 
-    private:
+    protected:
     /// The settings
     Settings _settings;
     /// The secret
@@ -73,7 +73,13 @@ class AWS : public Provider {
 
     /// The constructor
     explicit AWS(const RemoteInfo& info) : _settings({info.bucket, info.region, info.endpoint, info.port}) {
-        assert(info.provider == Provider::CloudService::AWS || info.provider == Provider::CloudService::MinIO);
+        // Check for compatible clouds
+        assert(info.provider == Provider::CloudService::AWS || info.provider == Provider::CloudService::MinIO || info.provider == Provider::CloudService::Oracle || info.provider == Provider::CloudService::IBM);
+        // Requires a bucket
+        assert(!info.bucket.empty());
+        // If the provider is not AWS, we explicitly require a region or an explicit endpoint for the data (for now)
+        assert(info.provider == Provider::CloudService::AWS || (!info.endpoint.empty() || !info.region.empty()));
+
         _type = info.provider;
     }
     /// The custom endpoint constructor

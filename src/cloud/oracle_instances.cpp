@@ -1,4 +1,4 @@
-#include "cloud/gcp_instances.hpp"
+#include "cloud/oracle_instances.hpp"
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -12,11 +12,11 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-vector<GCPInstance> GCPInstance::getInstanceDetails()
+vector<OracleInstance> OracleInstance::getInstanceDetails()
 // Gets a vector of instance type infos
 {
     // TODO: add instances
-    vector<GCPInstance> instances = {};
+    vector<OracleInstance> instances = {};
     return instances;
 }
 //---------------------------------------------------------------------------

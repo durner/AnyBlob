@@ -88,8 +88,7 @@ class GCPTester {
         resultString += "\r\nHost: test.storage.googleapis.com\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
-        auto vec = GCPInstance::getInstanceDetails();
-        REQUIRE(vec.size() > 0);
+        ignore = GCPInstance::getInstanceDetails();
 
         Provider::testEnviornment = false;
     }

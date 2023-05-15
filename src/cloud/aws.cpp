@@ -199,6 +199,8 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
     AWSSigner::Request request;
     request.method = "GET";
     request.type = "HTTP/1.1";
+
+    // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
         request.path = "/" + filePath;
     else
@@ -237,7 +239,8 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, c
     request.method = "PUT";
     request.type = "HTTP/1.1";
     request.bodyData = reinterpret_cast<const uint8_t*>(object.data());
-    ;
+
+    // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
         request.path = "/" + filePath;
     else

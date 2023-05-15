@@ -29,9 +29,9 @@ namespace cloud {
 class Provider {
     public:
     /// The remote prefixes count
-    static constexpr unsigned remoteFileCount = 4;
+    static constexpr unsigned remoteFileCount = 6;
     /// The remote prefixes
-    static constexpr std::string_view remoteFile[] = {"s3://", "azure://", "gcp://", "minio://"};
+    static constexpr std::string_view remoteFile[] = {"s3://", "azure://", "gcp://", "oci://", "ibm://", "minio://"};
     /// Are we currently testing the provdiers
     static bool testEnviornment;
 
@@ -40,7 +40,9 @@ class Provider {
         AWS = 0,
         Azure = 1,
         GCP = 2,
-        MinIO = 3,
+        Oracle = 3,
+        IBM = 4,
+        MinIO = 5,
         Local = 255
     };
 

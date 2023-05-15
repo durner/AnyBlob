@@ -2,6 +2,8 @@
 #include "cloud/aws.hpp"
 #include "cloud/azure.hpp"
 #include "cloud/gcp.hpp"
+#include "cloud/ibm.hpp"
+#include "cloud/oracle.hpp"
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -18,7 +20,7 @@ using namespace std;
 //---------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
     string helpText = "AnyBlobBenchmark cloudProvider benchmark [OPTIONS]\n\n";
-    helpText += "cloudProvider: [aws, gcp, azure]\n";
+    helpText += "cloudProvider: [aws, gcp, oracle, ibm, azure]\n";
     helpText += "benchmark: [bandwidth]\n\n";
     helpText += "OPTIONS:\n";
     helpText += "-b bucketName\n";
@@ -33,8 +35,8 @@ int main(int argc, char* argv[]) {
     helpText += "-a algorithm [uring, s3, s3crt]\n";
     helpText += "-o csv output file\n";
     helpText += "-d dnsresolver (default: throughput [aws])\n";
-    helpText += "-e clientEmail [required for GCP & Azure]\n";
-    helpText += "-k rsaKeyFile [required for GCP & Azure]\n";
+    helpText += "-e clientEmail [required for IBM, Oracle, GCP & Azure]\n";
+    helpText += "-k rsaKeyFile [required for IBM, Oracle, GCP & Azure]\n";
     helpText += "-u upload test (default: 0)\n";
     helpText += "-h https (default: 0)\n";
     helpText += "-x encryption at rest (default: 0)\n";
@@ -46,6 +48,8 @@ int main(int argc, char* argv[]) {
 
     anyblob::cloud::AWS::Settings awsSettings;
     anyblob::cloud::GCP::Settings gcpSettings;
+    anyblob::cloud::IBM::Settings ibmSettings;
+    anyblob::cloud::Oracle::Settings oracleSettings;
     anyblob::cloud::Azure::Settings azureSettings;
 
     anyblob::benchmark::Bandwidth::Settings bandwithSettings;
@@ -58,10 +62,14 @@ int main(int argc, char* argv[]) {
         if (!strcmp(argv[i], "-b")) {
             awsSettings.bucket = argv[++i];
             gcpSettings.bucket = awsSettings.bucket;
+            ibmSettings.bucket = awsSettings.bucket;
+            oracleSettings.bucket = awsSettings.bucket;
             azureSettings.container = awsSettings.bucket;
         } else if (!strcmp(argv[i], "-r")) {
             awsSettings.region = argv[++i];
             gcpSettings.region = awsSettings.region;
+            oracleSettings.region = awsSettings.region;
+            ibmSettings.region = awsSettings.region;
         } else if (!strcmp(argv[i], "-f")) {
             bandwithSettings.filePath = argv[++i];
         } else if (!strcmp(argv[i], "-o")) {
@@ -112,6 +120,16 @@ int main(int argc, char* argv[]) {
         anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
 
         Aws::ShutdownAPI(options);
+    }
+
+    if (!strcmp(argv[1], "oracle") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
+        string uri = "oci://" + oracleSettings.bucket + ":" + oracleSettings.region + "/";
+        anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
+    }
+
+    if (!strcmp(argv[1], "ibm") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
+        string uri = "ibm://" + ibmSettings.bucket + ":" + ibmSettings.region + "/";
+        anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
     }
 
     if (!strcmp(argv[1], "gcp") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {

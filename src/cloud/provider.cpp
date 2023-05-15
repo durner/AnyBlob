@@ -2,6 +2,9 @@
 #include "cloud/aws.hpp"
 #include "cloud/azure.hpp"
 #include "cloud/gcp.hpp"
+#include "cloud/ibm.hpp"
+#include "cloud/minio.hpp"
+#include "cloud/oracle.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
 #include <fstream>
@@ -119,8 +122,16 @@ unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, 
             auto azure = make_unique<anyblob::cloud::Azure>(info, keyId, secret);
             return azure;
         }
+        case anyblob::cloud::Provider::CloudService::IBM: {
+            auto ibm = make_unique<anyblob::cloud::IBM>(info, keyId, secret);
+            return ibm;
+        }
+        case anyblob::cloud::Provider::CloudService::Oracle: {
+            auto oracle = make_unique<anyblob::cloud::Oracle>(info, keyId, secret);
+            return oracle;
+        }
         case anyblob::cloud::Provider::CloudService::MinIO: {
-            auto minio = make_unique<anyblob::cloud::AWS>(info, keyId, secret);
+            auto minio = make_unique<anyblob::cloud::MinIO>(info, keyId, secret);
             return minio;
         }
         default: {
