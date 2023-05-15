@@ -29,63 +29,63 @@ class DataVector {
 
     public:
     /// Constructor
-    DataVector() : _capacity(0), _size(0) {}
+    constexpr DataVector() : _capacity(0), _size(0) {}
 
     /// Constructor with size
-    DataVector(uint64_t cap) : _capacity(0), _size(0) {
+    constexpr DataVector(uint64_t cap) : _capacity(0), _size(0) {
         resize(cap);
     }
 
     /// Copy constructor
-    DataVector(DataVector& rhs) : _capacity(0), _size(0) {
+    constexpr DataVector(DataVector& rhs) : _capacity(0), _size(0) {
         reserve(rhs._capacity);
         _size = rhs._size;
         std::memcpy(data(), rhs.data(), size() * sizeof(T));
     }
 
     /// Constructor from other pointers
-    DataVector(T* start, T* end) : _capacity(0), _size(0) {
+    constexpr DataVector(T* start, T* end) : _capacity(0), _size(0) {
         resize(end - start);
         std::memcpy(data(), start, size() * sizeof(T));
     }
 
     /// Constructor unowned, map to other pointer, capacity given in number of T elements
-    DataVector(T* ptr, uint64_t capacity) : _capacity(capacity * sizeof(T)), _size(0) {
+    constexpr DataVector(T* ptr, uint64_t capacity) : _capacity(capacity * sizeof(T)), _size(0) {
         _data = ptr;
     }
 
     /// Get the data
-    inline T* data() {
+    [[ nodiscard ]] constexpr T* data() {
         return _data;
     }
 
     /// Get the data
-    inline const T* cdata() const {
+    [[ nodiscard ]] constexpr const T* cdata() const {
         return _data;
     }
 
     /// Get the size
-    inline uint64_t size() const {
+    [[ nodiscard ]] constexpr uint64_t size() const {
         return _size;
     }
 
     /// Get the capacity
-    inline uint64_t capacity() const {
+    [[ nodiscard ]] constexpr uint64_t capacity() const {
         return _capacity;
     }
 
     /// Clear the size
-    inline void clear() {
+    constexpr void clear() {
         _size = 0;
     }
 
     /// Is the data owned
-    inline bool owned() {
+    [[ nodiscard ]] constexpr bool owned() {
         return _dataOwned || !_capacity;
     }
 
     /// Increase the capacity
-    inline void reserve(uint64_t cap) {
+    constexpr void reserve(uint64_t cap) {
         if (_capacity < cap) {
             if (!_dataOwned && _capacity)
                 throw std::runtime_error("Pointer not owned, thus size is fixed!");
@@ -99,7 +99,7 @@ class DataVector {
     }
 
     /// Change the number of elements
-    inline void resize(uint64_t size) {
+    constexpr void resize(uint64_t size) {
         if (size > _capacity) {
             reserve(size);
         }
@@ -107,7 +107,7 @@ class DataVector {
     }
 
     /// Transfer the ownership of the data
-    inline std::unique_ptr<T[]> transferBuffer() {
+    [[ nodiscard ]] constexpr std::unique_ptr<T[]> transferBuffer() {
         return move(_dataOwned);
     }
 };

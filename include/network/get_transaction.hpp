@@ -24,7 +24,7 @@ class GetTransaction : public Transaction {
     explicit GetTransaction(const cloud::Provider* provider) : Transaction(provider) {}
 
     /// Build a new get request for synchronous calls
-    void addRequest(const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+    inline void addRequest(const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(provider);
         auto originalMsg = std::make_unique<network::OriginalMessage>(provider->getRequest(remotePath, range), provider->getAddress(), provider->getPort(), result, capacity, traceId);
         messages.push_back(std::move(originalMsg));
@@ -32,7 +32,7 @@ class GetTransaction : public Transaction {
 
     /// Build a new get request with callback
     template <typename Callback>
-    void addRequest(Callback&& callback, const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+    inline void addRequest(Callback&& callback, const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(provider);
         auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback&&>(callback), provider->getRequest(remotePath, range), provider->getAddress(), provider->getPort(), result, capacity, traceId);
         messages.push_back(std::move(originalMsg));

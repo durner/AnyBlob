@@ -39,7 +39,7 @@ class AzureSigner {
     };
 
     /// Builds the signed url
-    static std::string createSignedRequest(const std::string& serviceAccountEmail, const std::string& privateRSA, Request& request);
+    [[nodiscard]] static std::string createSignedRequest(const std::string& serviceAccountEmail, const std::string& privateRSA, Request& request);
 };
 //---------------------------------------------------------------------------
 }; // namespace cloud

@@ -16,7 +16,7 @@ namespace cloud {
 /// Implements the Azure instances
 struct AzureInstance : public Provider::Instance {
     /// Gets a vector of instance type infos
-    static std::vector<AzureInstance> getInstanceDetails();
+    [[nodiscard]] static std::vector<AzureInstance> getInstanceDetails();
 };
 //---------------------------------------------------------------------------
 }; // namespace cloud

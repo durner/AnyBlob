@@ -16,7 +16,7 @@ namespace cloud {
 /// Implements the GCP instances
 struct GCPInstance : public Provider::Instance {
     /// Gets a vector of instance type infos
-    static std::vector<GCPInstance> getInstanceDetails();
+    [[nodiscard]] static std::vector<GCPInstance> getInstanceDetails();
 };
 //---------------------------------------------------------------------------
 }; // namespace cloud

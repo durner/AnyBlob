@@ -24,7 +24,7 @@ TEST_CASE("unordered_map") {
     REQUIRE(ht.find(0) != ht.end());
     REQUIRE(ht.find(2) == ht.end());
 
-    ht.erase(ht.find(0));
+    REQUIRE(ht.erase(ht.find(0)));
     REQUIRE(ht.size() == 1);
 }
 //---------------------------------------------------------------------------

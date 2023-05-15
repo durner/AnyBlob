@@ -65,9 +65,9 @@ class AWS : public Provider {
 
     public:
     /// Get instance details
-    Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
+    [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
     /// Get the region of the instance
-    static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
+    [[nodiscard]] static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
     /// Init the resolver
     void initResolver(network::TaskedSendReceiver& sendReceiver) override;
 
@@ -87,32 +87,32 @@ class AWS : public Provider {
     /// Initialize secret
     void initSecret(network::TaskedSendReceiver& sendReceiver) override;
     /// Builds the secret http request
-    std::unique_ptr<utils::DataVector<uint8_t>> downloadIAMUser() const;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> downloadIAMUser() const;
     /// Builds the secret http request
-    std::unique_ptr<utils::DataVector<uint8_t>> downloadSecret(std::string_view content);
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> downloadSecret(std::string_view content);
     /// Update secret
     bool updateSecret(std::string_view content);
     /// Checks whether the keys are still valid
-    bool validKeys() const;
+    [[nodiscard]] bool validKeys() const;
     /// Get the settings
-    Settings getSettings() { return _settings; }
+    [[nodiscard]] inline Settings getSettings() { return _settings; }
 
     /// Builds the http request for downloading a blob or listing the directory
-    std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
-    std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override;
 
     /// Get the address of the server
-    std::string getAddress() const override;
+    [[nodiscard]] std::string getAddress() const override;
     /// Get the port of the server
-    uint32_t getPort() const override;
+    [[nodiscard]] uint32_t getPort() const override;
 
     /// Builds the info http request
-    static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "instance-type");
+    [[nodiscard]] static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "instance-type");
     /// Get the IAM address
-    static constexpr const char* getIAMAddress() { return "169.254.169.254"; }
+    [[nodiscard]] static constexpr const char* getIAMAddress() { return "169.254.169.254"; }
     /// Get the port of the IAM server
-    static constexpr uint32_t getIAMPort() { return 80; }
+    [[nodiscard]] static constexpr uint32_t getIAMPort() { return 80; }
 
     friend Provider;
     friend test::AWSTester;

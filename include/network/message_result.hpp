@@ -55,30 +55,30 @@ class MessageResult {
     MessageResult(utils::DataVector<uint8_t>* dataVector);
 
     /// Get the result
-    const std::string_view getResult() const;
+    [[nodiscard]] const std::string_view getResult() const;
     /// Get the result
-    std::string_view getResult();
+    [[nodiscard]] std::string_view getResult();
     /// Get the const data
-    const uint8_t* getData() const;
+    [[nodiscard]] const uint8_t* getData() const;
     /// Get the data
-    uint8_t* getData();
+    [[nodiscard]] uint8_t* getData();
     /// Transfer owenership
-    std::unique_ptr<uint8_t[]> moveData();
+    [[nodiscard]] std::unique_ptr<uint8_t[]> moveData();
     /// Get the size
-    uint64_t getSize() const;
+    [[nodiscard]] uint64_t getSize() const;
     /// Get the offset
-    uint64_t getOffset() const;
+    [[nodiscard]] uint64_t getOffset() const;
     /// Get the state
-    MessageState getState() const;
+    [[nodiscard]] MessageState getState() const;
     /// Is the data owned by this object
-    bool owned() const;
+    [[nodiscard]] bool owned() const;
     /// Was the request successful
-    bool success() const;
+    [[nodiscard]] bool success() const;
 
     /// Get the data vector reference
-    utils::DataVector<uint8_t>& getDataVector();
+    [[nodiscard]] utils::DataVector<uint8_t>& getDataVector();
     /// Transfer owenership of data vector
-    std::unique_ptr<utils::DataVector<uint8_t>> moveDataVector();
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> moveDataVector();
 
     /// Define the friend message and message tasks
     friend HTTPMessage;

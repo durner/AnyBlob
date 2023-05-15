@@ -64,11 +64,11 @@ class TaskedSendReceiverGroup {
     ~TaskedSendReceiverGroup();
 
     /// Adds a message to the submission queue
-    bool send(OriginalMessage* msg);
+    [[nodiscard]] bool send(OriginalMessage* msg);
     /// Adds a span of message to the submission queue
-    bool send(std::span<OriginalMessage*> msgs);
+    [[nodiscard]] bool send(std::span<OriginalMessage*> msgs);
     /// Gets a tasked send receiver deamon
-    TaskSendReceiverHandle getHandle();
+    [[nodiscard]] TaskSendReceiverHandle getHandle();
     /// Submits group queue and waits for result
     void process(bool oneQueueInvocation = true);
 
@@ -102,7 +102,7 @@ class TaskedSendReceiver {
     TaskedSendReceiver(TaskedSendReceiverGroup& group);
 
     /// Get the group
-    const TaskedSendReceiverGroup* getGroup() const { return &_group; }
+    [[nodiscard]] const TaskedSendReceiverGroup* getGroup() const { return &_group; }
 
     /// Adds a resolver
     void addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver);
@@ -144,9 +144,9 @@ class TaskedSendReceiver {
     /// Submits queue and waits for result
     void sendReceive(bool local = false, bool oneQueueInvocation = true);
     /// Connect to the socket return fd
-    int32_t connect(std::string hostname, uint32_t port);
+    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port);
     /// Submits the queue
-    int32_t submitRequests();
+    [[nodiscard]] int32_t submitRequests();
 
     friend TaskedSendReceiverGroup;
     friend TaskSendReceiverHandle;

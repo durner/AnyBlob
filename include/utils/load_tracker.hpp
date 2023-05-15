@@ -100,19 +100,19 @@ class LoadTracker {
 
     private:
     /// Get the idle times where other work could run
-    static size_t getIdleTime(const CPUData& e) {
+    static constexpr size_t getIdleTime(const CPUData& e) {
         return e.times[static_cast<uint8_t>(CPUStates::S_IDLE)] + e.times[static_cast<uint8_t>(CPUStates::S_IOWAIT)];
     }
 
     /// Get the active cpu times
-    static size_t getActiveTime(const CPUData& e) {
+    static constexpr size_t getActiveTime(const CPUData& e) {
         return e.times[static_cast<uint8_t>(CPUStates::S_USER)] + e.times[static_cast<uint8_t>(CPUStates::S_NICE)] +
             e.times[static_cast<uint8_t>(CPUStates::S_SYSTEM)] + e.times[static_cast<uint8_t>(CPUStates::S_IRQ)] +
             e.times[static_cast<uint8_t>(CPUStates::S_SOFTIRQ)] + e.times[static_cast<uint8_t>(CPUStates::S_STEAL)];
     }
 
     /// Write stats as csv
-    void writeStats(const std::vector<CPUData>& entries1, const std::vector<CPUData>& entries2) {
+    inline void writeStats(const std::vector<CPUData>& entries1, const std::vector<CPUData>& entries2) {
         const size_t NUM_ENTRIES = entries1.size();
 
         for (size_t i = 0; i < NUM_ENTRIES; ++i) {

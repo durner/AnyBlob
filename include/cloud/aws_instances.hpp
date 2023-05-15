@@ -16,7 +16,7 @@ namespace cloud {
 /// Implements the AWS instances
 struct AWSInstance : public Provider::Instance {
     /// Gets a vector of instance type infos
-    static std::vector<AWSInstance> getInstanceDetails();
+    [[nodiscard]] static std::vector<AWSInstance> getInstanceDetails();
 };
 //---------------------------------------------------------------------------
 }; // namespace cloud

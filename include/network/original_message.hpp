@@ -48,21 +48,21 @@ struct OriginalMessage {
     virtual ~OriginalMessage() = default;
 
     /// Add the put request data to the message
-    void setPutRequestData(const uint8_t* data, uint64_t length) {
+    constexpr void setPutRequestData(const uint8_t* data, uint64_t length) {
         this->putData = data;
         this->putLength = length;
     }
 
     /// Set the result vector and transfer ownership
-    void setResultVector(utils::DataVector<uint8_t>* dataVector) {
+    inline void setResultVector(utils::DataVector<uint8_t>* dataVector) {
         result.dataVector = std::unique_ptr<utils::DataVector<uint8_t>>(dataVector);
     }
 
     /// Callback required
-    virtual bool requiresFinish() { return false; }
+    virtual inline bool requiresFinish() { return false; }
 
     /// Callback
-    virtual void finish() {}
+    virtual inline void finish() {}
 };
 //---------------------------------------------------------------------------
 /// The callback original message
@@ -78,10 +78,10 @@ struct OriginalCallbackMessage : public OriginalMessage {
     virtual ~OriginalCallbackMessage() override = default;
 
     /// Override if callback required
-    bool requiresFinish() override { return true; }
+    bool inline requiresFinish() override { return true; }
 
     /// Callback
-    void finish() override {
+    void inline finish() override {
         callback(result);
     }
 };
