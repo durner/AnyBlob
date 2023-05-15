@@ -50,6 +50,8 @@ class Bandwidth {
         std::vector<Systems> systems;
         /// HTTPS
         bool https = false;
+        /// Encryption at rest
+        bool encryption = false;
         /// Test upload
         bool testUpload = false;
     };

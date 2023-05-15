@@ -37,6 +37,7 @@ int main(int argc, char* argv[]) {
     helpText += "-k rsaKeyFile [required for GCP & Azure]\n";
     helpText += "-u upload test (default: 0)\n";
     helpText += "-h https (default: 0)\n";
+    helpText += "-x encryption at rest (default: 0)\n";
 
     if (argc < 3 || strcmp(argv[2], "bandwidth")) {
         cerr << helpText << endl;
@@ -85,6 +86,8 @@ int main(int argc, char* argv[]) {
             bandwithSettings.testUpload = atoi(argv[++i]);
         } else if (!strcmp(argv[i], "-h")) {
             bandwithSettings.https = atoi(argv[++i]);
+        } else if (!strcmp(argv[i], "-x")) {
+            bandwithSettings.encryption = atoi(argv[++i]);
         } else if (!strcmp(argv[i], "-a")) {
             ++i;
             if (!strcmp(argv[i], "s3"))

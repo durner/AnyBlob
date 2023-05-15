@@ -149,7 +149,7 @@ void TaskedSendReceiver::run()
 // Deamon
 {
     try {
-        sendReceive(false);
+        sendReceive(false, false);
     } catch (exception& e) {
         cerr << e.what() << endl;
     };
@@ -178,6 +178,15 @@ void TaskedSendReceiver::reuse(unique_ptr<utils::DataVector<uint8_t>> message)
 // Reuse message
 {
     verify(_group._reuse.insert(message.release()) != ~0ull);
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> TaskedSendReceiver::getReused()
+// Get reused memory
+{
+    auto mem = _group._reuse.consume();
+    if (mem.has_value())
+        return std::unique_ptr<utils::DataVector<uint8_t>>(mem.value());
+    return nullptr;
 }
 //--------------------------------------------------------------------------
 void TaskedSendReceiver::addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver)
