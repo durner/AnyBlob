@@ -16,6 +16,7 @@ class TaskedSendReceiver;
 class Transaction;
 class GetTransaction;
 class PutTransaction;
+class DeleteTransaction;
 struct OriginalMessage;
 }; // namespace network
 namespace utils {
@@ -76,6 +77,8 @@ class Provider {
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const = 0;
     /// Builds the http request for putting an object without the actual data (header only according to the data and length provided)
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const = 0;
+    /// Builds the http request for deleting an object
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const = 0;
     /// Get the address of the server
     [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
@@ -108,6 +111,7 @@ class Provider {
     friend network::Transaction;
     friend network::GetTransaction;
     friend network::PutTransaction;
+    friend network::DeleteTransaction;
 };
 //---------------------------------------------------------------------------
 } // namespace cloud

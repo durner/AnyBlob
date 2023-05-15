@@ -2,6 +2,7 @@
 #include "cloud/provider.hpp"
 #include "network/get_transaction.hpp"
 #include "network/put_transaction.hpp"
+#include "network/delete_transaction.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include <cstdlib>
 #include <cstring>
@@ -102,6 +103,22 @@ TEST_CASE("MinIO Integration") {
             REQUIRE(!rawDataString.compare(content[i++]));
         }
     }
+    {
+        // Create the put request
+        anyblob::network::DeleteTransaction deleteTxn(provider.get());
+        for (auto i = 0u; i < 2; i++)
+            deleteTxn.addRequest(fileName[i]);
+
+        // Upload the request synchronously with the scheduler object on this thread
+        deleteTxn.processSync(sendReceiver);
+
+        // Check the upload
+        for (const auto& it : deleteTxn) {
+            // Sucessful request
+            REQUIRE(it.success());
+        }
+    }
+
 }
 //---------------------------------------------------------------------------
 } // namespace test

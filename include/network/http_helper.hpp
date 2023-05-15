@@ -23,7 +23,8 @@ class HTTPHelper {
         HTTP_1_0_OK,
         HTTP_1_1_Partial,
         HTTP_1_1_OK,
-        HTTP_1_1_Created
+        HTTP_1_1_Created,
+        HTTP_1_1_No_Content
     };
 
     /// The encoding

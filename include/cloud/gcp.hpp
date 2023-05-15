@@ -76,6 +76,8 @@ class GCP : public Provider {
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override;
+    // Builds the http request for deleting an objects
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const override;
 
     /// Get the address of the server
     [[nodiscard]] std::string getAddress() const override;

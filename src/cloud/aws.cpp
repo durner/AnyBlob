@@ -66,9 +66,8 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendRece
                 return instance;
 
         return AWSInstance{string(s), 0, 0, ""};
-    } else {
-        return AWSInstance{"minio", 0, 0, "10"};
     }
+    return AWSInstance{"aws", 0, 0, ""};
 }
 //---------------------------------------------------------------------------
 string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
@@ -249,6 +248,40 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, c
     request.headers.emplace("Host", getAddress());
     request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
     request.headers.emplace("Content-Length", to_string(request.bodyLength));
+    request.headers.emplace("x-amz-request-payer", "requester");
+    if (!_secret->sessionToken.empty())
+        request.headers.emplace("x-amz-security-token", _secret->sessionToken);
+
+    auto canonical = AWSSigner::createCanonicalRequest(request);
+
+    AWSSigner::StringToSign stringToSign = {.request = request, .requestSHA = canonical.second, .region = _settings.region, .service = "s3"};
+    const auto uri = AWSSigner::createSignedRequest(_secret->keyId, _secret->secret, stringToSign);
+    auto httpHeader = request.method + " " + uri + " " + request.type + "\r\n";
+    for (auto& h : request.headers)
+        httpHeader += h.first + ": " + h.second + "\r\n";
+    httpHeader += "\r\n";
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequest(const string& filePath) const
+// Builds the http request for deleting an objects
+{
+    if (!validKeys())
+        return nullptr;
+
+    AWSSigner::Request request;
+    request.method = "DELETE";
+    request.type = "HTTP/1.1";
+
+    // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
+    if (_settings.endpoint.empty())
+        request.path = "/" + filePath;
+    else
+        request.path = "/" + _settings.bucket + "/" + filePath;
+    request.bodyData = nullptr;
+    request.bodyLength = 0;
+    request.headers.emplace("Host", getAddress());
+    request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
     request.headers.emplace("x-amz-request-payer", "requester");
     if (!_secret->sessionToken.empty())
         request.headers.emplace("x-amz-security-token", _secret->sessionToken);

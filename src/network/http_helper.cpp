@@ -25,6 +25,7 @@ HTTPHelper::Info HTTPHelper::detect(const string_view header)
     string str_http_1_1 = "HTTP/1.1 200 OK";
     string str_http_1_1_partial = "HTTP/1.1 206 Partial Content";
     string str_http_1_1_created = "HTTP/1.1 201 Created";
+    string str_http_1_1_no_conent = "HTTP/1.1 204 No Content";
 
     if (header.length() >= str_http_1_0.size() && !strncmp(header.data(), str_http_1_0.c_str(), str_http_1_0.size()))
         info.protocol = Protocol::HTTP_1_0_OK;
@@ -34,6 +35,8 @@ HTTPHelper::Info HTTPHelper::detect(const string_view header)
         info.protocol = Protocol::HTTP_1_1_Partial;
     else if (header.length() >= str_http_1_1_created.size() && !strncmp(header.data(), str_http_1_1_created.c_str(), str_http_1_1_created.size()))
         info.protocol = Protocol::HTTP_1_1_Created;
+    else if (header.length() >= str_http_1_1_no_conent.size() && !strncmp(header.data(), str_http_1_1_no_conent.c_str(), str_http_1_1_no_conent.size()))
+        info.protocol = Protocol::HTTP_1_1_No_Content;
 
     if (info.protocol != Protocol::Unknown) {
         if (header.npos != header.find("Transfer-Encoding: chunked")) {
@@ -84,9 +87,11 @@ bool HTTPHelper::finished(const uint8_t* data, uint64_t length, unique_ptr<Info>
                 if (ret)
                     info->length -= info->headerLength;
                 return ret;
-
             }
             default: {
+                if (info->protocol == Protocol::HTTP_1_1_No_Content)
+                    return true;
+
                 info = nullptr;
                 throw runtime_error("Unsupported HTTP transfer protocol");
             }

@@ -132,6 +132,31 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::putRequest(const string& filePath, c
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequest(const string& filePath) const
+// Builds the http request for deleting objects
+{
+    GCPSigner::Request request;
+    request.method = "DELETE";
+    request.type = "HTTP/1.1";
+    request.path = "/" + filePath;
+    request.bodyData = nullptr;
+    request.bodyLength = 0;
+
+    auto date = testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp();
+    request.queries.emplace("X-Goog-Date", date);
+    request.headers.emplace("Host", getAddress());
+
+    GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage"};
+    request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
+
+    auto httpHeader = request.method + " " + request.path + " " + request.type + "\r\n";
+    for (auto& h : request.headers)
+        httpHeader += h.first + ": " + h.second + "\r\n";
+    httpHeader += "\r\n";
+
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
 uint32_t GCP::getPort() const
 // Gets the port of GCP on http
 {

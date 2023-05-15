@@ -44,7 +44,7 @@ class RingBuffer {
     /// The buffer size
     uint64_t _size;
     /// The insert cache-aligned struct
-    struct alignas(64) {
+    struct {
         /// The current insert head
         std::atomic<uint64_t> pending;
         /// The current insert counter such that we can safely insert before seen takes element
@@ -53,7 +53,7 @@ class RingBuffer {
         SpinMutex mutex;
     } _insert;
     /// The seen cache-alignedstruct
-    struct alignas(64) {
+    struct {
         /// The seen head
         std::atomic<uint64_t> pending;
         /// The seen counter

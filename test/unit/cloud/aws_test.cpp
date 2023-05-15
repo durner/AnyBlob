@@ -62,6 +62,12 @@ class AWSTester {
         resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
+        dv = aws.deleteRequest("a/b/c.d");
+        resultString = "DELETE /a/b/c.d? HTTP/1.1\r\nAuthorization: AWS4-HMAC-SHA256 Credential=ABC/21000101/test/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-request-payer;x-amz-security-token, Signature=2240aba5140727498bd7bcea6f58e68a4c91ef2532b3273834a8d54983ae9319\r\nHost: test.s3.test.amazonaws.com\r\nx-amz-content-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\r\nx-amz-date: ";
+        resultString += aws.fakeAMZTimestamp;
+        resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+
         auto vec = AWSInstance::getInstanceDetails();
         REQUIRE(vec.size() > 0);
 

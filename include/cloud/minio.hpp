@@ -28,7 +28,7 @@ class MinIO : public AWS {
     /// Get the address of the server
     [[nodiscard]] std::string getAddress() const override;
     /// Get the instance details
-    Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
+    [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
 
     friend Provider;
 };

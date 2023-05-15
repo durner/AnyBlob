@@ -50,6 +50,12 @@ class AzureTester {
         resultString += "\r\nx-ms-version: 2015-02-21\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
+        dv = azure.deleteRequest("a/b/c.d");
+        resultString = "DELETE /test/a/b/c.d HTTP/1.1\r\nAuthorization: SharedKey test:nuGDW7QRI5/DB5Xt9vET/YEmipJ4UGjn64h4A+BFaL0=\r\nHost: test.blob.core.windows.net\r\nx-ms-date: ";
+        resultString += azure.fakeXMSTimestamp;
+        resultString += "\r\nx-ms-version: 2015-02-21\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+
         Provider::testEnviornment = false;
     }
 };

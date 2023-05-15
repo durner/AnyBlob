@@ -88,6 +88,10 @@ class GCPTester {
         resultString += "\r\nHost: test.storage.googleapis.com\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
+        dv = gcp.deleteRequest("a/b/c.d");
+        resultString = "DELETE /a/b/c.d?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=test%40test.com%2F21000101%2Ftest%2Fstorage%2Fgoog4_request&X-Goog-Date=21000101T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&x-goog-signature=bcd0bf851dd3121aa2b06a53b7abfd368c99d3424a37e87b71e45dc2c966e66d84ff6cee740835e07b808eba439ec9ffdc8c147138754e12eb68b89f1eaf47a08dc6b7a09d8aab85740e7e1007091caca7427a5f6d11998102214abd3086d403894bc38f4be97a30b9fa99b9247516636074558a9cb0caea7ae12de67780c2ff0c19db60136e3e7d5c9e196123a22b6aeb634a953e6bd3a0e18218dbaee362776fd7d50ccff4afc5ee3e5ed5c5c2610c8c2e30d786d7d5e8a272914942541f914395fa0b71a94ce4684a493b007d83bffc2ee2e06765cab000d5fdbbe07a46e26d3bb11c47617c53d62a4450af03c5100f6641fa7bd3ce816e859610cbd0b9d7f2a9f49f9c1ad25ea47c4e54afd1b91ce785fe7232515f89982d82163ea97df6cf50404fae8c5d738aa219b3907478d265c684033c12fc535b8c27863914881620df1462a4307f2b61b38291bb2e040f037a13b5841d5908aa069b2c4b878c972e3a646bce4a254d47ccee3a1da670ff40a614bf0a631729fa4e2fd161ce98ec HTTP/1.1\r\nHost: test.storage.googleapis.com\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+
         ignore = GCPInstance::getInstanceDetails();
 
         Provider::testEnviornment = false;

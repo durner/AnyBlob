@@ -147,6 +147,30 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath,
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Azure::deleteRequest(const string& filePath) const
+// Builds the http request for deleting objects
+{
+    AzureSigner::Request request;
+    request.method = "DELETE";
+    request.type = "HTTP/1.1";
+    request.path = "/" + _settings.container + "/" + filePath;
+    request.bodyData = nullptr;
+    request.bodyLength = 0;
+
+    auto date = testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp();
+    request.headers.emplace("x-ms-date", date);
+    request.headers.emplace("Host", getAddress());
+
+    request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
+
+    auto httpHeader = request.method + " " + request.path + " " + request.type + "\r\n";
+    for (auto& h : request.headers)
+        httpHeader += h.first + ": " + h.second + "\r\n";
+    httpHeader += "\r\n";
+
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
 uint32_t Azure::getPort() const
 // Gets the port of Azure on http
 {
