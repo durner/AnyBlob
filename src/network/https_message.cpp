@@ -147,16 +147,8 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
 void HTTPSMessage::reset(IOUringSocket& socket, bool aborted)
 // Reset for restart
 {
-    if (!aborted) {
-        originalMessage->result.getDataVector().clear();
-        receiveBufferOffset = 0;
-        sendBufferOffset = 0;
-        originalMessage->result.state = MessageState::Init;
-    } else {
-        originalMessage->result.state = MessageState::Aborted;
-    }
     tlsLayer = make_unique<TLSConnection>(*this, tlsLayer->getContext());
-    socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, true);
+    HTTPMessage::reset(socket, aborted);
 }
 //---------------------------------------------------------------------------
 } // namespace network
