@@ -1,0 +1,10 @@
+[submodule "thirdparty/perfevent"]
+    path = thirdparty/perfevent
+    url = https://github.com/viktorleis/perfevent
+[submodule "thirdparty/catch2"]
+    path = thirdparty/catch2
+    url = https://github.com/catchorg/Catch2
+    branch = v2.13.10
+[submodule "example/benchmark/thirdparty/perfevent"]
+	path = example/benchmark/thirdparty/perfevent
+	url = https://github.com/viktorleis/perfevent
