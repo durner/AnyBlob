@@ -214,15 +214,12 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
 
     if (connectRes < 0 && errno == EINPROGRESS) {
         // connection check
-        fd_set fdset;
-        FD_ZERO(&fdset);
-        FD_SET(fd, &fdset);
-        struct timeval tv;
-        tv.tv_sec = 0;
-        tv.tv_usec = tcpSettings.timeout;
+        struct pollfd pollEvent;
+        pollEvent.fd = fd;
+        pollEvent.events = POLLIN | POLLOUT;
 
         // connection check
-        auto t = select(fd + 1, NULL, &fdset, NULL, &tv);
+        auto t = poll(&pollEvent, 1, tcpSettings.timeout);
         if (t == 1) {
             int socketError;
             socklen_t socketErrorLen = sizeof(socketError);
