@@ -26,10 +26,10 @@ using namespace std;
 //---------------------------------------------------------------------------
 TEST_CASE("send_receiver") {
     PerfEventBlock e;
-    auto concurrency = 4;
+    auto concurrency = 8;
     uint64_t length = 4096u;
 
-    TaskedSendReceiverGroup group(concurrency << 2, concurrency << 2);
+    TaskedSendReceiverGroup group(concurrency >> 1, concurrency << 2);
 
     vector<unique_ptr<OriginalMessage>> msgs;
     for (auto i = 0; i < concurrency; i++) {

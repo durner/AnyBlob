@@ -1,6 +1,7 @@
 #pragma once
 #include "network/io_uring_socket.hpp"
 #include "network/message_task.hpp"
+#include "network/tls_context.hpp"
 #include "utils/ring_buffer.hpp"
 #include <atomic>
 #include <condition_variable>
@@ -52,9 +53,6 @@ class TaskedSendReceiverGroup {
     /// The queue maximum for each TaskedSendReceiver
     uint64_t _concurrentRequests;
 
-    /// The tls context
-    std::unique_ptr<TLSContext> context;
-
     /// Condition variable to stop wasting wait cycles
     std::condition_variable _cv;
     /// Mutex for condition variable
@@ -95,6 +93,8 @@ class TaskedSendReceiver {
     std::unique_ptr<IOUringSocket> _socketWrapper;
     /// The current tasks
     std::vector<std::unique_ptr<MessageTask>> _messageTasks;
+    /// The tls context
+    std::unique_ptr<TLSContext> _context;
     /// Timing infos
     std::vector<utils::TimingHelper>* _timings;
     /// Stops the daemon
