@@ -1,8 +1,9 @@
 # AnyBlobBenchmark
-This directory contains the AnyBlob benchmarking tools, and also includes all third-parties (e.g., AWS SDK) to run our experiments for Section 2 and Section 3 of the AnyBlob paper.
-The sub-directory scripts contains the scripts that we used to collect our raw data for the plots.
+This directory contains the AnyBlob benchmarking tools, and also includes all third-parties (e.g., AWS SDK) to run our experiments of the AnyBlob paper.
 
 # Validate Experiments
+
+## AnyBlob Experiments
 
 To validate our findings you need to set-up an AWS storage account to create randomly generated data objects.
 Further, set up an instance with IAM Storage permissions and copy the files to this node.
@@ -16,10 +17,10 @@ The raw data of our Figures were created from multiple scripts. This list contai
 - sizes_latency.sh for Figure 2 (Section 2.3)
 - latency.sh for Figure 3 (Section 2.3)
 - latency_sparse.sh for Figure 4 (Section 2.3)
-- throughput_sparse.sh for Figures 5 & 6 (Section 2.4)
-- sizes.sh for Figure 7 (Section 2.5)
-- model.sh for Section 2.8 and Figure 9 (Section 3.4)
-- https.sh for Section 2.7
+- throughput_sparse.sh for Figures 5, 6 & 7 (Section 2.4)
+- sizes.sh for Figure 8 (Section 2.5)
+- https.sh for Figure 9 (Section 2.6)
+- model.sh for Figure 10 (Section 2.8) and Figure 12 (Section 3.4)
 
 In the following, we show the steps to compile our benchmarking binary.
 
@@ -31,3 +32,6 @@ In the following, we show the steps to compile our benchmarking binary.
 	cmake ../.. -DCMAKE_BUILD_TYPE=Release
 	make -j16
 
+## Database Experiments
+
+All our DBMS related experiments and our binary of our proprietary system are shared in https://gitlab.db.in.tum.de/durner/cloud-storage-analytics.
