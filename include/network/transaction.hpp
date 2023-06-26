@@ -1,5 +1,8 @@
 #pragma once
+#include "cloud/provider.hpp"
 #include "network/message_result.hpp"
+#include "network/original_message.hpp"
+#include <cassert>
 #include <memory>
 #include <span>
 #include <string>
@@ -24,7 +27,6 @@ class TaskedSendReceiver;
 class TaskedSendReceiverGroup;
 //---------------------------------------------------------------------------
 /// The request/response transaction handler used to transfer data from and to remote storage
-/// Used as interface in the initiation GetTransaction and PutTransaction
 class Transaction {
     public:
     class Iterator;
@@ -38,18 +40,70 @@ class Transaction {
     /// The message
     message_vector_type messages;
 
+    public:
+
     /// The constructor
     Transaction() = default;
     /// The explicit constructor with the provider
     explicit Transaction(const cloud::Provider* provider) : provider(provider), messages() {}
 
-    public:
     /// Set the provider
     constexpr void setProvider(const cloud::Provider* provider) { this->provider = provider; }
     /// Sends the request messages to the task group
     void processAsync(TaskedSendReceiver& sendReceiver);
     /// Processes the request messages
     void processSync(TaskedSendReceiver& sendReceiver);
+
+    /// Build a new get request for synchronous calls
+    /// Note that the range is [start, end[, [0, 0[ gets the whole object
+    inline void getObjectRequest(const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(provider);
+        auto originalMsg = std::make_unique<network::OriginalMessage>(provider->getRequest(remotePath, range), provider->getAddress(), provider->getPort(), result, capacity, traceId);
+        messages.push_back(std::move(originalMsg));
+    }
+
+    /// Build a new get request with callback
+    /// Note that the range is [start, end[, [0, 0[ gets the whole object
+    template <typename Callback>
+    inline void getObjectRequest(Callback&& callback, const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(provider);
+        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback&&>(callback), provider->getRequest(remotePath, range), provider->getAddress(), provider->getPort(), result, capacity, traceId);
+        messages.push_back(std::move(originalMsg));
+    }
+
+    /// Build a new put request for synchronous calls
+    inline void putObjectRequest(const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(provider);
+        auto object = std::string_view(data, size);
+        auto originalMsg = std::make_unique<network::OriginalMessage>(provider->putRequest(remotePath, object), provider->getAddress(), provider->getPort(), result, capacity, traceId);
+        originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data), size);
+        messages.push_back(std::move(originalMsg));
+    }
+
+    /// Build a new put request with callback
+    template <typename Callback>
+    inline void putObjectRequest(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(provider);
+        auto object = std::string_view(data, size);
+        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback&&>(callback), provider->putRequest(remotePath, object), provider->getAddress(), provider->getPort(), result, capacity, traceId);
+        originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data), size);
+        messages.push_back(std::move(originalMsg));
+    }
+
+    /// Build a new delete request for synchronous calls
+    inline void deleteObjectRequest(const std::string& remotePath, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(provider);
+        auto originalMsg = std::make_unique<network::OriginalMessage>(provider->deleteRequest(remotePath), provider->getAddress(), provider->getPort(), result, capacity, traceId);
+        messages.push_back(std::move(originalMsg));
+    }
+
+    /// Build a new delete request with callback
+    template <typename Callback>
+    inline void deleteObjectRequest(Callback&& callback, const std::string& remotePath, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(provider);
+        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback&&>(callback), provider->deleteRequest(remotePath), provider->getAddress(), provider->getPort(), result, capacity, traceId);
+        messages.push_back(std::move(originalMsg));
+    }
 
     /// The iterator
     using iterator = Iterator;

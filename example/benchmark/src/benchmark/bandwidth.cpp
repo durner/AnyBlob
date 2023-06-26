@@ -3,9 +3,8 @@
 #include "cloud/aws_resolver.hpp"
 #include "cloud/azure.hpp"
 #include "cloud/gcp.hpp"
-#include "network/get_transaction.hpp"
+#include "network/transaction.hpp"
 #include "network/original_message.hpp"
-#include "network/put_transaction.hpp"
 #include "network/s3_send_receiver.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "perfevent/PerfEvent.hpp"
@@ -217,7 +216,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
             sendReceivers.back()->reuse(result.moveDataVector());
         };
 
-        network::GetTransaction getTxn[benchmarkSettings.concurrentThreads];
+        network::Transaction getTxn[benchmarkSettings.concurrentThreads];
 
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
             getTxn[i].setProvider(cloudProvider.get());
@@ -225,13 +224,13 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         if (benchmarkSettings.blobFiles > benchmarkSettings.requests) {
             for (auto i = 0u; i < benchmarkSettings.requests; i++) {
                 auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
-                getTxn[0].addRequest(callback, filePath, range, nullptr, 0, i);
+                getTxn[0].getObjectRequest(callback, filePath, range, nullptr, 0, i);
             }
         } else {
             auto createRequests = [&](uint64_t start, uint64_t end, uint64_t threadId) {
                 for (auto i = start; i < end; i++) {
                     auto filePath = benchmarkSettings.filePath + to_string((i % benchmarkSettings.blobFiles) + 1) + ".bin";
-                    getTxn[threadId].addRequest(callback, filePath, range, nullptr, 0, i);
+                    getTxn[threadId].getObjectRequest(callback, filePath, range, nullptr, 0, i);
                 }
             };
             auto start = 0ull;
@@ -288,7 +287,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                 finishedMessages++;
             };
 
-            network::PutTransaction putTxn(cloudProvider.get());
+            network::Transaction putTxn(cloudProvider.get());
             auto blob = make_unique<utils::DataVector<uint8_t>>(1 << 24);
             if (benchmarkSettings.encryption) {
                 auto plainBlob = make_unique<utils::DataVector<uint8_t>>((1 << 24) - 16);
@@ -308,7 +307,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                         end = benchmarkSettings.requests;
                     for (uint64_t j = start; j < end; j++) {
                         auto filePath = "upload_" + benchmarkSettings.filePath + to_string(j + 1) + ".bin";
-                        putTxn.addRequest(callbackUpload, filePath, reinterpret_cast<const char*>(blob->data()), blob->size(), nullptr, 0, i);
+                        putTxn.putObjectRequest(callbackUpload, filePath, reinterpret_cast<const char*>(blob->data()), blob->size(), nullptr, 0, i);
                     }
                 }
 

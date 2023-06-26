@@ -14,9 +14,6 @@ namespace anyblob {
 namespace network {
 class TaskedSendReceiver;
 class Transaction;
-class GetTransaction;
-class PutTransaction;
-class DeleteTransaction;
 struct OriginalMessage;
 }; // namespace network
 namespace utils {
@@ -109,9 +106,6 @@ class Provider {
     [[nodiscard]] virtual Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) = 0;
 
     friend network::Transaction;
-    friend network::GetTransaction;
-    friend network::PutTransaction;
-    friend network::DeleteTransaction;
 };
 //---------------------------------------------------------------------------
 } // namespace cloud

@@ -1,5 +1,5 @@
 #include "cloud/provider.hpp"
-#include "network/get_transaction.hpp"
+#include "network/transaction.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include <cstring>
 #include <iostream>
@@ -28,8 +28,8 @@ int main(int /*argc*/, char** /*argv*/) {
     auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, "", "", &sendReceiver);
 
     // Create the get request
-    anyblob::network::GetTransaction getTxn(provider.get());
-    getTxn.addRequest(fileName);
+    anyblob::network::Transaction getTxn(provider.get());
+    getTxn.getObjectRequest(fileName);
 
     // Retrieve the request synchronously with the scheduler object on this thread
     getTxn.processSync(sendReceiver);

@@ -1,9 +1,7 @@
 #include "catch2/single_include/catch2/catch.hpp"
 #include "cloud/provider.hpp"
-#include "network/get_transaction.hpp"
-#include "network/put_transaction.hpp"
-#include "network/delete_transaction.hpp"
 #include "network/tasked_send_receiver.hpp"
+#include "network/transaction.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -46,9 +44,9 @@ TEST_CASE("MinIO Integration") {
     // The file to be uploaded and downloaded
     string bucketName = "minio://";
     bucketName = bucketName + endpoint + "/" + bucket + ":" + region;
-    string fileName[] {"test.txt", "long.txt"};
+    string fileName[]{"test.txt", "long.txt"};
     string longText = stringGen(1 << 24);
-    string content[] {"Hello World!", longText};
+    string content[]{"Hello World!", longText};
 
     // Create a new task group (18 concurrent request maximum, and up to 1024 outstanding submissions)
     anyblob::network::TaskedSendReceiverGroup group(18, 1024);
@@ -60,9 +58,9 @@ TEST_CASE("MinIO Integration") {
     auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, key, secret, &sendReceiver);
     {
         // Create the put request
-        anyblob::network::PutTransaction putTxn(provider.get());
+        anyblob::network::Transaction putTxn(provider.get());
         for (auto i = 0u; i < 2; i++)
-            putTxn.addRequest(fileName[i], content[i].data(), content[i].size());
+            putTxn.putObjectRequest(fileName[i], content[i].data(), content[i].size());
 
         // Upload the request synchronously with the scheduler object on this thread
         putTxn.processSync(sendReceiver);
@@ -75,9 +73,9 @@ TEST_CASE("MinIO Integration") {
     }
     {
         // Create the get request
-        anyblob::network::GetTransaction getTxn(provider.get());
+        anyblob::network::Transaction getTxn(provider.get());
         for (auto i = 0u; i < 2; i++)
-            getTxn.addRequest(fileName[i]);
+            getTxn.getObjectRequest(fileName[i]);
 
         // Retrieve the request synchronously with the scheduler object on this thread
         getTxn.processSync(sendReceiver);
@@ -105,9 +103,9 @@ TEST_CASE("MinIO Integration") {
     }
     {
         // Create the put request
-        anyblob::network::DeleteTransaction deleteTxn(provider.get());
+        anyblob::network::Transaction deleteTxn(provider.get());
         for (auto i = 0u; i < 2; i++)
-            deleteTxn.addRequest(fileName[i]);
+            deleteTxn.deleteObjectRequest(fileName[i]);
 
         // Upload the request synchronously with the scheduler object on this thread
         deleteTxn.processSync(sendReceiver);
@@ -118,7 +116,6 @@ TEST_CASE("MinIO Integration") {
             REQUIRE(it.success());
         }
     }
-
 }
 //---------------------------------------------------------------------------
 } // namespace test
