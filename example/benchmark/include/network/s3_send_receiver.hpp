@@ -13,16 +13,18 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <unordered_map>
+#include <unistd.h>
 #include <aws/core/Aws.h>
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/core/utils/Outcome.h>
 #include <aws/core/utils/stream/PreallocatedStreamBuf.h>
+#include <aws/core/utils/threading/Executor.h>
 #include <aws/s3-crt/S3CrtClient.h>
 #include <aws/s3-crt/model/GetObjectRequest.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/GetObjectRequest.h>
-#include <unistd.h>
 // ---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -145,6 +147,8 @@ class S3SendReceiver {
             _config->maxConnections = threadsOrThroughput;
             _config->verifySSL = false;
             _config->enableTcpKeepAlive = true;
+            if (threadsOrThroughput >= (std::thread::hardware_concurrency() << 2))
+                _config->executor = Aws::MakeShared<Aws::Utils::Threading::PooledThreadExecutor>("s3-downloader", threadsOrThroughput);
         } else {
             _config->throughputTargetGbps = threadsOrThroughput;
         }
@@ -283,6 +287,10 @@ class S3SendReceiver {
                     (*_timings)[submissionId].size = outcome.GetResult().GetContentLength();
                     (*_timings)[submissionId].finish = std::chrono::steady_clock::now();
                 }
+                submissions--;
+            } else {
+                std::cout << "S3 download error - retry object!" << std::endl;
+                while (!this->send(req)) {}
                 submissions--;
             }
         });

@@ -93,6 +93,48 @@ string Provider::getKey(const string& keyFile)
     return string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
 }
 //---------------------------------------------------------------------------
+string Provider::getETag(const string_view header)
+// Get the etag from the upload header
+{
+    string needle = "ETag: \"";
+    auto pos = header.find(needle);
+    if (pos == header.npos)
+        return "";
+    pos += needle.length();
+    auto end = header.find("\"", pos);
+    return string(header.substr(pos, end - pos));
+}
+//---------------------------------------------------------------------------
+string Provider::getUploadId(const string_view body)
+// Get the upload id from the multipart request body
+{
+    string needle = "<UploadId>";
+    auto pos = body.find(needle);
+    if (pos == body.npos)
+        return "";
+    pos += needle.length();
+    auto end = body.find("</UploadId>", pos);
+    return string(body.substr(pos, end - pos));
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Provider::putRequestGeneric(const string& /*filePath*/, const string_view /*object*/, uint16_t /*part*/, const string_view /*uploadId*/) const
+// Builds the http request for putting multipart objects without the object data itself
+{
+    return nullptr;
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Provider::createMultiPartRequest(const string& /*filePath*/) const
+// Builds the http request for creating multipart put objects
+{
+    return nullptr;
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Provider::completeMultiPartRequest(const string& /*filePath*/, const string_view /*uploadId*/, const vector<string>& /*etags*/) const
+// Builds the http request for completing multipart put objects
+{
+    return nullptr;
+}
+//---------------------------------------------------------------------------
 unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, const string& keyId, const string& secret, network::TaskedSendReceiver* sendReceiver)
 // Create a provider
 {

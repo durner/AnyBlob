@@ -104,13 +104,20 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, c
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> GCP::putRequest(const string& filePath, const string_view object) const
+unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& filePath, const string_view object, uint16_t part, const string_view uploadId) const
 // Builds the http request for putting objects without the object data itself
 {
     GCPSigner::Request request;
     request.method = "PUT";
     request.type = "HTTP/1.1";
     request.path = "/" + filePath;
+
+    // Is it a multipart upload?
+    if (part) {
+        request.path += "?partNumber=" + to_string(part) + "&uploadId=";
+        request.path += uploadId;
+    }
+
     request.bodyData = reinterpret_cast<const uint8_t*>(object.data());
     request.bodyLength = object.size();
 
@@ -155,6 +162,71 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequest(const string& filePath
     httpHeader += "\r\n";
 
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> GCP::createMultiPartRequest(const string& filePath) const
+// Builds the http request for creating multipart upload objects
+{
+    GCPSigner::Request request;
+    request.method = "POST";
+    request.type = "HTTP/1.1";
+    request.path = "/" + filePath;
+    request.path += "?uploads";
+    request.bodyData = nullptr;
+    request.bodyLength = 0;
+
+    auto date = testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp();
+    request.queries.emplace("X-Goog-Date", date);
+    request.headers.emplace("Host", getAddress());
+    request.headers.emplace("Date", date);
+
+    GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage"};
+    request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
+
+    auto httpHeader = request.method + " " + request.path + " " + request.type + "\r\n";
+    for (auto& h : request.headers)
+        httpHeader += h.first + ": " + h.second + "\r\n";
+    httpHeader += "\r\n";
+
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> GCP::completeMultiPartRequest(const string& filePath, const string_view uploadId, const std::vector<std::string>& etags) const
+// Builds the http request for completing multipart upload objects
+{
+    string content = "<CompleteMultipartUpload>\n";
+    for (auto i = 0ull; i < etags.size(); i++) {
+        content += "<Part>\n<PartNumber>";
+        content += to_string(i+1);
+        content += "</PartNumber>\n<ETag>\"";
+        content += etags[i];
+        content += "\"</ETag>\n</Part>\n";
+    }
+    content += "</CompleteMultipartUpload>\n";
+
+    GCPSigner::Request request;
+    request.method = "POST";
+    request.type = "HTTP/1.1";
+    request.path = "/" + filePath;
+    request.path += "&uploadId=";
+    request.path += uploadId;
+    request.bodyData = nullptr;
+    request.bodyLength = 0;
+
+    auto date = testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp();
+    request.queries.emplace("X-Goog-Date", date);
+    request.headers.emplace("Host", getAddress());
+    request.headers.emplace("Date", date);
+    request.headers.emplace("Content-Length", to_string(content.size()));
+
+    GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage"};
+    request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
+
+    auto httpHeaderMessage = request.method + " " + request.path + " " + request.type + "\r\n";
+    for (auto& h : request.headers)
+        httpHeaderMessage += h.first + ": " + h.second + "\r\n";
+    httpHeaderMessage += "\r\n" + content;
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeaderMessage.data()), reinterpret_cast<uint8_t*>(httpHeaderMessage.data() + httpHeaderMessage.size()));
 }
 //---------------------------------------------------------------------------
 uint32_t GCP::getPort() const

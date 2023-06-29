@@ -228,7 +228,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, const string_view object) const
+unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& filePath, const string_view object, uint16_t part, const string_view uploadId) const
 // Builds the http request for putting objects without the object data itself
 {
     if (!validKeys())
@@ -244,6 +244,13 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequest(const string& filePath, c
         request.path = "/" + filePath;
     else
         request.path = "/" + _settings.bucket + "/" + filePath;
+
+    // Is it a multipart upload?
+    if (part) {
+        request.path += "?partNumber=" + to_string(part) + "&uploadId=";
+        request.path += uploadId;
+    }
+
     request.bodyLength = object.size();
     request.headers.emplace("Host", getAddress());
     request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
@@ -278,6 +285,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequest(const string& filePath
         request.path = "/" + filePath;
     else
         request.path = "/" + _settings.bucket + "/" + filePath;
+
     request.bodyData = nullptr;
     request.bodyLength = 0;
     request.headers.emplace("Host", getAddress());
@@ -295,6 +303,89 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequest(const string& filePath
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::createMultiPartRequest(const string& filePath) const
+// Builds the http request for creating multipart upload objects
+{
+    if (!validKeys())
+        return nullptr;
+
+    AWSSigner::Request request;
+    request.method = "POST";
+    request.type = "HTTP/1.1";
+
+    // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
+    if (_settings.endpoint.empty())
+        request.path = "/" + filePath;
+    else
+        request.path = "/" + _settings.bucket + "/" + filePath;
+    request.path += "?uploads";
+    request.bodyData = nullptr;
+    request.bodyLength = 0;
+    request.headers.emplace("Host", getAddress());
+    request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
+    request.headers.emplace("x-amz-request-payer", "requester");
+    if (!_secret->sessionToken.empty())
+        request.headers.emplace("x-amz-security-token", _secret->sessionToken);
+
+    auto canonical = AWSSigner::createCanonicalRequest(request);
+
+    AWSSigner::StringToSign stringToSign = {.request = request, .requestSHA = canonical.second, .region = _settings.region, .service = "s3"};
+    const auto uri = AWSSigner::createSignedRequest(_secret->keyId, _secret->secret, stringToSign);
+    auto httpHeader = request.method + " " + uri + " " + request.type + "\r\n";
+    for (auto& h : request.headers)
+        httpHeader += h.first + ": " + h.second + "\r\n";
+    httpHeader += "\r\n";
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const string& filePath, const string_view uploadId, const std::vector<std::string>& etags) const
+// Builds the http request for completing multipart upload objects
+{
+    if (!validKeys())
+        return nullptr;
+
+    string content = "<CompleteMultipartUpload>\n";
+    for (auto i = 0ull; i < etags.size(); i++) {
+        content += "<Part>\n<PartNumber>";
+        content += to_string(i+1);
+        content += "</PartNumber>\n<ETag>\"";
+        content += etags[i];
+        content += "\"</ETag>\n</Part>\n";
+    }
+    content += "</CompleteMultipartUpload>\n";
+
+    AWSSigner::Request request;
+    request.method = "POST";
+    request.type = "HTTP/1.1";
+
+    // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
+    if (_settings.endpoint.empty())
+        request.path = "/" + filePath;
+    else
+        request.path = "/" + _settings.bucket + "/" + filePath;
+    request.path += "&uploadId=";
+    request.path += uploadId;
+
+    request.bodyData = nullptr;
+    request.bodyLength = 0;
+    request.headers.emplace("Host", getAddress());
+    request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
+    request.headers.emplace("Content-Length", to_string(content.size()));
+    request.headers.emplace("x-amz-request-payer", "requester");
+    if (!_secret->sessionToken.empty())
+        request.headers.emplace("x-amz-security-token", _secret->sessionToken);
+
+    auto canonical = AWSSigner::createCanonicalRequest(request);
+
+    AWSSigner::StringToSign stringToSign = {.request = request, .requestSHA = canonical.second, .region = _settings.region, .service = "s3"};
+    const auto uri = AWSSigner::createSignedRequest(_secret->keyId, _secret->secret, stringToSign);
+    auto httpHeaderMessage = request.method + " " + uri + " " + request.type + "\r\n";
+    for (auto& h : request.headers)
+        httpHeaderMessage += h.first + ": " + h.second + "\r\n";
+    httpHeaderMessage += "\r\n" + content;
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeaderMessage.data()), reinterpret_cast<uint8_t*>(httpHeaderMessage.data() + httpHeaderMessage.size()));
 }
 //---------------------------------------------------------------------------
 uint32_t AWS::getPort() const

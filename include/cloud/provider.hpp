@@ -80,6 +80,16 @@ class Provider {
     [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
     [[nodiscard]] virtual uint32_t getPort() const = 0;
+
+    /// Is multipart upload supported, if size > 0?
+    [[nodiscard]] virtual uint64_t multipartUploadSize() const { return 0; }
+    /// Builds the http request for putting multipart objects without the object data itself
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequestGeneric(const std::string& /*filePath*/, const std::string_view /*object*/, uint16_t /*part*/, const std::string_view /*uploadId*/) const;
+    /// Builds the http request for creating multipart put objects
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& /*filePath*/) const;
+    /// Builds the http request for completing multipart put objects
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& /*filePath*/, const std::string_view /*uploadId*/, const std::vector<std::string>& /*etags*/) const;
+
     /// Initialize secret
     virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}
 
@@ -96,6 +106,10 @@ class Provider {
     [[nodiscard]] static Provider::RemoteInfo getRemoteInfo(const std::string& fileName);
     /// Get the key from a keyFile
     [[nodiscard]] static std::string getKey(const std::string& keyFile);
+    /// Get the etag from the upload header
+    [[nodiscard]] static std::string getETag(const std::string_view header);
+    /// Get the upload id from the multipart request body
+    [[nodiscard]] static std::string getUploadId(const std::string_view body);
 
     /// Create a provider (keyId is access email for GCP/Azure)
     [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = true, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);

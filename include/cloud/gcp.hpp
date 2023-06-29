@@ -1,6 +1,7 @@
 #pragma once
 #include "cloud/gcp_instances.hpp"
 #include "cloud/provider.hpp"
+#include "utils/data_vector.hpp"
 #include <cassert>
 #include <string>
 //---------------------------------------------------------------------------
@@ -71,13 +72,24 @@ class GCP : public Provider {
     private:
     /// Get the settings
     [[nodiscard]] inline Settings getSettings() { return _settings; }
+    /// Allows multipart upload if size > 0
+    [[nodiscard]] uint64_t multipartUploadSize() const override { return 128ull << 20; }
+
 
     /// Builds the http request for downloading a blob or listing the directory
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequestGeneric(const std::string& filePath, const std::string_view object, uint16_t part, const std::string_view uploadId) const override;
+    /// Builds the http request for putting objects without the object data itself
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override {
+        return putRequestGeneric(filePath, object, 0, "");
+    }
     // Builds the http request for deleting an objects
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const override;
+    /// Builds the http request for creating multipart put objects
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& filePath) const override;
+    /// Builds the http request for completing multipart put objects
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& filePath, const std::string_view uploadId, const std::vector<std::string>& etags) const override;
 
     /// Get the address of the server
     [[nodiscard]] std::string getAddress() const override;
