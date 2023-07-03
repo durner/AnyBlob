@@ -63,6 +63,8 @@ class AWS : public Provider {
     Settings _settings;
     /// The secret
     std::unique_ptr<Secret> _secret;
+    /// The multipart upload size
+    uint64_t _multipartUploadSize = 128ull << 20;
 
     public:
     /// Get instance details
@@ -104,7 +106,7 @@ class AWS : public Provider {
     /// Get the settings
     [[nodiscard]] inline Settings getSettings() { return _settings; }
     /// Allows multipart upload if size > 0
-    [[nodiscard]] uint64_t multipartUploadSize() const override { return 128ull << 20; }
+    [[nodiscard]] uint64_t multipartUploadSize() const override { return _multipartUploadSize; }
 
     /// Builds the http request for downloading a blob or listing the directory
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;

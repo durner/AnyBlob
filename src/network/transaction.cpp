@@ -18,21 +18,44 @@ using namespace std;
 void Transaction::processSync(TaskedSendReceiver& sendReceiver)
 // Processes the request messages
 {
-    // send the original request message
-    for (auto& msg : messages) {
-        sendReceiver.sendSync(msg.get());
-    }
+    do {
+        // send the original request message
+        for (; _messageCounter < _messages.size(); _messageCounter++) {
+            sendReceiver.sendSync(_messages[_messageCounter].get());
+        }
 
-    // do the download work
-    sendReceiver.processSync();
+        for (auto& multipart : _multipartUploads) {
+            if (multipart.state == MultipartUpload::State::Sending) {
+                for (auto i = 0ull; i < multipart.eTags.size(); i++)
+                    sendReceiver.sendSync(multipart.messages[i].get());
+                multipart.state = MultipartUpload::State::Default;
+            } else if (multipart.state == MultipartUpload::State::Validating) {
+                sendReceiver.sendSync(multipart.messages[multipart.eTags.size()].get());
+                multipart.state = MultipartUpload::State::Default;
+            }
+        }
+
+        // do the download work
+        sendReceiver.processSync();
+    } while (_multipartUploads.size() != _completedMultiparts);
 }
 //---------------------------------------------------------------------------
-void Transaction::processAsync(TaskedSendReceiver& sendReceiver)
+void Transaction::processAsync(TaskedSendReceiverGroup& group)
 // Sends the request messages to the task group
 {
     // send the original request message
-    for (auto& msg : messages) {
-        while (!sendReceiver.send(msg.get())) {}
+    for (; _messageCounter < _messages.size(); _messageCounter++) {
+        while (!group.send(_messages[_messageCounter].get())) {}
+    }
+    for (auto& multipart : _multipartUploads) {
+        if (multipart.state == MultipartUpload::State::Sending) {
+            for (auto i = 0ull; i < multipart.eTags.size(); i++)
+                while (!group.send(multipart.messages[i].get())) {}
+            multipart.state = MultipartUpload::State::Default;
+        } else if (multipart.state == MultipartUpload::State::Validating) {
+            while (!group.send(multipart.messages[multipart.eTags.size()].get())) {}
+            multipart.state = MultipartUpload::State::Default;
+        }
     }
 }
 //---------------------------------------------------------------------------

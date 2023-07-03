@@ -2,6 +2,7 @@
 #include "cloud/provider.hpp"
 #include "network/message_result.hpp"
 #include "network/original_message.hpp"
+#include <atomic>
 #include <cassert>
 #include <memory>
 #include <span>
@@ -33,92 +34,233 @@ class Transaction {
     class ConstIterator;
 
     protected:
-    /// The provider
-    const cloud::Provider* provider;
     /// The message typedef
     using message_vector_type = std::vector<std::unique_ptr<network::OriginalMessage>>;
+
+    /// The multipart upload struct
+    struct MultipartUpload {
+        /// The multipart state
+        enum State : uint8_t {
+            Default = 0,
+            Sending = 1,
+            Validating = 2,
+        };
+        /// The uploadId
+        std::string uploadId;
+        /// The submessages
+        message_vector_type messages;
+        /// The eTags
+        std::vector<std::string> eTags;
+        /// The number of outstanding part requests
+        std::atomic<int> outstanding;
+        /// The state
+        std::atomic<State> state;
+
+        /// The constructor
+        explicit MultipartUpload(int parts) : messages(parts + 1), eTags(parts), outstanding(parts), state(State::Default) {}
+        /// Copy constructor
+        MultipartUpload(MultipartUpload& other) = delete;
+        /// Move constructor
+        MultipartUpload(MultipartUpload&& other) noexcept : uploadId(std::move(other.uploadId)), messages(std::move(other.messages)), eTags(std::move(other.eTags)), outstanding(other.outstanding.load()), state(other.state.load()) {}
+        /// Copy assignment
+        MultipartUpload& operator=(MultipartUpload other) = delete;
+    };
+
+    /// The provider
+    const cloud::Provider* _provider;
+
     /// The message
-    message_vector_type messages;
+    message_vector_type _messages;
+    // The message coutner
+    std::atomic<uint64_t> _messageCounter;
+    /// Multipart uploads
+    std::vector<MultipartUpload> _multipartUploads;
+    /// Finished multipart uploads
+    std::atomic<uint64_t> _completedMultiparts;
+
+    /// Helper function to build callback messages
+    template <typename Callback, typename... Arguments>
+    std::unique_ptr<OriginalCallbackMessage<Callback>> makeCallbackMessage(Callback&& c, Arguments&&... args) {
+        return std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(c), std::forward<Arguments>(args)...);
+    }
 
     public:
-
     /// The constructor
-    Transaction() = default;
+    Transaction() : _provider(), _messages(), _messageCounter(), _multipartUploads(), _completedMultiparts() {}
     /// The explicit constructor with the provider
-    explicit Transaction(const cloud::Provider* provider) : provider(provider), messages() {}
+    explicit Transaction(const cloud::Provider* provider) : _provider(provider), _messages(), _messageCounter(), _multipartUploads(), _completedMultiparts() {}
 
     /// Set the provider
-    constexpr void setProvider(const cloud::Provider* provider) { this->provider = provider; }
+    constexpr void setProvider(const cloud::Provider* provider) { this->_provider = provider; }
     /// Sends the request messages to the task group
-    void processAsync(TaskedSendReceiver& sendReceiver);
+    void processAsync(network::TaskedSendReceiverGroup& group);
     /// Processes the request messages
     void processSync(TaskedSendReceiver& sendReceiver);
 
     /// Build a new get request for synchronous calls
     /// Note that the range is [start, end[, [0, 0[ gets the whole object
     inline void getObjectRequest(const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
-        assert(provider);
-        auto originalMsg = std::make_unique<network::OriginalMessage>(provider->getRequest(remotePath, range), provider->getAddress(), provider->getPort(), result, capacity, traceId);
-        messages.push_back(std::move(originalMsg));
+        assert(_provider);
+        auto originalMsg = std::make_unique<network::OriginalMessage>(_provider->getRequest(remotePath, range), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        _messages.push_back(std::move(originalMsg));
     }
 
     /// Build a new get request with callback
     /// Note that the range is [start, end[, [0, 0[ gets the whole object
     template <typename Callback>
     inline void getObjectRequest(Callback&& callback, const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
-        assert(provider);
-        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback&&>(callback), provider->getRequest(remotePath, range), provider->getAddress(), provider->getPort(), result, capacity, traceId);
-        messages.push_back(std::move(originalMsg));
+        assert(_provider);
+        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(callback), _provider->getRequest(remotePath, range), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        _messages.push_back(std::move(originalMsg));
     }
 
     /// Build a new put request for synchronous calls
     inline void putObjectRequest(const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
-        assert(provider);
+        assert(_provider);
+        if (_provider->multipartUploadSize() && size > _provider->multipartUploadSize())
+            return putObjectRequestMultiPart(remotePath, data, size, result, capacity, traceId);
         auto object = std::string_view(data, size);
-        auto originalMsg = std::make_unique<network::OriginalMessage>(provider->putRequest(remotePath, object), provider->getAddress(), provider->getPort(), result, capacity, traceId);
+        auto originalMsg = std::make_unique<network::OriginalMessage>(_provider->putRequest(remotePath, object), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
         originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data), size);
-        messages.push_back(std::move(originalMsg));
+        _messages.push_back(std::move(originalMsg));
     }
 
     /// Build a new put request with callback
     template <typename Callback>
     inline void putObjectRequest(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
-        assert(provider);
+        assert(_provider);
+        if (_provider->multipartUploadSize() && size > _provider->multipartUploadSize())
+            return putObjectRequestMultiPart(std::forward<Callback>(callback), remotePath, data, size, result, capacity, traceId);
         auto object = std::string_view(data, size);
-        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback&&>(callback), provider->putRequest(remotePath, object), provider->getAddress(), provider->getPort(), result, capacity, traceId);
+        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(callback), _provider->putRequest(remotePath, object), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
         originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data), size);
-        messages.push_back(std::move(originalMsg));
+        _messages.push_back(std::move(originalMsg));
     }
 
     /// Build a new delete request for synchronous calls
     inline void deleteObjectRequest(const std::string& remotePath, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
-        assert(provider);
-        auto originalMsg = std::make_unique<network::OriginalMessage>(provider->deleteRequest(remotePath), provider->getAddress(), provider->getPort(), result, capacity, traceId);
-        messages.push_back(std::move(originalMsg));
+        assert(_provider);
+        auto originalMsg = std::make_unique<network::OriginalMessage>(_provider->deleteRequest(remotePath), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        _messages.push_back(std::move(originalMsg));
     }
 
     /// Build a new delete request with callback
     template <typename Callback>
     inline void deleteObjectRequest(Callback&& callback, const std::string& remotePath, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
-        assert(provider);
-        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback&&>(callback), provider->deleteRequest(remotePath), provider->getAddress(), provider->getPort(), result, capacity, traceId);
-        messages.push_back(std::move(originalMsg));
+        assert(_provider);
+        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(callback), _provider->deleteRequest(remotePath), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        _messages.push_back(std::move(originalMsg));
     }
 
+    private:
+    /// Build a new put request for synchronous calls
+    inline void putObjectRequestMultiPart(const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(_provider);
+        auto splitSize = _provider->multipartUploadSize();
+        auto parts = (size / splitSize) + ((size % splitSize) ? 1u : 0u);
+        _multipartUploads.emplace_back(parts);
+        auto position = _multipartUploads.size() - 1;
+
+        auto uploadMessages = [position, parts, data, remotePath, traceId, splitSize, size, this](network::MessageResult& result) {
+            if (!result.success()) {
+                _completedMultiparts++;
+                return;
+            }
+
+            _multipartUploads[position].uploadId = _provider->getUploadId(result.getResult());
+            auto offset = 0ull;
+            for (auto i = 1ull; i <= parts; i++) {
+                auto finishMultipart = [position, remotePath, traceId, i, parts, this](network::MessageResult& result) {
+                    // TODO: requires abort handling
+                    if (!result.success())
+                        return;
+
+                    _multipartUploads[position].eTags[i - 1] = _provider->getETag(std::string_view(reinterpret_cast<const char*>(result.getData()), result.getOffset()));
+                    if (_multipartUploads[position].outstanding.fetch_sub(1) == 1) {
+                        auto finished = [this](network::MessageResult& /*result*/) {
+                            _completedMultiparts++;
+                        };
+                        auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                        _multipartUploads[position].messages[parts] = std::move(originalMsg);
+                        _multipartUploads[position].state = MultipartUpload::State::Validating;
+                    }
+                };
+                auto partSize = (i != parts) ? splitSize : size - offset;
+                auto object = std::string_view(data + offset, partSize);
+                auto originalMsg = makeCallbackMessage(std::move(finishMultipart), _provider->putRequestGeneric(remotePath, object, i, _multipartUploads[position].uploadId), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data + offset), partSize);
+                _multipartUploads[position].messages[i - 1] = std::move(originalMsg);
+                offset += partSize;
+            }
+            _multipartUploads[position].state = MultipartUpload::State::Sending;
+        };
+
+        auto originalMsg = makeCallbackMessage(std::move(uploadMessages), _provider->createMultiPartRequest(remotePath), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        _messages.push_back(std::move(originalMsg));
+    }
+
+    /// Build a new put request with callback
+    template <typename Callback>
+    inline void putObjectRequestMultiPart(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(_provider);
+        auto splitSize = _provider->multipartUploadSize();
+        auto parts = (size / splitSize) + ((size % splitSize) ? 1u : 0u);
+        _multipartUploads.emplace_back(parts);
+        auto position = _multipartUploads.size() - 1;
+
+        auto uploadMessages = [&callback, position, parts, data, remotePath, traceId, splitSize, size, this](network::MessageResult& result) {
+            if (!result.success()) {
+                _completedMultiparts++;
+                return;
+            }
+            _multipartUploads[position].uploadId = _provider->getUploadId(result.getResult());
+            auto offset = 0ull;
+            for (auto i = 1ull; i <= parts; i++) {
+                auto finishMultipart = [&callback, position, remotePath, traceId, i, parts, this](network::MessageResult& result) {
+                    // TODO: requires abort handling
+                    if (!result.success())
+                        return;
+
+                    _multipartUploads[position].eTags[i - 1] = _provider->getETag(std::string_view(reinterpret_cast<const char*>(result.getData()), result.getOffset()));
+                    if (_multipartUploads[position].outstanding.fetch_sub(1) == 1) {
+                        auto finished = [&callback, this](network::MessageResult& result) {
+                            _completedMultiparts++;
+                            std::forward<Callback>(callback)(result);
+                        };
+                        auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                        _multipartUploads[position].messages[parts] = std::move(originalMsg);
+                        _multipartUploads[position].state = MultipartUpload::State::Validating;
+                    }
+                };
+                auto partSize = (i != parts) ? splitSize : size - offset;
+                auto object = std::string_view(data + offset, partSize);
+                auto originalMsg = makeCallbackMessage(std::move(finishMultipart), _provider->putRequestGeneric(remotePath, object, i, _multipartUploads[position].uploadId), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data + offset), partSize);
+                _multipartUploads[position].messages[i - 1] = std::move(originalMsg);
+                offset += partSize;
+            }
+            _multipartUploads[position].state = MultipartUpload::State::Sending;
+        };
+
+        auto originalMsg = makeCallbackMessage(std::move(uploadMessages), _provider->createMultiPartRequest(remotePath), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        _messages.push_back(std::move(originalMsg));
+    }
+
+    public:
     /// The iterator
     using iterator = Iterator;
     /// The const iterator
     using const_iterator = ConstIterator;
 
     /// The begin it
-    inline iterator begin() { return iterator(messages.begin()); }
+    inline iterator begin() { return iterator(_messages.begin()); }
     /// The end it
-    inline iterator end() { return iterator(messages.end()); }
+    inline iterator end() { return iterator(_messages.end()); }
 
     /// The begin it
-    inline const_iterator cbegin() const { return const_iterator(messages.cbegin()); }
+    inline const_iterator cbegin() const { return const_iterator(_messages.cbegin()); }
     /// The end it
-    inline const_iterator cend() const { return const_iterator(messages.cend()); }
+    inline const_iterator cend() const { return const_iterator(_messages.cend()); }
 
     /// The iterator
     class Iterator {

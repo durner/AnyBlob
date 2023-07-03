@@ -1,12 +1,12 @@
 #include "catch2/single_include/catch2/catch.hpp"
 #include "cloud/provider.hpp"
+#include "cloud/minio.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "network/transaction.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -20,7 +20,7 @@ namespace test {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TEST_CASE("MinIO Integration") {
+TEST_CASE("MinIO Sync Integration") {
     // Get the enviornment
     const char* bucket = getenv("AWS_S3_BUCKET");
     const char* region = getenv("AWS_S3_REGION");
@@ -72,6 +72,23 @@ TEST_CASE("MinIO Integration") {
         }
     }
     {
+        // Create the multipart put request
+        auto minio = static_cast<anyblob::cloud::MinIO*>(provider.get());
+        minio->setMultipartUploadSize(6ull << 20);
+        anyblob::network::Transaction putTxn(provider.get());
+        for (auto i = 0u; i < 2; i++)
+            putTxn.putObjectRequest(fileName[i], content[i].data(), content[i].size());
+
+        // Upload the request synchronously with the scheduler object on this thread
+        putTxn.processSync(sendReceiver);
+
+        // Check the upload
+        for (const auto& it : putTxn) {
+            // Sucessful request
+            REQUIRE(it.success());
+        }
+    }
+    {
         // Create the get request
         anyblob::network::Transaction getTxn(provider.get());
         for (auto i = 0u; i < 2; i++)
@@ -102,15 +119,15 @@ TEST_CASE("MinIO Integration") {
         }
     }
     {
-        // Create the put request
+        // Create the delete request
         anyblob::network::Transaction deleteTxn(provider.get());
         for (auto i = 0u; i < 2; i++)
             deleteTxn.deleteObjectRequest(fileName[i]);
 
-        // Upload the request synchronously with the scheduler object on this thread
+        // Process the request synchronously with the scheduler object on this thread
         deleteTxn.processSync(sendReceiver);
 
-        // Check the upload
+        // Check the deletion
         for (const auto& it : deleteTxn) {
             // Sucessful request
             REQUIRE(it.success());

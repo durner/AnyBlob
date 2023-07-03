@@ -249,7 +249,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         }
 
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
-            getTxn[i].processAsync(*sendReceivers.back());
+            getTxn[i].processAsync(group);
 
         fstream s;
         unique_ptr<utils::Timer> timer;
@@ -317,7 +317,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                     sendReceivers[i]->setTimings(nullptr);
                 }
 
-                putTxn.processAsync(*sendReceivers.back());
+                putTxn.processAsync(group);
 
                 while (finishedMessages != requestPerSocket * benchmarkSettings.concurrentThreads)
                     usleep(100);

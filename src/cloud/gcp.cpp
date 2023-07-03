@@ -114,8 +114,8 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& file
 
     // Is it a multipart upload?
     if (part) {
-        request.path += "?partNumber=" + to_string(part) + "&uploadId=";
-        request.path += uploadId;
+        request.queries.emplace("partNumber", to_string(part));
+        request.queries.emplace("uploadId", uploadId);
     }
 
     request.bodyData = reinterpret_cast<const uint8_t*>(object.data());
@@ -171,7 +171,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::createMultiPartRequest(const string&
     request.method = "POST";
     request.type = "HTTP/1.1";
     request.path = "/" + filePath;
-    request.path += "?uploads";
+    request.queries.emplace("uploads", "");
     request.bodyData = nullptr;
     request.bodyLength = 0;
 
@@ -208,8 +208,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::completeMultiPartRequest(const strin
     request.method = "POST";
     request.type = "HTTP/1.1";
     request.path = "/" + filePath;
-    request.path += "&uploadId=";
-    request.path += uploadId;
+    request.queries.emplace("uploadId", uploadId);
     request.bodyData = nullptr;
     request.bodyLength = 0;
 

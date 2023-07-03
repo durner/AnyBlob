@@ -247,8 +247,8 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& file
 
     // Is it a multipart upload?
     if (part) {
-        request.path += "?partNumber=" + to_string(part) + "&uploadId=";
-        request.path += uploadId;
+        request.queries.emplace("partNumber", to_string(part));
+        request.queries.emplace("uploadId", uploadId);
     }
 
     request.bodyLength = object.size();
@@ -320,7 +320,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::createMultiPartRequest(const string&
         request.path = "/" + filePath;
     else
         request.path = "/" + _settings.bucket + "/" + filePath;
-    request.path += "?uploads";
+    request.queries.emplace("uploads", "");
     request.bodyData = nullptr;
     request.bodyLength = 0;
     request.headers.emplace("Host", getAddress());
@@ -365,9 +365,8 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const strin
         request.path = "/" + filePath;
     else
         request.path = "/" + _settings.bucket + "/" + filePath;
-    request.path += "&uploadId=";
-    request.path += uploadId;
 
+    request.queries.emplace("uploadId", uploadId);
     request.bodyData = nullptr;
     request.bodyLength = 0;
     request.headers.emplace("Host", getAddress());

@@ -29,6 +29,8 @@ class MinIO : public AWS {
     [[nodiscard]] std::string getAddress() const override;
     /// Get the instance details
     [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
+    /// Set the upload split size
+    constexpr void setMultipartUploadSize(uint64_t size) { _multipartUploadSize = size; }
 
     friend Provider;
 };
