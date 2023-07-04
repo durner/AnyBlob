@@ -24,6 +24,7 @@ struct OriginalMessage;
 struct HTTPMessage;
 struct HTTPSMessage;
 class TLSConnection;
+class Transaction;
 //---------------------------------------------------------------------------
 /// Current status of the message
 enum class MessageState : uint8_t {
@@ -35,7 +36,8 @@ enum class MessageState : uint8_t {
     Receiving,
     TLSShutdown,
     Finished,
-    Aborted
+    Aborted,
+    Cancelled
 };
 //---------------------------------------------------------------------------
 /// The failure codes
@@ -111,6 +113,7 @@ class MessageResult {
     friend HTTPSMessage;
     friend OriginalMessage;
     friend TLSConnection;
+    friend Transaction;
 };
 //---------------------------------------------------------------------------
 } // namespace network

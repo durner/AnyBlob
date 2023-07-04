@@ -117,7 +117,11 @@ class AWS : public Provider {
         return putRequestGeneric(filePath, object, 0, "");
     }
     // Builds the http request for deleting an objects
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const override {
+        return deleteRequestGeneric(filePath, "");
+    }
+    /// Builds the http request for deleting objects
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> deleteRequestGeneric(const std::string& filePath, const std::string_view uploadId) const override;
     /// Builds the http request for creating multipart put objects
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& filePath) const override;
     /// Builds the http request for completing multipart put objects

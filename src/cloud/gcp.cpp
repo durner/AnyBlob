@@ -139,7 +139,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& file
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequest(const string& filePath) const
+unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequestGeneric(const string& filePath, const string_view uploadId) const
 // Builds the http request for deleting objects
 {
     GCPSigner::Request request;
@@ -148,6 +148,11 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequest(const string& filePath
     request.path = "/" + filePath;
     request.bodyData = nullptr;
     request.bodyLength = 0;
+
+    // Is it a multipart upload?
+    if (!uploadId.empty()) {
+        request.queries.emplace("uploadId", uploadId);
+    }
 
     auto date = testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp();
     request.queries.emplace("X-Goog-Date", date);
@@ -197,7 +202,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::completeMultiPartRequest(const strin
     string content = "<CompleteMultipartUpload>\n";
     for (auto i = 0ull; i < etags.size(); i++) {
         content += "<Part>\n<PartNumber>";
-        content += to_string(i+1);
+        content += to_string(i + 1);
         content += "</PartNumber>\n<ETag>\"";
         content += etags[i];
         content += "\"</ETag>\n</Part>\n";
@@ -209,8 +214,8 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::completeMultiPartRequest(const strin
     request.type = "HTTP/1.1";
     request.path = "/" + filePath;
     request.queries.emplace("uploadId", uploadId);
-    request.bodyData = nullptr;
-    request.bodyLength = 0;
+    request.bodyData = reinterpret_cast<const uint8_t*>(content.data());
+    request.bodyLength = content.size();
 
     auto date = testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp();
     request.queries.emplace("X-Goog-Date", date);

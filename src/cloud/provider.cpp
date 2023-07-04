@@ -123,6 +123,12 @@ unique_ptr<utils::DataVector<uint8_t>> Provider::putRequestGeneric(const string&
     return nullptr;
 }
 //---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Provider::deleteRequestGeneric(const string& /*filePath*/, const string_view /*uploadId*/) const
+// Builds the http request for delete multipart objects
+{
+    return nullptr;
+}
+//---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Provider::createMultiPartRequest(const string& /*filePath*/) const
 // Builds the http request for creating multipart put objects
 {

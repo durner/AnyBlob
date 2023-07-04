@@ -44,6 +44,7 @@ class Transaction {
             Default = 0,
             Sending = 1,
             Validating = 2,
+            Aborted = 1u << 7
         };
         /// The uploadId
         std::string uploadId;
@@ -155,48 +156,8 @@ class Transaction {
     private:
     /// Build a new put request for synchronous calls
     inline void putObjectRequestMultiPart(const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
-        assert(_provider);
-        auto splitSize = _provider->multipartUploadSize();
-        auto parts = (size / splitSize) + ((size % splitSize) ? 1u : 0u);
-        _multipartUploads.emplace_back(parts);
-        auto position = _multipartUploads.size() - 1;
-
-        auto uploadMessages = [position, parts, data, remotePath, traceId, splitSize, size, this](network::MessageResult& result) {
-            if (!result.success()) {
-                _completedMultiparts++;
-                return;
-            }
-
-            _multipartUploads[position].uploadId = _provider->getUploadId(result.getResult());
-            auto offset = 0ull;
-            for (auto i = 1ull; i <= parts; i++) {
-                auto finishMultipart = [position, remotePath, traceId, i, parts, this](network::MessageResult& result) {
-                    // TODO: requires abort handling
-                    if (!result.success())
-                        return;
-
-                    _multipartUploads[position].eTags[i - 1] = _provider->getETag(std::string_view(reinterpret_cast<const char*>(result.getData()), result.getOffset()));
-                    if (_multipartUploads[position].outstanding.fetch_sub(1) == 1) {
-                        auto finished = [this](network::MessageResult& /*result*/) {
-                            _completedMultiparts++;
-                        };
-                        auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
-                        _multipartUploads[position].messages[parts] = std::move(originalMsg);
-                        _multipartUploads[position].state = MultipartUpload::State::Validating;
-                    }
-                };
-                auto partSize = (i != parts) ? splitSize : size - offset;
-                auto object = std::string_view(data + offset, partSize);
-                auto originalMsg = makeCallbackMessage(std::move(finishMultipart), _provider->putRequestGeneric(remotePath, object, i, _multipartUploads[position].uploadId), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
-                originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data + offset), partSize);
-                _multipartUploads[position].messages[i - 1] = std::move(originalMsg);
-                offset += partSize;
-            }
-            _multipartUploads[position].state = MultipartUpload::State::Sending;
-        };
-
-        auto originalMsg = makeCallbackMessage(std::move(uploadMessages), _provider->createMultiPartRequest(remotePath), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
-        _messages.push_back(std::move(originalMsg));
+        auto finished = [](network::MessageResult& /*result*/) {};
+        putObjectRequestMultiPart(std::move(finished), remotePath, data, size, result, capacity, traceId);
     }
 
     /// Build a new put request with callback
@@ -208,27 +169,39 @@ class Transaction {
         _multipartUploads.emplace_back(parts);
         auto position = _multipartUploads.size() - 1;
 
-        auto uploadMessages = [&callback, position, parts, data, remotePath, traceId, splitSize, size, this](network::MessageResult& result) {
-            if (!result.success()) {
+        auto uploadMessages = [&callback, position, parts, data, remotePath, traceId, splitSize, size, this](network::MessageResult& initalRequestResult) {
+            if (!initalRequestResult.success()) {
                 _completedMultiparts++;
                 return;
             }
-            _multipartUploads[position].uploadId = _provider->getUploadId(result.getResult());
+            _multipartUploads[position].uploadId = _provider->getUploadId(initalRequestResult.getResult());
             auto offset = 0ull;
             for (auto i = 1ull; i <= parts; i++) {
-                auto finishMultipart = [&callback, position, remotePath, traceId, i, parts, this](network::MessageResult& result) {
-                    // TODO: requires abort handling
-                    if (!result.success())
-                        return;
-
-                    _multipartUploads[position].eTags[i - 1] = _provider->getETag(std::string_view(reinterpret_cast<const char*>(result.getData()), result.getOffset()));
+                auto finishMultipart = [&callback, &initalRequestResult, position, remotePath, traceId, i, parts, this](network::MessageResult& result) {
+                    if (!result.success()) [[unlikely]] {
+                        _multipartUploads[position].state = MultipartUpload::State::Aborted;
+                    } else {
+                        _multipartUploads[position].eTags[i - 1] = _provider->getETag(std::string_view(reinterpret_cast<const char*>(result.getData()), result.getOffset()));
+                    }
                     if (_multipartUploads[position].outstanding.fetch_sub(1) == 1) {
-                        auto finished = [&callback, this](network::MessageResult& result) {
-                            _completedMultiparts++;
-                            std::forward<Callback>(callback)(result);
-                        };
-                        auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
-                        _multipartUploads[position].messages[parts] = std::move(originalMsg);
+                        if (_multipartUploads[position].state != MultipartUpload::State::Aborted) [[likely]] {
+                            auto finished = [&callback, &initalRequestResult, this](network::MessageResult& result) {
+                                if (!result.success())
+                                    initalRequestResult.state = network::MessageState::Cancelled;
+                                _completedMultiparts++;
+                                std::forward<Callback>(callback)(initalRequestResult);
+                            };
+                            auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                            _multipartUploads[position].messages[parts] = std::move(originalMsg);
+                        } else {
+                            auto finished = [&callback, &initalRequestResult, this](network::MessageResult& /*result*/) {
+                                initalRequestResult.state = network::MessageState::Cancelled;
+                                _completedMultiparts++;
+                                std::forward<Callback>(callback)(initalRequestResult);
+                            };
+                            auto originalMsg = makeCallbackMessage(std::move(finished), _provider->deleteRequestGeneric(remotePath, _multipartUploads[position].uploadId), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                            _multipartUploads[position].messages[parts] = std::move(originalMsg);
+                        }
                         _multipartUploads[position].state = MultipartUpload::State::Validating;
                     }
                 };

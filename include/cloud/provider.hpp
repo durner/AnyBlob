@@ -85,6 +85,8 @@ class Provider {
     [[nodiscard]] virtual uint64_t multipartUploadSize() const { return 0; }
     /// Builds the http request for putting multipart objects without the object data itself
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequestGeneric(const std::string& /*filePath*/, const std::string_view /*object*/, uint16_t /*part*/, const std::string_view /*uploadId*/) const;
+    /// Builds the http request for deleting multipart aborted objects
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> deleteRequestGeneric(const std::string& /*filePath*/, const std::string_view /*uploadId*/) const;
     /// Builds the http request for creating multipart put objects
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& /*filePath*/) const;
     /// Builds the http request for completing multipart put objects

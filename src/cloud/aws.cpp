@@ -270,7 +270,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& file
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequest(const string& filePath) const
+unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequestGeneric(const string& filePath, const string_view uploadId) const
 // Builds the http request for deleting an objects
 {
     if (!validKeys())
@@ -285,6 +285,11 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequest(const string& filePath
         request.path = "/" + filePath;
     else
         request.path = "/" + _settings.bucket + "/" + filePath;
+
+    // Is it a multipart upload?
+    if (!uploadId.empty()) {
+        request.queries.emplace("uploadId", uploadId);
+    }
 
     request.bodyData = nullptr;
     request.bodyLength = 0;
@@ -367,8 +372,8 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const strin
         request.path = "/" + _settings.bucket + "/" + filePath;
 
     request.queries.emplace("uploadId", uploadId);
-    request.bodyData = nullptr;
-    request.bodyLength = 0;
+    request.bodyData = reinterpret_cast<const uint8_t*>(content.data());
+    request.bodyLength = content.size();
     request.headers.emplace("Host", getAddress());
     request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
     request.headers.emplace("Content-Length", to_string(content.size()));
