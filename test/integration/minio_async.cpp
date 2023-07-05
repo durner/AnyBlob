@@ -111,6 +111,28 @@ TEST_CASE("MinIO Asynchronous Integration") {
         }
     }
     {
+        // Check the upload for failure due to too small part
+        std::atomic<uint16_t> finishedMessages = 0;
+        auto checkSuccess = [&finishedMessages](anyblob::network::MessageResult& result) {
+            // Sucessful request
+            REQUIRE(!result.success());
+            finishedMessages++;
+        };
+
+        // Create the multipart put request
+        auto minio = static_cast<anyblob::cloud::MinIO*>(provider.get());
+        minio->setMultipartUploadSize(1ull << 20); // too small, requires at least 5MiB parts
+        anyblob::network::Transaction putTxn(provider.get());
+        putTxn.putObjectRequest(checkSuccess, fileName[1], content[1].data(), content[1].size());
+
+        while (finishedMessages != 1) {
+            // Upload the new request asynchronously
+            putTxn.processAsync(group);
+            // Wait for the upload
+            usleep(100);
+        }
+    }
+    {
         std::atomic<uint16_t> finishedMessages = 0;
         // Create the get request
         anyblob::network::Transaction getTxn(provider.get());

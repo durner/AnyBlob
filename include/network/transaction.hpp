@@ -56,6 +56,8 @@ class Transaction {
         std::atomic<int> outstanding;
         /// The state
         std::atomic<State> state;
+        /// The error message id
+        std::atomic<int> errorMessageId;
 
         /// The constructor
         explicit MultipartUpload(int parts) : messages(parts + 1), eTags(parts), outstanding(parts), state(State::Default) {}
@@ -179,6 +181,7 @@ class Transaction {
             for (auto i = 1ull; i <= parts; i++) {
                 auto finishMultipart = [&callback, &initalRequestResult, position, remotePath, traceId, i, parts, this](network::MessageResult& result) {
                     if (!result.success()) [[unlikely]] {
+                        _multipartUploads[position].errorMessageId = i - 1;
                         _multipartUploads[position].state = MultipartUpload::State::Aborted;
                     } else {
                         _multipartUploads[position].eTags[i - 1] = _provider->getETag(std::string_view(reinterpret_cast<const char*>(result.getData()), result.getOffset()));
@@ -186,16 +189,19 @@ class Transaction {
                     if (_multipartUploads[position].outstanding.fetch_sub(1) == 1) {
                         if (_multipartUploads[position].state != MultipartUpload::State::Aborted) [[likely]] {
                             auto finished = [&callback, &initalRequestResult, this](network::MessageResult& result) {
-                                if (!result.success())
+                                if (!result.success()) {
                                     initalRequestResult.state = network::MessageState::Cancelled;
+                                    initalRequestResult.originError = &result;
+                                }
                                 _completedMultiparts++;
                                 std::forward<Callback>(callback)(initalRequestResult);
                             };
                             auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
                             _multipartUploads[position].messages[parts] = std::move(originalMsg);
                         } else {
-                            auto finished = [&callback, &initalRequestResult, this](network::MessageResult& /*result*/) {
+                            auto finished = [&callback, &initalRequestResult, position, this](network::MessageResult& /*result*/) {
                                 initalRequestResult.state = network::MessageState::Cancelled;
+                                initalRequestResult.originError = &_multipartUploads[position].messages[_multipartUploads[position].errorMessageId]->result;
                                 _completedMultiparts++;
                                 std::forward<Callback>(callback)(initalRequestResult);
                             };

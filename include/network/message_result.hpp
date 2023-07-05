@@ -67,6 +67,8 @@ class MessageResult {
     uint64_t size;
     /// The offset of the result; the start after the message header
     uint64_t offset;
+    /// The error response
+    const MessageResult* originError;
     /// The failure code
     uint16_t failureCode;
     /// The state
@@ -96,8 +98,10 @@ class MessageResult {
     [[nodiscard]] uint64_t getOffset() const;
     /// Get the state
     [[nodiscard]] MessageState getState() const;
-    /// Get the original message
+    /// Get the failure code
     [[nodiscard]] uint16_t getFailureCode() const;
+    /// Get the error response (incl. header)
+    [[nodiscard]] std::string_view getError() const;
     /// Is the data owned by this object
     [[nodiscard]] bool owned() const;
     /// Was the request successful

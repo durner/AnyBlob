@@ -1,6 +1,6 @@
 #include "catch2/single_include/catch2/catch.hpp"
-#include "cloud/provider.hpp"
 #include "cloud/minio.hpp"
+#include "cloud/provider.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "network/transaction.hpp"
 #include <cstdlib>
@@ -86,6 +86,22 @@ TEST_CASE("MinIO Sync Integration") {
         for (const auto& it : putTxn) {
             // Sucessful request
             REQUIRE(it.success());
+        }
+    }
+    {
+        // Create the multipart put request but enforce failure due to small part size
+        auto minio = static_cast<anyblob::cloud::MinIO*>(provider.get());
+        minio->setMultipartUploadSize(1ull << 20); // part size must be larger than 5MiB
+        anyblob::network::Transaction putTxn(provider.get());
+        putTxn.putObjectRequest(fileName[1], content[1].data(), content[1].size());
+
+        // Upload the request synchronously with the scheduler object on this thread
+        putTxn.processSync(sendReceiver);
+
+        // Check the upload
+        for (const auto& it : putTxn) {
+            // Sucessful request
+            REQUIRE(!it.success());
         }
     }
     {

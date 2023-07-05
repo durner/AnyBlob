@@ -13,13 +13,13 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-MessageResult::MessageResult() : size(), offset(), failureCode(), state(MessageState::Init)
+MessageResult::MessageResult() : size(), offset(), originError(nullptr), failureCode(), state(MessageState::Init)
 // The default constructor
 {
     dataVector = make_unique<utils::DataVector<uint8_t>>();
 }
 //---------------------------------------------------------------------------
-MessageResult::MessageResult(uint8_t* data, uint64_t size) : size(), offset(), failureCode(), state(MessageState::Init)
+MessageResult::MessageResult(uint8_t* data, uint64_t size) : size(), offset(), originError(nullptr), failureCode(), state(MessageState::Init)
 // The constructor with buffer input
 {
     if (data)
@@ -28,7 +28,7 @@ MessageResult::MessageResult(uint8_t* data, uint64_t size) : size(), offset(), f
         dataVector = make_unique<utils::DataVector<uint8_t>>();
 }
 //---------------------------------------------------------------------------
-MessageResult::MessageResult(utils::DataVector<uint8_t>* dataVector) : size(), offset(), failureCode(), state(MessageState::Init)
+MessageResult::MessageResult(utils::DataVector<uint8_t>* dataVector) : size(), offset(), originError(nullptr), failureCode(), state(MessageState::Init)
 // The constructor with buffer input
 {
     this->dataVector = unique_ptr<utils::DataVector<uint8_t>>(dataVector);
@@ -83,9 +83,21 @@ MessageState MessageResult::getState() const
 }
 //---------------------------------------------------------------------------
 uint16_t MessageResult::getFailureCode() const
-// Get the original message
+// Get the failure code
 {
-    return failureCode;
+    if (originError)
+        return originError->getFailureCode();
+    else
+        return failureCode;
+}
+//---------------------------------------------------------------------------
+std::string_view MessageResult::getError() const
+// Get the error header
+{
+    if (originError)
+        return originError->getError();
+    else
+        return string_view(reinterpret_cast<char*>(dataVector->data()), dataVector->size());
 }
 //---------------------------------------------------------------------------
 bool MessageResult::owned() const

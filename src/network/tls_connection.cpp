@@ -1,7 +1,6 @@
 #include "network/tls_connection.hpp"
 #include "network/https_message.hpp"
 #include "network/tls_context.hpp"
-#include <iostream>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
@@ -141,8 +140,7 @@ TLSConnection::Progress TLSConnection::shutdown(IOUringSocket& socket, bool fail
         if (!failedOnce) [[likely]] {
             status = Progress::Init;
             return shutdown(socket, true);
-        }
-        else {
+        } else {
             _context.dropSession(_message.fd);
         }
     }
@@ -184,7 +182,10 @@ TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
                     auto writeSize = _state.networkBioRead - _state.socketWrite;
                     const uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketWrite;
                     _message.request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, writeSize, _message.fd, IOUringSocket::EventType::write, &_message});
-                    socket.send_prep_to(_message.request.get(), &_message.tcpSettings.kernelTimeout);
+                    if (writeSize <= static_cast<int64_t>(_message.chunkSize))
+                        socket.send_prep_to(_message.request.get(), &_message.tcpSettings.kernelTimeout);
+                    else
+                        socket.send_prep(_message.request.get());
                     return _state.progress;
                 } else {
                     _state.progress = Progress::ReceivingInit;

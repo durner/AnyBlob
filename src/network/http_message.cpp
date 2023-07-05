@@ -71,7 +71,10 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                     length = originalMessage->putLength + originalMessage->message->size() - sendBufferOffset;
                 }
                 request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, length, fd, IOUringSocket::EventType::write, this});
-                socket.send_prep_to(request.get(), &tcpSettings.kernelTimeout);
+                if (length <= static_cast<int64_t>(chunkSize))
+                    socket.send_prep_to(request.get(), &tcpSettings.kernelTimeout);
+                else
+                    socket.send_prep(request.get());
             }
             break;
         }
