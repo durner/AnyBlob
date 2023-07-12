@@ -263,8 +263,10 @@ void IOUringSocket::disconnect(int32_t fd, string hostname, uint32_t port, TCPSe
         resCache = _resolverCache.find("")->second.get();
     }
     resCache->stopSocket(fd, bytes);
-    if (forceShutdown)
+    if (forceShutdown) {
         shutdown(fd, SHUT_RDWR);
+        resCache->shutdownSocket(fd);
+    }
     if (tcpSettings && tcpSettings->reuse > 0 && hostname.length() > 0 && port) {
         _fdCache.emplace(hostname, fd);
         _fdSockets.erase(fd);

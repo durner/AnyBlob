@@ -46,6 +46,8 @@ class ThroughputResolver : public network::Resolver {
     virtual void startSocket(int fd, unsigned ipAsInt) override;
     /// Stop the timing
     virtual void stopSocket(int fd, uint64_t bytes) override;
+    /// Clears the used server from the cache
+    virtual void shutdownSocket(int fd) override;
     /// The destructor
     virtual ~ThroughputResolver() noexcept = default;
 };

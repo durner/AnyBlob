@@ -56,6 +56,21 @@ void ThroughputResolver::startSocket(int fd, unsigned addrPos)
     _fdMap.emplace(fd, make_pair(addrPos, chrono::steady_clock::now()));
 }
 //---------------------------------------------------------------------------
+void ThroughputResolver::shutdownSocket(int fd)
+// Start a socket
+{
+    auto it = _fdMap.find(fd);
+    if (it != _fdMap.end()) {
+        auto pos = it->second.first;
+        auto& ip = _addr[pos];
+        for (auto compPos = 0u; compPos < _addr.size(); compPos++) {
+            if (!strncmp(ip->ai_addr->sa_data, _addr[compPos]->ai_addr->sa_data, 14)) {
+                _addrString[compPos].second = 0;
+            }
+        }
+    }
+}
+//---------------------------------------------------------------------------
 void ThroughputResolver::stopSocket(int fd, uint64_t bytes)
 // Stop a socket
 {

@@ -46,7 +46,7 @@ struct MessageTask {
     Type type;
 
     /// The failure limit
-    static constexpr uint16_t failuresMax = 8;
+    static constexpr uint16_t failuresMax = 32;
 
     /// The pure virtual  callback
     virtual MessageState execute(IOUringSocket& socket) = 0;

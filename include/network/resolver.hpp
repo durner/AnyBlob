@@ -42,6 +42,8 @@ class Resolver {
     virtual void startSocket(int /*fd*/, unsigned /*ipAsInt*/) {}
     /// Stop the timing
     virtual void stopSocket(int /*fd*/, uint64_t /*bytes*/) {}
+    /// Shutdown of the socket should clear the same addresses
+    virtual void shutdownSocket(int /*fd*/) {}
     /// The destructor
     virtual ~Resolver() noexcept = default;
 
