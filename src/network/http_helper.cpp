@@ -16,7 +16,7 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-HTTPHelper::Info HTTPHelper::detect(const string_view header)
+HTTPHelper::Info HTTPHelper::detect(string_view header)
 // Detect the protocol
 {
     auto info = Info{0, 0, Protocol::Unknown, Encoding::Unknown};

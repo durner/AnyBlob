@@ -1,5 +1,6 @@
 #include "utils/unordered_map.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
+#include <thread>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -26,6 +27,60 @@ TEST_CASE("unordered_map") {
 
     REQUIRE(ht.erase(ht.find(0)));
     REQUIRE(ht.size() == 1);
+}
+//---------------------------------------------------------------------------
+TEST_CASE("unordered_map_multi_threaded") {
+    // Insert 1000 elements in 10 threads
+    UnorderedMap<int, int> ht(128);
+    std::thread t[10];
+    for (int i = 0; i < 10; i++) {
+        t[i] = std::thread([&ht, i]() {
+            for (int j = 0; j < 10; j++) {
+                std::ignore = ht.insert(i * 10 + j, i * 10 + j);
+            }
+        });
+    }
+    for (int i = 0; i < 10; i++) {
+        t[i].join();
+    }
+    // Find the elements multu-threaded
+    for (int i = 0; i < 10; i++) {
+        t[i] = std::thread([&ht, i]() {
+            for (int j = 0; j < 10; j++) {
+                REQUIRE(ht.find(i * 10 + j) != ht.end());
+            }
+        });
+    }
+    for (int i = 0; i < 10; i++) {
+        t[i].join();
+    }
+}
+//---------------------------------------------------------------------------
+TEST_CASE("unordered_map_multi_threaded_delete") {
+    UnorderedMap<int, int> ht(128);
+    // Insert 1000 elements in 10 threads
+    std::thread t[10];
+    for (int i = 0; i < 10; i++) {
+        t[i] = std::thread([&ht, i]() {
+            for (int j = 0; j < 10; j++) {
+                std::ignore = ht.insert(i * 10 + j, i * 10 + j);
+            }
+        });
+    }
+    for (int i = 0; i < 10; i++) {
+        t[i].join();
+    }
+    // Delete the elements multi-threaded
+    for (int i = 0; i < 10; i++) {
+        t[i] = std::thread([&ht, i]() {
+            for (int j = 0; j < 10; j++) {
+                REQUIRE(ht.erase(i * 10 + j));
+            }
+        });
+    }
+    for (int i = 0; i < 10; i++) {
+        t[i].join();
+    }
 }
 //---------------------------------------------------------------------------
 } // namespace test

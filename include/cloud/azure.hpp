@@ -77,7 +77,7 @@ class Azure : public Provider {
     /// Builds the http request for downloading a blob or listing the directory
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, std::string_view object) const override;
     // Builds the http request for deleting an objects
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const override;
 
@@ -89,7 +89,7 @@ class Azure : public Provider {
     /// Builds the info http request
     [[nodiscard]] static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo();
     /// Get the IAM address
-    [[nodiscard]] static constexpr const char* getIAMAddress() {
+    [[nodiscard]] static constexpr std::string_view getIAMAddress() {
         return "169.254.169.254";
     }
     /// Get the port of the IAM server

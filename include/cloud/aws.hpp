@@ -111,9 +111,9 @@ class AWS : public Provider {
     /// Builds the http request for downloading a blob or listing the directory
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequestGeneric(const std::string& filePath, const std::string_view object, uint16_t part, const std::string_view uploadId) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequestGeneric(const std::string& filePath, std::string_view object, uint16_t part, std::string_view uploadId) const override;
     /// Builds the http request for putting objects without the object data itself
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, const std::string_view object) const override {
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, std::string_view object) const override {
         return putRequestGeneric(filePath, object, 0, "");
     }
     // Builds the http request for deleting an objects
@@ -121,11 +121,11 @@ class AWS : public Provider {
         return deleteRequestGeneric(filePath, "");
     }
     /// Builds the http request for deleting objects
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> deleteRequestGeneric(const std::string& filePath, const std::string_view uploadId) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> deleteRequestGeneric(const std::string& filePath, std::string_view uploadId) const override;
     /// Builds the http request for creating multipart put objects
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& filePath) const override;
     /// Builds the http request for completing multipart put objects
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& filePath, const std::string_view uploadId, const std::vector<std::string>& etags) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& filePath, std::string_view uploadId, const std::vector<std::string>& etags) const override;
 
     /// Get the address of the server
     [[nodiscard]] std::string getAddress() const override;
@@ -135,7 +135,7 @@ class AWS : public Provider {
     /// Builds the info http request
     [[nodiscard]] static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "instance-type");
     /// Get the IAM address
-    [[nodiscard]] static constexpr const char* getIAMAddress() { return "169.254.169.254"; }
+    [[nodiscard]] static constexpr std::string_view getIAMAddress() { return "169.254.169.254"; }
     /// Get the port of the IAM server
     [[nodiscard]] static constexpr uint32_t getIAMPort() { return 80; }
 

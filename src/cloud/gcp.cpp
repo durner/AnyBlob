@@ -104,7 +104,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, c
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& filePath, const string_view object, uint16_t part, const string_view uploadId) const
+unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& filePath, string_view object, uint16_t part, string_view uploadId) const
 // Builds the http request for putting objects without the object data itself
 {
     GCPSigner::Request request;
@@ -139,7 +139,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& file
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequestGeneric(const string& filePath, const string_view uploadId) const
+unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequestGeneric(const string& filePath, string_view uploadId) const
 // Builds the http request for deleting objects
 {
     GCPSigner::Request request;
@@ -196,7 +196,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::createMultiPartRequest(const string&
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> GCP::completeMultiPartRequest(const string& filePath, const string_view uploadId, const std::vector<std::string>& etags) const
+unique_ptr<utils::DataVector<uint8_t>> GCP::completeMultiPartRequest(const string& filePath, string_view uploadId, const std::vector<std::string>& etags) const
 // Builds the http request for completing multipart upload objects
 {
     string content = "<CompleteMultipartUpload>\n";

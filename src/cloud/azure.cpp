@@ -121,7 +121,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath, const string_view object) const
+unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath, string_view object) const
 // Builds the http request for putting objects without the object data itself
 {
     AzureSigner::Request request;

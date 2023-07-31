@@ -47,7 +47,7 @@ class HTTPHelper {
 
     private:
     /// Detect the protocol
-    [[nodiscard]] static Info detect(const std::string_view s);
+    [[nodiscard]] static Info detect(std::string_view s);
 
     public:
     /// Retrieve the content without http meta info, note that this changes data

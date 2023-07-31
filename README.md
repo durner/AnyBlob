@@ -4,7 +4,7 @@ In this repository, we present AnyBlob.
 AnyBlob is a universal download manager that allows to retrieve and upload objects to different cloud object stores.
 Our download manager uses less CPU resources than cloud-vendor provided libraries while retaining maximum throughput performance.
 AnyBlob leverages IO\_uring for superior performance per core.
-For experimental results, please visit our research paper at [].
+For experimental results, please visit our research paper at [PVLDB 16](https://www.vldb.org/pvldb/vol16/p2734-durner.pdf).
 
 ## Building AnyBlob
 
@@ -42,9 +42,10 @@ For coverage testing you can simply `make coverage` and open the coverage report
 
 ## Cite this work
 
-If you are using AnyBlob in our scientific work, please cite:
+If you are using AnyBlob in your scientific work, please cite:
 
 ```
 Exploiting Cloud Object Storage for High-Performance Analytics
 Dominik Durner, Viktor Leis, and Thomas Neumann
+PVLDB 16, 11 (2023), 49th International Conference on Very Large Data Bases
 ```

@@ -228,7 +228,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& filePath, const string_view object, uint16_t part, const string_view uploadId) const
+unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& filePath, string_view object, uint16_t part, string_view uploadId) const
 // Builds the http request for putting objects without the object data itself
 {
     if (!validKeys())
@@ -270,7 +270,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& file
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequestGeneric(const string& filePath, const string_view uploadId) const
+unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequestGeneric(const string& filePath, string_view uploadId) const
 // Builds the http request for deleting an objects
 {
     if (!validKeys())
@@ -345,7 +345,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::createMultiPartRequest(const string&
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const string& filePath, const string_view uploadId, const std::vector<std::string>& etags) const
+unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const string& filePath, string_view uploadId, const std::vector<std::string>& etags) const
 // Builds the http request for completing multipart upload objects
 {
     if (!validKeys())

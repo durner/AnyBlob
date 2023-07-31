@@ -42,7 +42,7 @@ struct OriginalMessage {
     uint64_t putLength;
 
     /// The constructor
-    OriginalMessage(std::unique_ptr<utils::DataVector<uint8_t>> message, std::string hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : message(std::move(message)), result(receiveBuffer, bufferSize), hostname(hostname), port(port), traceId(traceId), putData(nullptr), putLength() {}
+    OriginalMessage(std::unique_ptr<utils::DataVector<uint8_t>> message, std::string_view hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : message(std::move(message)), result(receiveBuffer, bufferSize), hostname(hostname), port(port), traceId(traceId), putData(nullptr), putLength() {}
 
     /// The destructor
     virtual ~OriginalMessage() = default;
@@ -72,7 +72,7 @@ struct OriginalCallbackMessage : public OriginalMessage {
     Callback callback;
 
     /// The constructor
-    OriginalCallbackMessage(Callback&& callback, std::unique_ptr<utils::DataVector<uint8_t>> message, std::string hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : OriginalMessage(std::move(message), hostname, port, receiveBuffer, bufferSize, traceId), callback(std::forward<Callback>(callback)) {}
+    OriginalCallbackMessage(Callback&& callback, std::unique_ptr<utils::DataVector<uint8_t>> message, std::string_view hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : OriginalMessage(std::move(message), hostname, port, receiveBuffer, bufferSize, traceId), callback(std::forward<Callback>(callback)) {}
 
     /// The destructor
     virtual ~OriginalCallbackMessage() override = default;

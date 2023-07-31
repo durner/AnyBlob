@@ -69,7 +69,7 @@ class GCPTester {
 
         auto provider = Provider::makeProvider("gcp://test:test/", false, "test@test.com", key);
         GCP& gcp = *static_cast<GCP*>(provider.get());
-        REQUIRE(!strcmp(gcp.getIAMAddress(), "169.254.169.254"));
+        REQUIRE(!gcp.getIAMAddress().compare("169.254.169.254"));
         REQUIRE(gcp.getIAMPort() == 80);
 
         auto dv = gcp.downloadInstanceInfo();
