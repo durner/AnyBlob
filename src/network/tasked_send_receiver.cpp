@@ -29,7 +29,7 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TaskedSendReceiverGroup::TaskedSendReceiverGroup(uint64_t concurrentRequests, uint64_t submissions, uint64_t chunkSize, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(concurrentRequests), _cv(), _mutex()
+TaskedSendReceiverGroup::TaskedSendReceiverGroup(uint64_t chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _cv(), _mutex()
 // Initializes the global submissions and completions
 {
     TLSContext::initOpenSSL();
@@ -56,12 +56,12 @@ bool TaskedSendReceiverGroup::send(span<OriginalMessage*> msgs)
     return (_submissions.insertAll(msgs) != ~0ull);
 }
 //---------------------------------------------------------------------------
-TaskSendReceiverHandle TaskedSendReceiverGroup::getHandle()
+TaskedSendReceiverHandle TaskedSendReceiverGroup::getHandle()
 // Runs a new tasked send receiver deamon
 {
     for (auto head = _head.load(); head;) {
         if (_head.compare_exchange_weak(head, head->_next)) {
-            TaskSendReceiverHandle handle(this);
+            TaskedSendReceiverHandle handle(this);
             handle._sendReceiver = head;
             return handle;
         }
@@ -69,7 +69,7 @@ TaskSendReceiverHandle TaskedSendReceiverGroup::getHandle()
     }
     lock_guard<mutex> lg(_resizeMutex);
     auto& ref = _sendReceivers.emplace_back(make_unique<TaskedSendReceiver>(*this));
-    TaskSendReceiverHandle handle(this);
+    TaskedSendReceiverHandle handle(this);
     handle._sendReceiver = ref.get();
     return handle;
 }
@@ -81,12 +81,12 @@ void TaskedSendReceiverGroup::process(bool oneQueueInvocation)
     handle.sendReceive(oneQueueInvocation);
 }
 //---------------------------------------------------------------------------
-TaskSendReceiverHandle::TaskSendReceiverHandle(TaskedSendReceiverGroup* group) : _group(group)
+TaskedSendReceiverHandle::TaskedSendReceiverHandle(TaskedSendReceiverGroup* group) : _group(group)
 // The constructor
 {
 }
 //---------------------------------------------------------------------------
-TaskSendReceiverHandle::TaskSendReceiverHandle(TaskSendReceiverHandle&& other)
+TaskedSendReceiverHandle::TaskedSendReceiverHandle(TaskedSendReceiverHandle&& other)
 // Move constructor
 {
     _group = other._group;
@@ -94,7 +94,7 @@ TaskSendReceiverHandle::TaskSendReceiverHandle(TaskSendReceiverHandle&& other)
     other._sendReceiver = nullptr;
 }
 //---------------------------------------------------------------------------
-TaskSendReceiverHandle& TaskSendReceiverHandle::operator=(TaskSendReceiverHandle&& other)
+TaskedSendReceiverHandle& TaskedSendReceiverHandle::operator=(TaskedSendReceiverHandle&& other)
 // Move assignment
 {
     if (other._group == _group) {
@@ -104,7 +104,7 @@ TaskSendReceiverHandle& TaskSendReceiverHandle::operator=(TaskSendReceiverHandle
     return *this;
 }
 //---------------------------------------------------------------------------
-bool TaskSendReceiverHandle::run()
+bool TaskedSendReceiverHandle::run()
 // Starts the deamon
 {
     if (!_sendReceiver)
@@ -113,7 +113,7 @@ bool TaskSendReceiverHandle::run()
     return true;
 }
 //---------------------------------------------------------------------------
-void TaskSendReceiverHandle::stop()
+void TaskedSendReceiverHandle::stop()
 // Stops the deamon
 {
     if (!_sendReceiver)
@@ -129,7 +129,7 @@ void TaskSendReceiverHandle::stop()
     }
 }
 //---------------------------------------------------------------------------
-bool TaskSendReceiverHandle::sendReceive(bool oneQueueInvocation)
+bool TaskedSendReceiverHandle::sendReceive(bool oneQueueInvocation)
 // Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
 {
     if (!_sendReceiver)

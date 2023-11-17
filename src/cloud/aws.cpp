@@ -185,7 +185,7 @@ void AWS::initResolver(network::TaskedSendReceiver& sendReceiver)
 // Inits the resolver
 {
     if (_type == Provider::CloudService::AWS) {
-        sendReceiver.addResolver("amazonaws.com", unique_ptr<network::Resolver>(new cloud::AWSResolver(sendReceiver.getConcurrentRequests())));
+        sendReceiver.addResolver("amazonaws.com", unique_ptr<network::Resolver>(new cloud::AWSResolver(sendReceiver.getGroup()->getConcurrentRequests())));
     }
 }
 //---------------------------------------------------------------------------

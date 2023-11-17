@@ -18,14 +18,18 @@ int main(int /*argc*/, char** /*argv*/) {
     auto bucketName = "s3://anyblob:eu-central-1";
     auto fileName = "anyblob/anyblob.txt";
 
-    // Create a new task group (18 concurrent request maximum, and up to 1024 outstanding submissions)
-    anyblob::network::TaskedSendReceiverGroup group(18, 1024);
+    // Create a new task group
+    anyblob::network::TaskedSendReceiverGroup group;
 
     // Create an AnyBlob scheduler object for the group
     anyblob::network::TaskedSendReceiver sendReceiver(group);
 
     // Create the provider for the corresponding filename
     auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, "", "", &sendReceiver);
+
+    // Update the concurrency according to instance settings
+    auto config = provider->getConfig(sendReceiver);
+    group.setConfig(config);
 
     // Create the get request
     anyblob::network::Transaction getTxn(provider.get());

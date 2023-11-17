@@ -2,6 +2,7 @@
 #include "network/io_uring_socket.hpp"
 #include "network/message_task.hpp"
 #include "network/tls_context.hpp"
+#include "network/config.hpp"
 #include "utils/ring_buffer.hpp"
 #include <atomic>
 #include <condition_variable>
@@ -29,7 +30,7 @@ struct TimingHelper;
 namespace network {
 //---------------------------------------------------------------------------
 class TaskedSendReceiver;
-class TaskSendReceiverHandle;
+class TaskedSendReceiverHandle;
 class Resolver;
 struct OriginalMessage;
 //---------------------------------------------------------------------------
@@ -48,6 +49,8 @@ class TaskedSendReceiverGroup {
     /// Implicitly handle the unused send receivers
     std::atomic<TaskedSendReceiver*> _head;
 
+    /// The number of submissions in queue (per thread)
+    static constexpr uint64_t submissionPerCore = 1 << 10;
     /// The recv chunk size
     uint64_t _chunkSize;
     /// The queue maximum for each TaskedSendReceiver
@@ -60,7 +63,7 @@ class TaskedSendReceiverGroup {
 
     public:
     /// Initializes the global submissions and completions
-    TaskedSendReceiverGroup(uint64_t concurrentRequests, uint64_t submissions, uint64_t chunkSize = 64u * 1024, uint64_t reuse = 0);
+    TaskedSendReceiverGroup(uint64_t chunkSize = 64u * 1024, uint64_t submissions = std::thread::hardware_concurrency() * submissionPerCore, uint64_t reuse = 0);
     /// Destructor
     ~TaskedSendReceiverGroup();
 
@@ -69,12 +72,27 @@ class TaskedSendReceiverGroup {
     /// Adds a span of message to the submission queue
     [[nodiscard]] bool send(std::span<OriginalMessage*> msgs);
     /// Gets a tasked send receiver deamon
-    [[nodiscard]] TaskSendReceiverHandle getHandle();
+    [[nodiscard]] TaskedSendReceiverHandle getHandle();
     /// Submits group queue and waits for result
     void process(bool oneQueueInvocation = true);
 
+    /// Update the concurrent requests via config
+    void setConfig(const network::Config& config) {
+        if (_concurrentRequests != config.coreRequests())
+            _concurrentRequests = config.coreRequests();
+    }
+    /// Update the concurrent requests
+    void setConcurrentRequests(uint64_t concurrentRequests) {
+        if (_concurrentRequests != concurrentRequests)
+            _concurrentRequests = concurrentRequests;
+    }
+    /// Get the concurrent requests
+    uint64_t getConcurrentRequests() const {
+        return _concurrentRequests;
+    }
+
     friend TaskedSendReceiver;
-    friend TaskSendReceiverHandle;
+    friend TaskedSendReceiverHandle;
 };
 //---------------------------------------------------------------------------
 /// Implements a send recieve roundtrip with the help of IOUringSockets
@@ -125,16 +143,6 @@ class TaskedSendReceiver {
     /// Stops the deamon
     void stop() { _stopDeamon = true; }
 
-    /// Update the concurrent requests
-    void setConcurrentRequests(uint64_t concurrentRequests) {
-        if (_group._concurrentRequests != concurrentRequests)
-            _group._concurrentRequests = concurrentRequests;
-    }
-    /// Get the concurrent requests
-    uint64_t getConcurrentRequests() {
-        return _group._concurrentRequests;
-    }
-
     /// Set the timings
     void setTimings(std::vector<utils::TimingHelper>* timings) {
         _timings = timings;
@@ -153,11 +161,11 @@ class TaskedSendReceiver {
     [[nodiscard]] int32_t submitRequests();
 
     friend TaskedSendReceiverGroup;
-    friend TaskSendReceiverHandle;
+    friend TaskedSendReceiverHandle;
 };
 //---------------------------------------------------------------------------
 /// Handle to a TaskedSendReceiver
-class TaskSendReceiverHandle {
+class TaskedSendReceiverHandle {
     private:
     /// The shared group
     TaskedSendReceiverGroup* _group;
@@ -165,22 +173,22 @@ class TaskSendReceiverHandle {
     TaskedSendReceiver* _sendReceiver;
 
     /// Default constructor is deleted
-    TaskSendReceiverHandle() = delete;
+    TaskedSendReceiverHandle() = delete;
     /// Consturctor
-    TaskSendReceiverHandle(TaskedSendReceiverGroup* group);
+    TaskedSendReceiverHandle(TaskedSendReceiverGroup* group);
     /// Delete copy
-    TaskSendReceiverHandle(TaskSendReceiverHandle& other) = delete;
+    TaskedSendReceiverHandle(TaskedSendReceiverHandle& other) = delete;
     /// Delete copy assignment
-    TaskSendReceiverHandle& operator=(TaskSendReceiverHandle& other) = delete;
+    TaskedSendReceiverHandle& operator=(TaskedSendReceiverHandle& other) = delete;
 
     /// Submits queue and waits for result
     bool sendReceive(bool oneQueueInvocation = true);
 
     public:
     /// Move constructor
-    TaskSendReceiverHandle(TaskSendReceiverHandle&& other);
+    TaskedSendReceiverHandle(TaskedSendReceiverHandle&& other);
     /// Move assignment
-    TaskSendReceiverHandle& operator=(TaskSendReceiverHandle&& other);
+    TaskedSendReceiverHandle& operator=(TaskedSendReceiverHandle&& other);
 
     /// Runs the handle, thread becomes the the TaskedSendReceiver
     bool run();

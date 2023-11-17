@@ -29,7 +29,8 @@ TEST_CASE("send_receiver") {
     auto concurrency = 8;
     uint64_t length = 4096u;
 
-    TaskedSendReceiverGroup group(concurrency >> 1, concurrency << 2);
+    TaskedSendReceiverGroup group;
+    group.setConcurrentRequests(concurrency);
 
     vector<unique_ptr<OriginalMessage>> msgs;
     for (auto i = 0; i < concurrency; i++) {

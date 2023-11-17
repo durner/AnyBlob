@@ -154,7 +154,8 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, const string& uri)
 void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
 // The bandwith benchmark for uring interface
 {
-    network::TaskedSendReceiverGroup group(benchmarkSettings.concurrentRequests, benchmarkSettings.requests << 1, benchmarkSettings.chunkSize);
+    network::TaskedSendReceiverGroup group(benchmarkSettings.chunkSize, benchmarkSettings.requests << 1);
+    group.setConcurrentRequests(benchmarkSettings.concurrentRequests);
     vector<unique_ptr<network::TaskedSendReceiver>> sendReceivers;
     vector<unique_ptr<network::TaskedSendReceiverGroup>> taskGroups;
     for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {

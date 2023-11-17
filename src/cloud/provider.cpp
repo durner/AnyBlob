@@ -6,6 +6,7 @@
 #include "cloud/minio.hpp"
 #include "cloud/oracle.hpp"
 #include "network/tasked_send_receiver.hpp"
+#include "network/config.hpp"
 #include "utils/data_vector.hpp"
 #include <fstream>
 #include <istream>
@@ -170,6 +171,13 @@ unique_ptr<utils::DataVector<uint8_t>> Provider::completeMultiPartRequest(const 
 // Builds the http request for completing multipart put objects
 {
     return nullptr;
+}
+//---------------------------------------------------------------------------
+network::Config Provider::getConfig(network::TaskedSendReceiver& sendReceiver)
+// Uses the send receiver to get instance configs
+{
+    auto instance = getInstanceDetails(sendReceiver);
+    return network::Config{network::Config::defaultCoreThroughput, network::Config::defaultCoreConcurrency, instance.network};
 }
 //---------------------------------------------------------------------------
 unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, const string& keyId, const string& secret, network::TaskedSendReceiver* sendReceiver)

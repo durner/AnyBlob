@@ -14,6 +14,7 @@ namespace anyblob {
 namespace network {
 class TaskedSendReceiver;
 class Transaction;
+struct Config;
 struct OriginalMessage;
 }; // namespace network
 namespace utils {
@@ -25,7 +26,7 @@ namespace cloud {
 //---------------------------------------------------------------------------
 /// Implements the cloud provider abstraction
 class Provider {
-    public:
+public:
     /// The remote prefixes count
     static constexpr unsigned remoteFileCount = 6;
     /// The remote prefixes
@@ -44,6 +45,7 @@ class Provider {
         Local = 255
     };
 
+    /// RemoteInfo struct
     struct RemoteInfo {
         /// The provider
         CloudService provider;
@@ -57,6 +59,7 @@ class Provider {
         int port = 80;
     };
 
+    /// Instance struct
     struct Instance {
         /// The instance type
         std::string type;
@@ -65,10 +68,11 @@ class Provider {
         /// Number of vCPus
         unsigned vcpu;
         /// The network performance in Mbit/s
-        unsigned network;
+        uint64_t network;
     };
 
-    protected:
+
+protected:
     CloudService _type;
     /// Builds the http request for downloading a blob or listing a directory
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const = 0;
@@ -95,7 +99,7 @@ class Provider {
     /// Initialize secret
     virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}
 
-    public:
+public:
     /// The destructor
     virtual ~Provider() = default;
     /// Gets the cloud provider type
@@ -115,6 +119,7 @@ class Provider {
     /// Parse a row from csv file
     [[nodiscard]] static std::vector<std::string> parseCSVRow(std::string_view body);
 
+
     /// Create a provider (keyId is access email for GCP/Azure)
     [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = true, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
 
@@ -122,6 +127,8 @@ class Provider {
     virtual void initResolver(network::TaskedSendReceiver& /*sendReceiver*/) {}
     /// Get the instance infos
     [[nodiscard]] virtual Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) = 0;
+    /// Get the config
+    [[nodiscard]] virtual network::Config getConfig(network::TaskedSendReceiver& sendReceiver);
 
     friend network::Transaction;
 };

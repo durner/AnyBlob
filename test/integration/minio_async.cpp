@@ -49,8 +49,8 @@ TEST_CASE("MinIO Asynchronous Integration") {
     string longText = stringGen(1 << 24);
     string content[]{"Hello World!", longText};
 
-    // Create a new task group (18 concurrent request maximum, and up to 1024 outstanding submissions)
-    anyblob::network::TaskedSendReceiverGroup group(18, 1024);
+    // Create a new task group
+    anyblob::network::TaskedSendReceiverGroup group;
 
     // Create an AnyBlob scheduler object for the group
     anyblob::network::TaskedSendReceiver sendReceiver(group);
@@ -66,6 +66,11 @@ TEST_CASE("MinIO Asynchronous Integration") {
 
     // Create the provider for the corresponding filename
     auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, key, secret, &sendReceiver);
+
+    // Update the concurrency according to instance settings (noop here, as minio uses default values)
+    auto config = provider->getConfig(sendReceiver);
+    group.setConfig(config);
+
     {
         // Check the upload for success
         std::atomic<uint16_t> finishedMessages = 0;
