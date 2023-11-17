@@ -64,8 +64,8 @@ class Provider {
         double memory;
         /// Number of vCPus
         unsigned vcpu;
-        /// The network performance in Gbit
-        std::string network;
+        /// The network performance in Mbit/s
+        unsigned network;
     };
 
     protected:
@@ -112,6 +112,8 @@ class Provider {
     [[nodiscard]] static std::string getETag(std::string_view header);
     /// Get the upload id from the multipart request body
     [[nodiscard]] static std::string getUploadId(std::string_view body);
+    /// Parse a row from csv file
+    [[nodiscard]] static std::vector<std::string> parseCSVRow(std::string_view body);
 
     /// Create a provider (keyId is access email for GCP/Azure)
     [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = true, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);

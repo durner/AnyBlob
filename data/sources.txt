@@ -1,0 +1,10 @@
+GCP:
+wget https://gcloud-compute.com/machine-types-regions.csv -O gcp.csv
+sed -i -n -e '1p' -e '/us-east1,/p' gcp.csv
+
+AWS:
+Export csv from website
+https://instances.vantage.sh/?region=us-east-2
+
+Azure:
+Get data with local scraper.py, add new URLs from azure doc for upcoming types

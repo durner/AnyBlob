@@ -68,7 +68,7 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiver& sendRe
             if (!instance.type.compare(vmType))
                 return instance;
     }
-    return AzureInstance{string(s), 0, 0, ""};
+    return AzureInstance{string(s), 0, 0, 0};
 }
 //---------------------------------------------------------------------------
 string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)

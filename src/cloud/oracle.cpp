@@ -18,7 +18,7 @@ Provider::Instance Oracle::getInstanceDetails(network::TaskedSendReceiver& /*sen
 // Get the instance details
 {
     // TODO: add instances and retrieve shape information
-    return OracleInstance{"oracle", 0, 0, ""};
+    return OracleInstance{"oracle", 0, 0, 0};
 }
 //---------------------------------------------------------------------------
 string Oracle::getAddress() const

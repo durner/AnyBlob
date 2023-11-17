@@ -18,7 +18,7 @@ Provider::Instance IBM::getInstanceDetails(network::TaskedSendReceiver& /*sendRe
 // IBM instance info
 {
     // TODO: add instances and retrieve VM information
-    return IBMInstance{"ibm", 0, 0, ""};
+    return IBMInstance{"ibm", 0, 0, 0};
 }
 //---------------------------------------------------------------------------
 string IBM::getAddress() const

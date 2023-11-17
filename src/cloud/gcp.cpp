@@ -57,7 +57,7 @@ Provider::Instance GCP::getInstanceDetails(network::TaskedSendReceiver& sendRece
         if (!instance.type.compare(machineType))
             return instance;
 
-    return GCPInstance{string(s), 0, 0, ""};
+    return GCPInstance{string(s), 0, 0, 0};
 }
 //---------------------------------------------------------------------------
 string GCP::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)

@@ -117,6 +117,37 @@ string Provider::getUploadId(string_view body)
     return string(body.substr(pos, end - pos));
 }
 //---------------------------------------------------------------------------
+vector<string> Provider::parseCSVRow(string_view body)
+// Read a csv row (simplified, no quotes in quotes and no new lines)
+{
+    std::vector<std::string> row;
+    row.push_back("");
+    auto i = 0ull;
+    auto inQuote = false;
+    for (char c : body) {
+        if (!inQuote) {
+            switch (c) {
+                case ',':
+                    row.push_back("");
+                    i++;
+                    break;
+                case '"':
+                    inQuote = true;
+                    break;
+                default:
+                    row[i].push_back(c);
+                    break;
+            }
+        } else {
+            if (c == '"')
+                inQuote = false;
+            else
+                row[i].push_back(c);
+        }
+    }
+    return row;
+}
+//---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Provider::putRequestGeneric(const string& /*filePath*/, string_view /*object*/, uint16_t /*part*/, string_view /*uploadId*/) const
 // Builds the http request for putting multipart objects without the object data itself
 {

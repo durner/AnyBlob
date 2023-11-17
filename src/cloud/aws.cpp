@@ -65,9 +65,9 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendRece
             if (!instance.type.compare(s))
                 return instance;
 
-        return AWSInstance{string(s), 0, 0, ""};
+        return AWSInstance{string(s), 0, 0, 0};
     }
-    return AWSInstance{"aws", 0, 0, ""};
+    return AWSInstance{"aws", 0, 0, 0};
 }
 //---------------------------------------------------------------------------
 string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
