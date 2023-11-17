@@ -15,8 +15,8 @@ using namespace std;
 //---------------------------------------------------------------------------
 int main(int /*argc*/, char** /*argv*/) {
     // The file to be downloaded
-    auto bucketName = "s3://cloud-storage-analytics:eu-central-1";
-    auto fileName = "tpchSf500.db/tpchSf500.db";
+    auto bucketName = "s3://anyblob:eu-central-1";
+    auto fileName = "anyblob/anyblob.txt";
 
     // Create a new task group (18 concurrent request maximum, and up to 1024 outstanding submissions)
     anyblob::network::TaskedSendReceiverGroup group(18, 1024);
