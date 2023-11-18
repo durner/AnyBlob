@@ -16,27 +16,27 @@ namespace network {
 struct Config {
     /// Default concurrent requests to achieve coreThroughput (based on AWS experiments)
     static constexpr uint64_t defaultCoreConcurrency = 20;
-    /// Default throuput per core in Mbit/s (based on AWS experiments)
+    /// Default throughput per core in Mbit/s (based on AWS experiments)
     /// Per-object bandwidth: 8,000 Mbits / 20 Requests = 400 Mbits / Requests = 50 MiBs / Request
     /// Total requests example: 100,000 Mbits / 400 Mbits = 250 Requests
     static constexpr uint64_t defaultCoreThroughput = 8000;
 
 
-    /// Throuput per core in Mbit/s
-    uint64_t _coreThroughput;
+    /// Throughput per core in Mbit/s
+    uint64_t coreThroughput;
     /// Concurrent requests to achieve coreThroughput
-    unsigned _coreConcurreny;
+    unsigned coreConcurreny;
     /// The network performance in Mbit/s
-    uint64_t _network;
+    uint64_t network;
 
     /// Get the network bandwidth
-    constexpr auto bandwidth() const { return _network; }
+    constexpr auto bandwidth() const { return network; }
     /// Get the number of requests per core
-    constexpr auto coreRequests() const { return _coreConcurreny; }
+    constexpr auto coreRequests() const { return coreConcurreny; }
     /// Get the total outstanding requests
     constexpr auto totalRequests() const { return retrievers() * coreRequests(); }
     /// Get the number of retriever threads to saturate bandwidth
-    constexpr unsigned retrievers() const { return std::ceil(static_cast<double>(_network) / _coreThroughput); }
+    constexpr unsigned retrievers() const { return std::ceil(static_cast<double>(network) / coreThroughput); }
 };
 //---------------------------------------------------------------------------
 } // namespace network
