@@ -1,0 +1,35 @@
+name: "Build AnyBlob"
+description: "Build AnyBlob using either clang or gcc"
+inputs:
+    clang-toolchain:
+        required: false
+        description: "Build with clang and use libcxx as the standard library"
+        default: false
+
+runs:
+    using: "composite"
+    steps:
+      # CMake configuration option 1 - GCC toolchain
+      - name: Configure CMake
+        if: ${{ inputs.clang-toolchain == 'false' }}
+        run: |
+          cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        shell: bash
+
+      # CMake configuration option 2 - Clang toolchain
+      - name: Configure CMake
+        if: ${{ inputs.clang-toolchain == 'true' }}
+        # Explicitly use clang-15. The runner comes with clang-13, 14, and 15.
+        # However, only clang-15 and up support `-Wno-unqualified-std-cast-call`.
+        run: | 
+          sudo apt install libc++-15-dev libc++abi-15-dev
+          cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+                -DCMAKE_C_COMPILER=clang-15  \
+                -DCMAKE_CXX_COMPILER=clang++-15 \
+                -DANYBLOB_LIBCXX_COMPAT=1
+        shell: bash
+
+      # Build library and test binaries
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+        shell: bash

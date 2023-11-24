@@ -1,7 +1,3 @@
-// Sadly, the include order matters here. PerfEvent depends on sstream but
-// does not include the header.
-#include <sstream>
-
 #include "catch2/single_include/catch2/catch.hpp"
 #include "cloud/aws_resolver.hpp"
 #include "network/io_uring_socket.hpp"
