@@ -1,4 +1,8 @@
 #pragma once
+// The `ThroughputResolver` depends on gnu stdlib associative containers that are
+// not supported by libcxx. We remove the throughput resolver in its entirety when
+// building with libcxx.
+#ifndef ANYBLOB_LIBCXX_COMPAT
 #include "network/resolver.hpp"
 #include <chrono>
 #include <ext/pb_ds/assoc_container.hpp>
@@ -55,3 +59,4 @@ class ThroughputResolver : public network::Resolver {
 }; // namespace network
 //---------------------------------------------------------------------------
 }; // namespace anyblob
+#endif // ANYBLOB_LIBCXX_COMPAT

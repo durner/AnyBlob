@@ -1,5 +1,5 @@
 #pragma once
-#include "network/throughput_resolver.hpp"
+#include "network/resolver.hpp"
 #include <memory>
 #include <string>
 #include <unordered_map>

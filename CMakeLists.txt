@@ -43,6 +43,15 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "Coverage")
 endif()
 
+option(ANYBLOB_LIBCXX_COMPAT "Build AnyBlob in a way that's compatible with libcxx." OFF)
+if (ANYBLOB_LIBCXX_COMPAT)
+    # Update compiler flags to use libcxx as standard library.
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -stdlib=libc++")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -stdlib=libc++")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -stdlib=libc++")
+    set(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_COVERAGE} -stdlib=libc++")
+endif()
+
 # ---------------------------------------------------------------------------
 # Coverage Environment
 # ---------------------------------------------------------------------------
@@ -113,6 +122,10 @@ include("${PROJECT_SOURCE_DIR}/test/integration/local.cmake")
 add_library(AnyBlob STATIC ${SRC_CPP} ${INCLUDE_HPP})
 target_link_libraries(AnyBlob PUBLIC OpenSSL::SSL Threads::Threads ${LIBURING_LIBRARY} jemalloc)
 target_include_directories(AnyBlob PUBLIC ${PROJECT_SOURCE_DIR}/include)
+if (ANYBLOB_LIBCXX_COMPAT)
+    # For libcxx compat some files like the throughput resolver cannot be compiled at the moment.
+    target_compile_definitions(AnyBlob PRIVATE ANYBLOB_LIBCXX_COMPAT)
+endif()
 
 # ---------------------------------------------------------------------------
 # Unit tests

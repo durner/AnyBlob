@@ -8,6 +8,7 @@
 #include <chrono>
 #include <iomanip>
 #include <string>
+#include <sstream>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021

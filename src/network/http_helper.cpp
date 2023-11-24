@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <string_view>
+#include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021

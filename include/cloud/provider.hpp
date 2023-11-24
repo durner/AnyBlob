@@ -1,6 +1,8 @@
 #pragma once
 #include <memory>
 #include <vector>
+#include <string>
+#include <string_view>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021

@@ -1,6 +1,5 @@
 #include "network/resolver.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
-#include "network/throughput_resolver.hpp"
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
