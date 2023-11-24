@@ -3,7 +3,7 @@
 #include "network/http_helper.hpp"
 #include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
-#include "network/throughput_resolver.hpp"
+#include "network/resolver.hpp"
 #include "utils/data_vector.hpp"
 #include <chrono>
 #include <iomanip>

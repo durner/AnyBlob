@@ -5,6 +5,7 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <cassert>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023

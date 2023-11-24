@@ -1,3 +1,4 @@
+#ifndef ANYBLOB_LIBCXX_COMPAT 
 #include "network/throughput_resolver.hpp"
 #include <cstring>
 #include <limits>
@@ -106,3 +107,4 @@ void ThroughputResolver::stopSocket(int fd, uint64_t bytes)
 }; // namespace network
 //---------------------------------------------------------------------------
 }; // namespace anyblob
+#endif // ANYBLOB_LIBCXX_COMPAT

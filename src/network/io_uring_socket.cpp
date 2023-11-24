@@ -11,6 +11,9 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+#ifndef ANYBLOB_LIBCXX_COMPAT
+#include "network/throughput_resolver.hpp"
+#endif 
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -43,7 +46,14 @@ IOUringSocket::IOUringSocket(uint32_t entries, int32_t /*flags*/) : _resolverCac
     if (_eventId < 0)
         throw runtime_error("Event FD creation error!");
     io_uring_register_eventfd(&_uring, _eventId);
+#ifndef ANYBLOB_LIBCXX_COMPAT
+    // By default, use the ThroughputResolver.
     _resolverCache.emplace("", make_unique<ThroughputResolver>(entries));
+#else
+    // If we build in libcxx compatability mode, we need to use the default resolver.
+    // The ThroughputResolver currently does not build with libcxx.
+    _resolverCache.emplace("", make_unique<Resolver>(entries));
+#endif
 }
 //---------------------------------------------------------------------------
 int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpSettings, int retryLimit)

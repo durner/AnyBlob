@@ -1,3 +1,7 @@
+// Sadly, the include order matters here. PerfEvent depends on sstream but
+// does not include the header.
+#include <sstream>
+
 #include "catch2/single_include/catch2/catch.hpp"
 #include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
