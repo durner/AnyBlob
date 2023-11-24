@@ -45,6 +45,7 @@ endif()
 
 option(ANYBLOB_LIBCXX_COMPAT "Build AnyBlob in a way that's compatible with libcxx." OFF)
 if (ANYBLOB_LIBCXX_COMPAT)
+    message("Building AnyBlob with libcxx")
     # Update compiler flags to use libcxx as standard library.
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -stdlib=libc++")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -stdlib=libc++")
@@ -123,7 +124,6 @@ add_library(AnyBlob STATIC ${SRC_CPP} ${INCLUDE_HPP})
 target_link_libraries(AnyBlob PUBLIC OpenSSL::SSL Threads::Threads ${LIBURING_LIBRARY} jemalloc)
 target_include_directories(AnyBlob PUBLIC ${PROJECT_SOURCE_DIR}/include)
 if (ANYBLOB_LIBCXX_COMPAT)
-    # For libcxx compat some files like the throughput resolver cannot be compiled at the moment.
     target_compile_definitions(AnyBlob PRIVATE ANYBLOB_LIBCXX_COMPAT)
 endif()
 

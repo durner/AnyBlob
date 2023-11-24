@@ -1,0 +1,11 @@
+name: "Install Dependencies"
+description: "Installs dynamic libraries required by AnyBlob"
+
+runs:
+    using: "composite"
+    steps:
+      # Install dependencies
+      - name: Install dependencies
+        run: sudo apt update && sudo apt install liburing-dev openssl libssl-dev libjemalloc-dev lld
+        shell: bash
+
