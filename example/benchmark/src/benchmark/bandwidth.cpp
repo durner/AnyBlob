@@ -3,10 +3,10 @@
 #include "cloud/aws_resolver.hpp"
 #include "cloud/azure.hpp"
 #include "cloud/gcp.hpp"
-#include "network/transaction.hpp"
 #include "network/original_message.hpp"
 #include "network/s3_send_receiver.hpp"
 #include "network/tasked_send_receiver.hpp"
+#include "network/transaction.hpp"
 #include "perfevent/PerfEvent.hpp"
 #include "utils/timer.hpp"
 #include "utils/utils.hpp"
@@ -225,13 +225,19 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         if (benchmarkSettings.blobFiles > benchmarkSettings.requests) {
             for (auto i = 0u; i < benchmarkSettings.requests; i++) {
                 auto filePath = benchmarkSettings.filePath + to_string(dist(rng)) + ".bin";
-                getTxn[0].getObjectRequest(callback, filePath, range, nullptr, 0, i);
+                auto getObjectRequest = [&getTxn, &filePath, &range, i, callback]() {
+                    return getTxn[0].getObjectRequest(move(callback), filePath, range, nullptr, 0, i);
+                };
+                getTxn[0].verifyKeyRequest(*sendReceivers.back(), move(getObjectRequest));
             }
         } else {
             auto createRequests = [&](uint64_t start, uint64_t end, uint64_t threadId) {
                 for (auto i = start; i < end; i++) {
                     auto filePath = benchmarkSettings.filePath + to_string((i % benchmarkSettings.blobFiles) + 1) + ".bin";
-                    getTxn[threadId].getObjectRequest(callback, filePath, range, nullptr, 0, i);
+                    auto getObjectRequest = [&getTxn, &filePath, &range, i, threadId, callback]() {
+                        return getTxn[threadId].getObjectRequest(move(callback), filePath, range, nullptr, 0, i);
+                    };
+                    getTxn[threadId].verifyKeyRequest(*sendReceivers.back(), move(getObjectRequest));
                 }
             };
             auto start = 0ull;
@@ -308,7 +314,10 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                         end = benchmarkSettings.requests;
                     for (uint64_t j = start; j < end; j++) {
                         auto filePath = "upload_" + benchmarkSettings.filePath + to_string(j + 1) + ".bin";
-                        putTxn.putObjectRequest(callbackUpload, filePath, reinterpret_cast<const char*>(blob->data()), blob->size(), nullptr, 0, i);
+                        auto putObjectRequest = [&putTxn, &filePath, &content, callbackUpload, &blob, i]() {
+                            return putTxn.putObjectRequest(move(callbackUpload), filePath, reinterpret_cast<const char*>(blob->data()), blob->size(), nullptr, 0, i);
+                        };
+                        putTxn.verifyKeyRequest(*sendReceivers.back(), move(putObjectRequest));
                     }
                 }
 

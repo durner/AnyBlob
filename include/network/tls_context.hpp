@@ -1,9 +1,9 @@
 #pragma once
-#include <memory>
 #include <array>
+#include <memory>
 #include <unordered_map>
-#include <openssl/types.h>
 #include <openssl/ssl.h>
+#include <openssl/types.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023
@@ -28,7 +28,7 @@ class TLSContext {
     /// The cache mask
     static constexpr uint64_t cacheMask = (~0ull) >> (64 - cachePower);
     /// The session cache
-    std::array<std::pair<uint64_t,  SSL_SESSION*>, 1ull << cachePower> _sessionCache;
+    std::array<std::pair<uint64_t, SSL_SESSION*>, 1ull << cachePower> _sessionCache;
 
     public:
     /// The constructor

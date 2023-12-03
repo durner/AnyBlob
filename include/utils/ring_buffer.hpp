@@ -68,7 +68,7 @@ class RingBuffer {
 
     /// Insert a tuple into buffer
     template <bool wait = false>
-    [[ nodiscard ]] constexpr uint64_t insert(T tuple) {
+    [[nodiscard]] constexpr uint64_t insert(T tuple) {
         while (true) {
             std::unique_lock lock(_insert.mutex);
             auto seenHead = _seen.commited.load(std::memory_order_acquire);
@@ -86,7 +86,7 @@ class RingBuffer {
 
     /// Insert a span into buffer
     template <bool wait = false>
-    [[ nodiscard ]] constexpr uint64_t insertAll(std::span<T> tuples) {
+    [[nodiscard]] constexpr uint64_t insertAll(std::span<T> tuples) {
         while (true) {
             std::unique_lock lock(_insert.mutex);
             auto seenHead = _seen.commited.load();
@@ -108,7 +108,7 @@ class RingBuffer {
 
     /// Consume from buffer
     template <bool wait = false>
-    [[ nodiscard ]] constexpr std::optional<T> consume() {
+    [[nodiscard]] constexpr std::optional<T> consume() {
         while (true) {
             std::unique_lock lock(_seen.mutex);
             auto curInsert = _insert.commited.load(std::memory_order_acquire);
@@ -125,7 +125,7 @@ class RingBuffer {
     }
 
     /// Check if empty
-    [[ nodiscard ]] constexpr bool empty() const {
+    [[nodiscard]] constexpr bool empty() const {
         return !(_insert.commited.load(std::memory_order_acquire) - _seen.commited.load(std::memory_order_acquire));
     }
 };

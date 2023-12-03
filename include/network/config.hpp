@@ -21,7 +21,6 @@ struct Config {
     /// Total requests example: 100,000 Mbits / 400 Mbits = 250 Requests
     static constexpr uint64_t defaultCoreThroughput = 8000;
 
-
     /// Throughput per core in Mbit/s
     uint64_t coreThroughput;
     /// Concurrent requests to achieve coreThroughput

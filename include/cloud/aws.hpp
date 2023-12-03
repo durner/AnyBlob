@@ -1,8 +1,11 @@
 #pragma once
 #include "cloud/aws_instances.hpp"
+#include "cloud/aws_signer.hpp"
 #include "cloud/provider.hpp"
 #include "utils/data_vector.hpp"
 #include <cassert>
+#include <memory>
+#include <mutex>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -37,6 +40,8 @@ class AWS : public Provider {
         std::string endpoint;
         /// The port
         uint32_t port = 80;
+        /// Is zonal request required?
+        bool zonal = false;
     };
 
     /// The secret
@@ -48,9 +53,9 @@ class AWS : public Provider {
         /// The secret
         std::string secret;
         /// The session token
-        std::string sessionToken;
-        /// The expieration
-        int64_t experiation;
+        std::string token;
+        /// The expiration
+        int64_t expiration;
     };
 
     /// The fake AMZ timestamp
@@ -61,10 +66,19 @@ class AWS : public Provider {
     protected:
     /// The settings
     Settings _settings;
-    /// The secret
-    std::unique_ptr<Secret> _secret;
+    /// The global secret
+    std::shared_ptr<Secret> _globalSecret;
+    /// The global session secret
+    std::shared_ptr<Secret> _globalSessionSecret;
     /// The multipart upload size
     uint64_t _multipartUploadSize = 128ull << 20;
+    /// The secret mutex
+    std::mutex _mutex;
+    /// The thread local secret
+    thread_local static std::shared_ptr<Secret> _secret;
+    /// The session secret
+    thread_local static std::shared_ptr<Secret> _sessionSecret;
+
 
     public:
     /// Get instance details
@@ -75,7 +89,7 @@ class AWS : public Provider {
     void initResolver(network::TaskedSendReceiver& sendReceiver) override;
 
     /// The constructor
-    explicit AWS(const RemoteInfo& info) : _settings({info.bucket, info.region, info.endpoint, info.port}) {
+    explicit AWS(const RemoteInfo& info) : _settings({info.bucket, info.region, info.endpoint, info.port, info.zonal}), _mutex() {
         // Check for compatible clouds
         assert(info.provider == Provider::CloudService::AWS || info.provider == Provider::CloudService::MinIO || info.provider == Provider::CloudService::Oracle || info.provider == Provider::CloudService::IBM);
         // Requires a bucket
@@ -87,27 +101,37 @@ class AWS : public Provider {
     }
     /// The custom endpoint constructor
     AWS(const RemoteInfo& info, const std::string& keyId, const std::string& key) : AWS(info) {
-        _secret = std::make_unique<Secret>();
-        _secret->keyId = keyId;
-        _secret->secret = key;
+        _globalSecret = std::make_unique<Secret>();
+        // At init it is fine to simply overwrite
+        _globalSecret->keyId = keyId;
+        _globalSecret->secret = key;
+        _secret = _globalSecret;
     }
 
     private:
     /// Initialize secret
     void initSecret(network::TaskedSendReceiver& sendReceiver) override;
+    /// Get a local copy of the global secret
+    void getSecret() override;
     /// Builds the secret http request
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> downloadIAMUser() const;
     /// Builds the secret http request
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> downloadSecret(std::string_view content);
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> downloadSecret(std::string_view content, std::string& iamUser);
     /// Update secret
-    bool updateSecret(std::string_view content);
+    bool updateSecret(std::string_view content, std::string_view iamUser);
+    /// Update session token
+    bool updateSessionToken(std::string_view content);
     /// Checks whether the keys are still valid
-    [[nodiscard]] bool validKeys() const;
+    [[nodiscard]] bool validKeys(uint32_t offset = 60) const;
+    /// Checks whether the keys are still valid
+    [[nodiscard]] bool validSession(uint32_t offset = 60) const;
     /// Get the settings
     [[nodiscard]] inline Settings getSettings() { return _settings; }
     /// Allows multipart upload if size > 0
     [[nodiscard]] uint64_t multipartUploadSize() const override { return _multipartUploadSize; }
 
+    /// Creates the generic http request and signs it
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> buildRequest(AWSSigner::Request& request, std::string_view payload = "", bool initHeaders = true) const;
     /// Builds the http request for downloading a blob or listing the directory
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
@@ -126,7 +150,8 @@ class AWS : public Provider {
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& filePath) const override;
     /// Builds the http request for completing multipart put objects
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& filePath, std::string_view uploadId, const std::vector<std::string>& etags) const override;
-
+    /// Builds the http request for getting the session token objects
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getSessionToken(std::string_view type = "ReadWrite") const;
     /// Get the address of the server
     [[nodiscard]] std::string getAddress() const override;
     /// Get the port of the server
