@@ -39,14 +39,15 @@ class AWSTester {
         resultString = "GET /latest/meta-data/iam/security-credentials HTTP/1.1\r\nHost: 169.254.169.254\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
-        dv = aws.downloadSecret("ABCDEF\n");
+        string iamUser;
+        dv = aws.downloadSecret("ABCDEF\n", iamUser);
         resultString = "GET /latest/meta-data/iam/security-credentials/ABCDEF HTTP/1.1\r\nHost: 169.254.169.254\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
         string keyService = "{\"AccessKeyId\" : \"ABC\", \"SecretAccessKey\" : \"ABC\", \"Token\" : \"ABC\", \"Expiration\" : \"";
         keyService += aws.fakeIAMTimestamp;
         keyService += "\"}";
-        REQUIRE(aws.updateSecret(keyService));
+        REQUIRE(aws.updateSecret(keyService, iamUser));
 
         auto p = pair<uint64_t, uint64_t>(numeric_limits<uint64_t>::max(), numeric_limits<uint64_t>::max());
         dv = aws.getRequest("a/b/c.d", p);

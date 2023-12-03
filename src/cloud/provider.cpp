@@ -5,8 +5,8 @@
 #include "cloud/ibm.hpp"
 #include "cloud/minio.hpp"
 #include "cloud/oracle.hpp"
-#include "network/tasked_send_receiver.hpp"
 #include "network/config.hpp"
+#include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
 #include <fstream>
 #include <istream>
@@ -82,6 +82,12 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
             } else {
                 info.bucket = bucketRegion;
                 info.region = "";
+            }
+            if (!remoteFile[i].compare("s3://")) {
+                // Handle s3 one zone express
+                if (info.bucket.size() > 6 && info.bucket.find("--x-s3", info.bucket.size() - 7)) {
+                    info.zonal = true;
+                }
             }
             info.provider = static_cast<CloudService>(i);
         }

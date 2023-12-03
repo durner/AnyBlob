@@ -99,19 +99,19 @@ class UnorderedMap {
         }
 
         /// Equality operator
-        [[ nodiscard ]] constexpr bool operator==(const Iterator& rhs) const {
+        [[nodiscard]] constexpr bool operator==(const Iterator& rhs) const {
             return (_tableBucket == rhs._tableBucket) && (_valueBucket == rhs._valueBucket);
         }
         /// Non equality operator
-        [[ nodiscard ]] constexpr bool operator!=(const Iterator& rhs) const {
+        [[nodiscard]] constexpr bool operator!=(const Iterator& rhs) const {
             return (_tableBucket != rhs._tableBucket) || (_valueBucket != rhs._valueBucket);
         }
         /// Get the value bucket reference
-        [[ nodiscard ]] constexpr std::pair<Key, Value>& operator*() const {
+        [[nodiscard]] constexpr std::pair<Key, Value>& operator*() const {
             return _valueBucket->keyValue;
         }
         /// Get the value bucket pointer
-        [[ nodiscard ]] constexpr std::pair<Key, Value>* operator->() const {
+        [[nodiscard]] constexpr std::pair<Key, Value>* operator->() const {
             return &_valueBucket->keyValue;
         }
 
@@ -139,14 +139,14 @@ class UnorderedMap {
     }
 
     /// The non-const begin iterator
-    [[ nodiscard ]] constexpr Iterator begin() { return Iterator(_map[0].get()); }
+    [[nodiscard]] constexpr Iterator begin() { return Iterator(_map[0].get()); }
     /// The non-const end iterator
-    [[ nodiscard ]] constexpr Iterator end() { return Iterator(); }
+    [[nodiscard]] constexpr Iterator end() { return Iterator(); }
 
     /// Returns the number of buckets
-    [[ nodiscard ]] constexpr size_t buckets() const { return _map.size(); }
+    [[nodiscard]] constexpr size_t buckets() const { return _map.size(); }
     /// Returns the size of the unordered map
-    [[ nodiscard ]] constexpr size_t size() const { return _size; }
+    [[nodiscard]] constexpr size_t size() const { return _size; }
 
     /// Insert element, returns iterator
     template <class K, class V>
@@ -186,7 +186,7 @@ class UnorderedMap {
 
     /// Erase element
     template <class K>
-    [[ nodiscard ]] constexpr bool erase(K&& key) {
+    [[nodiscard]] constexpr bool erase(K&& key) {
         auto position = Hash{}(key) % buckets();
         std::unique_lock lock(_map[position]->sharedMutex);
         auto* chain = &_map[position]->chain;
@@ -202,7 +202,7 @@ class UnorderedMap {
     }
 
     /// Erase element from iterator
-    [[ nodiscard ]] constexpr bool erase(Iterator it) {
+    [[nodiscard]] constexpr bool erase(Iterator it) {
         auto key = it->first;
         it.release();
         return erase(std::move(key));
@@ -210,7 +210,7 @@ class UnorderedMap {
 
     /// Find element, returns iterator
     template <class K>
-    [[ nodiscard ]] constexpr Iterator find(K&& key) {
+    [[nodiscard]] constexpr Iterator find(K&& key) {
         auto position = Hash{}(key) % buckets();
         std::shared_lock lock(_map[position]->sharedMutex);
         auto* chain = &_map[position]->chain;

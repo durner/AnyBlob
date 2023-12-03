@@ -73,7 +73,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
 
     {
         // Check the upload for success
-        std::atomic<uint16_t> finishedMessages = 0;
+        atomic<uint16_t> finishedMessages = 0;
         auto checkSuccess = [&finishedMessages](anyblob::network::MessageResult& result) {
             // Sucessful request
             REQUIRE(result.success());
@@ -82,8 +82,12 @@ TEST_CASE("MinIO Asynchronous Integration") {
 
         // Create the put request
         anyblob::network::Transaction putTxn(provider.get());
-        for (auto i = 0u; i < 2; i++)
-            putTxn.putObjectRequest(checkSuccess, fileName[i], content[i].data(), content[i].size());
+        for (auto i = 0u; i < 2; i++) {
+            auto putObjectRequest = [&putTxn, &fileName, &content, &checkSuccess, i]() {
+                return putTxn.putObjectRequest(checkSuccess, fileName[i], content[i].data(), content[i].size());
+            };
+            putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+        }
 
         // Upload the request asynchronously
         putTxn.processAsync(group);
@@ -94,7 +98,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
     }
     {
         // Check the upload for success
-        std::atomic<uint16_t> finishedMessages = 0;
+        atomic<uint16_t> finishedMessages = 0;
         auto checkSuccess = [&finishedMessages](anyblob::network::MessageResult& result) {
             // Sucessful request
             REQUIRE(result.success());
@@ -105,8 +109,12 @@ TEST_CASE("MinIO Asynchronous Integration") {
         auto minio = static_cast<anyblob::cloud::MinIO*>(provider.get());
         minio->setMultipartUploadSize(6ull << 20);
         anyblob::network::Transaction putTxn(provider.get());
-        for (auto i = 0u; i < 2; i++)
-            putTxn.putObjectRequest(checkSuccess, fileName[i], content[i].data(), content[i].size());
+        for (auto i = 0u; i < 2; i++) {
+            auto putObjectRequest = [&putTxn, &fileName, &content, &checkSuccess, i]() {
+                return putTxn.putObjectRequest(checkSuccess, fileName[i], content[i].data(), content[i].size());
+            };
+            putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+        }
 
         while (finishedMessages != 2) {
             // Upload the new request asynchronously
@@ -117,7 +125,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
     }
     {
         // Check the upload for failure due to too small part
-        std::atomic<uint16_t> finishedMessages = 0;
+        atomic<uint16_t> finishedMessages = 0;
         auto checkSuccess = [&finishedMessages](anyblob::network::MessageResult& result) {
             // Sucessful request
             REQUIRE(!result.success());
@@ -128,7 +136,11 @@ TEST_CASE("MinIO Asynchronous Integration") {
         auto minio = static_cast<anyblob::cloud::MinIO*>(provider.get());
         minio->setMultipartUploadSize(1ull << 20); // too small, requires at least 5MiB parts
         anyblob::network::Transaction putTxn(provider.get());
-        putTxn.putObjectRequest(checkSuccess, fileName[1], content[1].data(), content[1].size());
+
+        auto putObjectRequest = [&putTxn, &fileName, &content, callback = move(checkSuccess)]() {
+            return putTxn.putObjectRequest(move(callback), fileName[1], content[1].data(), content[1].size());
+        };
+        putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
 
         while (finishedMessages != 1) {
             // Upload the new request asynchronously
@@ -138,7 +150,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
         }
     }
     {
-        std::atomic<uint16_t> finishedMessages = 0;
+        atomic<uint16_t> finishedMessages = 0;
         // Create the get request
         anyblob::network::Transaction getTxn(provider.get());
         for (auto i = 0u; i < 2; i++) {
@@ -163,7 +175,11 @@ TEST_CASE("MinIO Asynchronous Integration") {
                 finishedMessages++;
             };
 
-            getTxn.getObjectRequest(std::move(checkSuccess), fileName[i]);
+            auto& currentFileName = fileName[i];
+            auto getObjectRequest = [&getTxn, &currentFileName, callback = move(checkSuccess)]() {
+                return getTxn.getObjectRequest(move(callback), currentFileName);
+            };
+            getTxn.verifyKeyRequest(sendReceiver, move(getObjectRequest));
         }
 
         // Retrieve the request asynchronously
@@ -175,7 +191,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
     }
     {
         // Check the delete for success
-        std::atomic<uint16_t> finishedMessages = 0;
+        atomic<uint16_t> finishedMessages = 0;
         auto checkSuccess = [&finishedMessages](anyblob::network::MessageResult& result) {
             // Sucessful request
             REQUIRE(result.success());
@@ -184,8 +200,13 @@ TEST_CASE("MinIO Asynchronous Integration") {
 
         // Create the delete request
         anyblob::network::Transaction deleteTxn(provider.get());
-        for (auto i = 0u; i < 2; i++)
-            deleteTxn.deleteObjectRequest(checkSuccess, fileName[i]);
+        for (auto i = 0u; i < 2; i++) {
+            auto& currentFileName = fileName[i];
+            auto deleteRequest = [&deleteTxn, &currentFileName, callback = move(checkSuccess)]() {
+                return deleteTxn.deleteObjectRequest(move(callback), currentFileName);
+            };
+            deleteTxn.verifyKeyRequest(sendReceiver, move(deleteRequest));
+        }
 
         // Process the request asynchronously
         deleteTxn.processAsync(group);

@@ -5,6 +5,7 @@
 #include "network/tasked_send_receiver.hpp"
 #include "network/resolver.hpp"
 #include "utils/data_vector.hpp"
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -51,8 +52,8 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiver& sendRe
 {
     auto message = downloadInstanceInfo();
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
-    sendReceiver.send(originalMsg.get());
-    sendReceiver.process();
+    sendReceiver.sendSync(originalMsg.get());
+    sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HTTPHelper::Info> infoPtr;
     auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
@@ -76,8 +77,8 @@ string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
 {
     auto message = downloadInstanceInfo();
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
-    sendReceiver.send(originalMsg.get());
-    sendReceiver.process();
+    sendReceiver.sendSync(originalMsg.get());
+    sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HTTPHelper::Info> infoPtr;
     auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);

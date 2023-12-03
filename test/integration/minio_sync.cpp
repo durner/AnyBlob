@@ -64,8 +64,12 @@ TEST_CASE("MinIO Sync Integration") {
     {
         // Create the put request
         anyblob::network::Transaction putTxn(provider.get());
-        for (auto i = 0u; i < 2; i++)
-            putTxn.putObjectRequest(fileName[i], content[i].data(), content[i].size());
+        for (auto i = 0u; i < 2; i++) {
+            auto putObjectRequest = [&putTxn, &fileName, &content, i]() {
+                return putTxn.putObjectRequest(fileName[i], content[i].data(), content[i].size());
+            };
+            putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+        }
 
         // Upload the request synchronously with the scheduler object on this thread
         putTxn.processSync(sendReceiver);
@@ -81,8 +85,12 @@ TEST_CASE("MinIO Sync Integration") {
         auto minio = static_cast<anyblob::cloud::MinIO*>(provider.get());
         minio->setMultipartUploadSize(6ull << 20);
         anyblob::network::Transaction putTxn(provider.get());
-        for (auto i = 0u; i < 2; i++)
-            putTxn.putObjectRequest(fileName[i], content[i].data(), content[i].size());
+        for (auto i = 0u; i < 2; i++) {
+            auto putObjectRequest = [&putTxn, &fileName, &content, i]() {
+                return putTxn.putObjectRequest(fileName[i], content[i].data(), content[i].size());
+            };
+            putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+        }
 
         // Upload the request synchronously with the scheduler object on this thread
         putTxn.processSync(sendReceiver);
@@ -98,7 +106,10 @@ TEST_CASE("MinIO Sync Integration") {
         auto minio = static_cast<anyblob::cloud::MinIO*>(provider.get());
         minio->setMultipartUploadSize(1ull << 20); // part size must be larger than 5MiB
         anyblob::network::Transaction putTxn(provider.get());
-        putTxn.putObjectRequest(fileName[1], content[1].data(), content[1].size());
+        auto putObjectRequest = [&putTxn, &fileName, &content]() {
+            return putTxn.putObjectRequest(fileName[1], content[1].data(), content[1].size());
+        };
+        putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
 
         // Upload the request synchronously with the scheduler object on this thread
         putTxn.processSync(sendReceiver);
@@ -112,8 +123,13 @@ TEST_CASE("MinIO Sync Integration") {
     {
         // Create the get request
         anyblob::network::Transaction getTxn(provider.get());
-        for (auto i = 0u; i < 2; i++)
-            getTxn.getObjectRequest(fileName[i]);
+        for (auto i = 0u; i < 2; i++) {
+            auto& currentFileName = fileName[i];
+            auto getObjectRequest = [&getTxn, &currentFileName]() {
+                return getTxn.getObjectRequest(currentFileName);
+            };
+            getTxn.verifyKeyRequest(sendReceiver, move(getObjectRequest));
+        }
 
         // Retrieve the request synchronously with the scheduler object on this thread
         getTxn.processSync(sendReceiver);
@@ -142,8 +158,13 @@ TEST_CASE("MinIO Sync Integration") {
     {
         // Create the delete request
         anyblob::network::Transaction deleteTxn(provider.get());
-        for (auto i = 0u; i < 2; i++)
-            deleteTxn.deleteObjectRequest(fileName[i]);
+        for (auto i = 0u; i < 2; i++) {
+            auto& currentFileName = fileName[i];
+            auto deleteRequest = [&deleteTxn, &currentFileName]() {
+                return deleteTxn.deleteObjectRequest(currentFileName);
+            };
+            deleteTxn.verifyKeyRequest(sendReceiver, move(deleteRequest));
+        }
 
         // Process the request synchronously with the scheduler object on this thread
         deleteTxn.processSync(sendReceiver);

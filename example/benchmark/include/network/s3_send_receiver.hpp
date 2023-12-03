@@ -15,7 +15,6 @@
 #include <mutex>
 #include <thread>
 #include <unordered_map>
-#include <unistd.h>
 #include <aws/core/Aws.h>
 #include <aws/core/client/ClientConfiguration.h>
 #include <aws/core/utils/Outcome.h>
@@ -25,6 +24,7 @@
 #include <aws/s3-crt/model/GetObjectRequest.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/GetObjectRequest.h>
+#include <unistd.h>
 // ---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021

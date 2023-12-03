@@ -59,8 +59,7 @@ struct MessageTask {
         std::string_view s(reinterpret_cast<char*>(sendingMessage->message->data()), sendingMessage->message->size());
         if (s.find("HTTP") != std::string_view::npos && sendingMessage->port == 443) {
             return std::make_unique<HTTPSMessage>(sendingMessage, context, std::forward<Args>(args)...);
-        }
-        else if (s.find("HTTP") != std::string_view::npos) {
+        } else if (s.find("HTTP") != std::string_view::npos) {
             return std::make_unique<HTTPMessage>(sendingMessage, std::forward<Args>(args)...);
         }
         return nullptr;
