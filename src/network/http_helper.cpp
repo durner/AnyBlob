@@ -20,39 +20,54 @@ using namespace std;
 HTTPHelper::Info HTTPHelper::detect(string_view header)
 // Detect the protocol
 {
-    auto info = Info{0, 0, Protocol::Unknown, Encoding::Unknown};
+    static constexpr auto unknown = Info{0, 0, Protocol::Unknown, Encoding::Unknown};
+    Info info = unknown;
 
-    string str_http_1_0 = "HTTP/1.0 200 OK";
-    string str_http_1_1 = "HTTP/1.1 200 OK";
-    string str_http_1_1_partial = "HTTP/1.1 206 Partial Content";
-    string str_http_1_1_created = "HTTP/1.1 201 Created";
-    string str_http_1_1_no_conent = "HTTP/1.1 204 No Content";
-
-    if (header.length() >= str_http_1_0.size() && !strncmp(header.data(), str_http_1_0.c_str(), str_http_1_0.size()))
+    static constexpr string_view str_http_1_0 = "HTTP/1.0 200 OK\n";
+    static constexpr string_view str_http_1_1 = "HTTP/1.1 200 OK\n";
+    static constexpr string_view str_http_1_1_partial = "HTTP/1.1 206 Partial Content\n";
+    static constexpr string_view str_http_1_1_created = "HTTP/1.1 201 Created\n";
+    static constexpr string_view str_http_1_1_no_content = "HTTP/1.1 204 No Content\n";
+    if (header.starts_with(str_http_1_0)) {
         info.protocol = Protocol::HTTP_1_0_OK;
-    else if (header.length() >= str_http_1_1.size() && !strncmp(header.data(), str_http_1_1.c_str(), str_http_1_1.size()))
+        header = header.substr(str_http_1_0.size(), header.length() - str_http_1_0.size());
+    } else if (header.starts_with(str_http_1_1)) {
         info.protocol = Protocol::HTTP_1_1_OK;
-    else if (header.length() >= str_http_1_1_partial.size() && !strncmp(header.data(), str_http_1_1_partial.c_str(), str_http_1_1_partial.size()))
+        header = header.substr(str_http_1_1.size(), header.length() - str_http_1_1.size());
+    } else if (header.starts_with(str_http_1_1_partial)) {
         info.protocol = Protocol::HTTP_1_1_Partial;
-    else if (header.length() >= str_http_1_1_created.size() && !strncmp(header.data(), str_http_1_1_created.c_str(), str_http_1_1_created.size()))
+        header = header.substr(str_http_1_1_partial.size(), header.length() - str_http_1_1_partial.size());
+    } else if (header.starts_with(str_http_1_1_created)) {
         info.protocol = Protocol::HTTP_1_1_Created;
-    else if (header.length() >= str_http_1_1_no_conent.size() && !strncmp(header.data(), str_http_1_1_no_conent.c_str(), str_http_1_1_no_conent.size()))
+        header = header.substr(str_http_1_1_created.size(), header.length() - str_http_1_1_created.size());
+    } else if (header.starts_with(str_http_1_1_no_content)) {
         info.protocol = Protocol::HTTP_1_1_No_Content;
+        header = header.substr(str_http_1_1_no_content.size(), header.length() - str_http_1_1_no_content.size());
+    }
+
+    static constexpr string_view chunkedEncoding = "Transfer-Encoding: chunked\n";
+    static constexpr string_view contentLength = "Content-Length: ";
+    static constexpr string_view headerEnd = "\r\n\r\n";
 
     if (info.protocol != Protocol::Unknown) {
-        if (header.npos != header.find("Transfer-Encoding: chunked")) {
+        if (header.find(chunkedEncoding) != string_view::npos) {
             info.encoding = Encoding::ChunkedEncoding;
-            info.headerLength = header.find("\r\n\r\n"sv) + 4;
+            auto end = header.find(headerEnd);
+            if (end == string_view::npos) return unknown;
+            info.headerLength = static_cast<unsigned>(end) + headerEnd.length();
         } else {
-            string contentLength = "Content-Length: ";
             auto pos = header.find(contentLength);
-            if (header.npos != pos) {
+            if (pos != string_view::npos) {
                 auto end = header.find("\r\n", pos);
+                if (end == string_view::npos) return unknown;
                 auto strSize = header.substr(pos + contentLength.size(), end - pos);
                 info.encoding = Encoding::ContentLength;
                 from_chars(strSize.data(), strSize.data() + strSize.size(), info.length);
+                header = header.substr(pos, header.length() - pos);
             }
-            info.headerLength = header.find("\r\n\r\n"sv) + 4;
+            auto end = header.find(headerEnd);
+            if (end == string_view::npos) return unknown;
+            info.headerLength = static_cast<unsigned>(end) + headerEnd.length();
         }
     }
 
