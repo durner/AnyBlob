@@ -25,9 +25,9 @@ class Resolver {
     /// The addr info
     std::vector<std::unique_ptr<addrinfo, decltype(&freeaddrinfo)>> _addr;
     /// The current addr string
-    std::vector<std::pair<std::string, int>> _addrString;
+    std::vector<std::pair</*addrAndPort=*/std::string, /*cacheCtr=*/int>> _addrString;
     /// The ctr
-    uint64_t _addrCtr;
+    unsigned _addrCtr;
 
     public:
     /// The constructor
@@ -35,9 +35,9 @@ class Resolver {
     /// The address resolving
     virtual unsigned resolve(std::string hostname, std::string port, bool& oldAddress);
     /// Increment the addr ctr
-    virtual void increment() { _addrCtr++; }
+    void increment() { _addrCtr++; }
     /// Erase the current cache
-    virtual void erase() { _addrString[_addrCtr % _addrString.size()].second = 0; }
+    void erase() { _addrString[_addrCtr % _addrString.size()].second = 0; }
     /// Start the timing
     virtual void startSocket(int /*fd*/, unsigned /*ipAsInt*/) {}
     /// Stop the timing
@@ -48,7 +48,7 @@ class Resolver {
     virtual ~Resolver() noexcept = default;
 
     /// Get the tld
-    static std::string_view tld(std::string const& domain);
+    static std::string_view tld(std::string_view domain);
 
     friend IOUringSocket;
 };
