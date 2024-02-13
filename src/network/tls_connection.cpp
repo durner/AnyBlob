@@ -98,8 +98,9 @@ TLSConnection::Progress TLSConnection::operationHelper(IOUringSocket& socket, F&
 TLSConnection::Progress TLSConnection::recv(IOUringSocket& socket, char* buffer, int64_t bufferLength, int64_t& resultLength)
 // Recv a TLS encrypted message
 {
+    assert(in_range<int>(bufferLength));
     auto ssl = this->_ssl;
-    auto sslRead = [ssl, buffer, bufferLength]() {
+    auto sslRead = [ssl, buffer, bufferLength = static_cast<int>(bufferLength)]() {
         return SSL_read(ssl, buffer, bufferLength);
     };
     return operationHelper(socket, sslRead, resultLength);
@@ -108,8 +109,9 @@ TLSConnection::Progress TLSConnection::recv(IOUringSocket& socket, char* buffer,
 TLSConnection::Progress TLSConnection::send(IOUringSocket& socket, const char* buffer, int64_t bufferLength, int64_t& resultLength)
 // Send a TLS encrypted message
 {
+    assert(in_range<int>(bufferLength));
     auto ssl = this->_ssl;
-    auto sslWrite = [ssl, buffer, bufferLength]() {
+    auto sslWrite = [ssl, buffer, bufferLength = static_cast<int>(bufferLength)]() {
         return SSL_write(ssl, buffer, bufferLength);
     };
     return operationHelper(socket, sslWrite, resultLength);
@@ -157,8 +159,8 @@ TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
             _state.reset();
             _state.internalBioWrite = BIO_ctrl_pending(_networkBio);
             if (_state.internalBioWrite) {
-                int64_t readSize = static_cast<int64_t>(_message.chunkSize) > _state.internalBioWrite ? _state.internalBioWrite : _message.chunkSize;
-                _state.networkBioRead = BIO_read(_networkBio, _buffer.get(), readSize);
+                auto readSize = _message.chunkSize > _state.internalBioWrite ? _state.internalBioWrite : _message.chunkSize;
+                _state.networkBioRead = BIO_read(_networkBio, _buffer.get(), static_cast<int>(readSize));
             }
         } // fallthrough
         case Progress::Sending: {
@@ -182,8 +184,8 @@ TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
                     _state.progress = Progress::Sending;
                     auto writeSize = _state.networkBioRead - _state.socketWrite;
                     const uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketWrite;
-                    _message.request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, writeSize, _message.fd, IOUringSocket::EventType::write, &_message});
-                    if (writeSize <= static_cast<int64_t>(_message.chunkSize))
+                    _message.request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, static_cast<int64_t>(writeSize), _message.fd, IOUringSocket::EventType::write, &_message});
+                    if (writeSize <= _message.chunkSize)
                         socket.send_prep_to(_message.request.get(), &_message.tcpSettings.kernelTimeout);
                     else
                         socket.send_prep(_message.request.get());
@@ -213,7 +215,8 @@ TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
                         _state.progress = Progress::Aborted;
                         return _state.progress;
                     } else if (_message.request->length > 0) {
-                        _state.networkBioWrite += BIO_write(_networkBio, _buffer.get() + _state.socketRead, _message.request->length);
+                        assert(in_range<int>(_message.request->length));
+                        _state.networkBioWrite += BIO_write(_networkBio, _buffer.get() + _state.socketRead, static_cast<int>(_message.request->length));
                         _state.socketRead += _message.request->length;
                         assert(_state.networkBioWrite == _state.socketRead);
                     } else if (_message.request->length != -EINPROGRESS && _message.request->length != -EAGAIN) {
@@ -227,7 +230,7 @@ TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
                 }
                 if (!_state.networkBioWrite || _state.networkBioWrite != _state.socketRead) {
                     _state.progress = Progress::Receiving;
-                    int64_t readSize = static_cast<int64_t>(_message.chunkSize) > (_state.internalBioRead - _state.socketRead) ? _state.internalBioRead - _state.socketRead : _message.chunkSize;
+                    int64_t readSize = _message.chunkSize > (_state.internalBioRead - _state.socketRead) ? _state.internalBioRead - _state.socketRead : _message.chunkSize;
                     uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketRead;
                     _message.request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = ptr}, readSize, _message.fd, IOUringSocket::EventType::read, &_message});
                     socket.recv_prep_to(_message.request.get(), &_message.tcpSettings.kernelTimeout, _message.tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);

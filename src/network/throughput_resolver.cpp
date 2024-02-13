@@ -28,7 +28,7 @@ ThroughputResolver::ThroughputResolver(unsigned entries) : Resolver(entries), _t
 unsigned ThroughputResolver::resolve(string hostname, string port, bool& reuse)
 // Resolve the request
 {
-    auto modulo = _addrString.size() < 8 ? _addrString.size() : 8;
+    auto modulo = static_cast<unsigned>(_addrString.size() < 8 ? _addrString.size() : 8);
     auto addrPos = _addrCtr % modulo;
     auto curCtr = _addrString[addrPos].second--;
     auto hostString = hostname + ":" + port;

@@ -1,5 +1,7 @@
 #include "utils/utils.hpp"
+#include <cassert>
 #include <stdexcept>
+#include <utility>
 #include <openssl/aes.h>
 #include <openssl/bio.h>
 #include <openssl/core_names.h>
@@ -28,9 +30,10 @@ namespace utils {
 string base64Encode(const uint8_t* input, uint64_t length)
 // Encodes a string as a base64 string
 {
+    assert(in_range<int>(length));
     int64_t baseLength = 4 * ((length + 2) / 3);
     auto buffer = make_unique<char[]>(baseLength + 1);
-    auto encodeLength = EVP_EncodeBlock(reinterpret_cast<unsigned char*>(buffer.get()), input, length);
+    auto encodeLength = EVP_EncodeBlock(reinterpret_cast<unsigned char*>(buffer.get()), input, static_cast<int>(length));
     if (encodeLength != baseLength)
         throw runtime_error("OpenSSL Error!");
     return string(buffer.get(), encodeLength);
@@ -39,9 +42,10 @@ string base64Encode(const uint8_t* input, uint64_t length)
 pair<unique_ptr<uint8_t[]>, uint64_t> base64Decode(const uint8_t* input, uint64_t length)
 // Decodes from base64 to raw string
 {
+    assert(in_range<int>(length));
     auto baseLength = 3 * length / 4;
     auto buffer = make_unique<uint8_t[]>(baseLength + 1);
-    uint64_t decodeLength = EVP_DecodeBlock(reinterpret_cast<unsigned char*>(buffer.get()), input, length);
+    uint64_t decodeLength = EVP_DecodeBlock(reinterpret_cast<unsigned char*>(buffer.get()), input, static_cast<int>(length));
     if (decodeLength != baseLength)
         throw runtime_error("OpenSSL Error!");
     while (input[--length] == '=') {
@@ -59,8 +63,8 @@ string hexEncode(const uint8_t* input, uint64_t length, bool upper)
     string output;
     output.reserve(length << 1);
     for (auto i = 0u; i < length; i++) {
-        output.push_back(upper ? toupper(hex[input[i] >> 4]) : hex[input[i] >> 4]);
-        output.push_back(upper ? toupper(hex[input[i] & 15]) : hex[input[i] & 15]);
+        output.push_back(upper ? static_cast<char>(toupper(hex[input[i] >> 4])) : hex[input[i] >> 4]);
+        output.push_back(upper ? static_cast<char>(toupper(hex[input[i] & 15])) : hex[input[i] & 15]);
     }
     return output;
 }
@@ -166,7 +170,8 @@ pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t 
 pair<unique_ptr<uint8_t[]>, uint64_t> rsaSign(const uint8_t* keyData, uint64_t keyLength, const uint8_t* msgData, uint64_t msgLength)
 // Encodes the msg with the key with rsa
 {
-    auto* keybio = BIO_new_mem_buf(reinterpret_cast<const void*>(keyData), keyLength);
+    assert(in_range<int>(keyLength));
+    auto* keybio = BIO_new_mem_buf(reinterpret_cast<const void*>(keyData), static_cast<int>(keyLength));
     if (!keybio)
         throw runtime_error("OpenSSL Error - No Buffer Mem!");
 
@@ -198,6 +203,7 @@ pair<unique_ptr<uint8_t[]>, uint64_t> rsaSign(const uint8_t* keyData, uint64_t k
 uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* encData, uint64_t encLength, uint8_t* plainData)
 // Decrypt with AES
 {
+    assert(in_range<int>(encLength));
     int len;
     uint64_t plainLength;
 
@@ -208,7 +214,7 @@ uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uin
     if (EVP_DecryptInit(ctx.get(), EVP_aes_256_cbc(), key, iv) <= 0)
         throw runtime_error("OpenSSL Decrypt Init Error!");
 
-    if (EVP_DecryptUpdate(ctx.get(), plainData, &len, reinterpret_cast<const unsigned char*>(encData), encLength) <= 0)
+    if (EVP_DecryptUpdate(ctx.get(), plainData, &len, reinterpret_cast<const unsigned char*>(encData), static_cast<int>(encLength)) <= 0)
         throw runtime_error("OpenSSL Decrypt Error!");
     plainLength = len;
 
@@ -222,6 +228,7 @@ uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uin
 uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* plainData, uint64_t plainLength, uint8_t* encData)
 // Encrypt with AES
 {
+    assert(in_range<int>(plainLength));
     int len;
     uint64_t encLength;
 
@@ -232,7 +239,7 @@ uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uin
     if (EVP_EncryptInit(ctx.get(), EVP_aes_256_cbc(), key, iv) <= 0)
         throw runtime_error("OpenSSL Encrypt Init Error!");
 
-    if (EVP_EncryptUpdate(ctx.get(), encData, &len, reinterpret_cast<const unsigned char*>(plainData), plainLength) <= 0)
+    if (EVP_EncryptUpdate(ctx.get(), encData, &len, reinterpret_cast<const unsigned char*>(plainData), static_cast<int>(plainLength)) <= 0)
         throw runtime_error("OpenSSL Encrypt Error!");
     encLength = len;
 

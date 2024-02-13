@@ -292,7 +292,7 @@ void IOUringSocket::addResolver(const string& hostname, unique_ptr<Resolver> res
     _resolverCache.emplace(string(Resolver::tld(hostname)), move(resolver));
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::send_prep(const Request* req, int32_t msg_flags, int32_t flags)
+io_uring_sqe* IOUringSocket::send_prep(const Request* req, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) send
 {
     auto sqe = io_uring_get_sqe(&_uring);
@@ -302,7 +302,7 @@ io_uring_sqe* IOUringSocket::send_prep(const Request* req, int32_t msg_flags, in
     return sqe;
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::recv_prep(Request* req, int32_t msg_flags, int32_t flags)
+io_uring_sqe* IOUringSocket::recv_prep(Request* req, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) recv
 {
     auto sqe = io_uring_get_sqe(&_uring);
@@ -312,7 +312,7 @@ io_uring_sqe* IOUringSocket::recv_prep(Request* req, int32_t msg_flags, int32_t 
     return sqe;
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::send_prep_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags, int32_t flags)
+io_uring_sqe* IOUringSocket::send_prep_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) send with relative timeout
 {
     auto sqe = io_uring_get_sqe(&_uring);
@@ -325,7 +325,7 @@ io_uring_sqe* IOUringSocket::send_prep_to(const Request* req, __kernel_timespec*
     return sqe;
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags, int32_t flags)
+io_uring_sqe* IOUringSocket::recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) recv with relative timeout
 {
     auto sqe = io_uring_get_sqe(&_uring);

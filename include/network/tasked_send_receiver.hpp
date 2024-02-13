@@ -55,7 +55,7 @@ class TaskedSendReceiverGroup {
     /// The recv chunk size
     uint64_t _chunkSize;
     /// The queue maximum for each TaskedSendReceiver
-    uint64_t _concurrentRequests;
+    unsigned _concurrentRequests;
 
     /// Condition variable to stop wasting wait cycles
     std::condition_variable _cv;
@@ -64,7 +64,7 @@ class TaskedSendReceiverGroup {
 
     public:
     /// Initializes the global submissions and completions
-    TaskedSendReceiverGroup(uint64_t chunkSize = 64u * 1024, uint64_t submissions = std::thread::hardware_concurrency() * submissionPerCore, uint64_t reuse = 0);
+    TaskedSendReceiverGroup(unsigned chunkSize = 64u * 1024, uint64_t submissions = std::thread::hardware_concurrency() * submissionPerCore, uint64_t reuse = 0);
     /// Destructor
     ~TaskedSendReceiverGroup();
 
@@ -83,12 +83,12 @@ class TaskedSendReceiverGroup {
             _concurrentRequests = config.coreRequests();
     }
     /// Update the concurrent requests
-    void setConcurrentRequests(uint64_t concurrentRequests) {
+    void setConcurrentRequests(unsigned concurrentRequests) {
         if (_concurrentRequests != concurrentRequests)
             _concurrentRequests = concurrentRequests;
     }
     /// Get the concurrent requests
-    uint64_t getConcurrentRequests() const {
+    unsigned getConcurrentRequests() const {
         return _concurrentRequests;
     }
 

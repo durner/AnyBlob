@@ -106,7 +106,7 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
                     } else {
                         // resize and grow capacity
                         if (receive.capacity() < receive.size() + chunkSize && info) {
-                            receive.reserve(max(info->length + info->headerLength + chunkSize, static_cast<uint64_t>(receive.capacity() * 1.5)));
+                            receive.reserve(max(info->length + info->headerLength + chunkSize, receive.capacity() + receive.capacity() / 2));
                         }
                         receive.resize(receive.size() + chunkSize);
                         return execute(socket);
