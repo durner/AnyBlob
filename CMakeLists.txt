@@ -32,9 +32,10 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fuse-ld=lld")
 set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} -fuse-ld=lld")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fuse-ld=lld")
 
+
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address,undefined -Wall -Wextra -Wold-style-cast -Woverloaded-virtual -Wmissing-declarations -Wno-unqualified-std-cast-call -Wvla -Wconversion -Werror")
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -march=native -Wall -Wextra -Wold-style-cast -Woverloaded-virtual -Wmissing-declarations -Wno-unqualified-std-cast-call -Wvla -Wconversion -Werror")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g -march=native -Wall -Wextra -Wold-style-cast -Woverloaded-virtual -Wmissing-declarations -Wno-unqualified-std-cast-call -Wvla -Wconversion -Werror")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -Wall -Wextra -Wold-style-cast -Woverloaded-virtual -Wmissing-declarations -Wno-unqualified-std-cast-call -Wvla -Wconversion -Werror")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Wextra -Wold-style-cast -Woverloaded-virtual -Wmissing-declarations -Wno-unqualified-std-cast-call -Wvla -Wconversion -Werror")
 set(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Wextra -Wold-style-cast -Woverloaded-virtual -Wmissing-declarations -Wno-unqualified-std-cast-call -Wvla -Wconversion -Werror -coverage")
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
