@@ -65,7 +65,9 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
                 auto addressPort = sub.substr(0, pos);
                 if (auto colonPos = addressPort.find(':'); colonPos != string::npos) {
                     info.endpoint = addressPort.substr(0, colonPos);
-                    info.port = atoi(addressPort.substr(colonPos + 1).c_str());
+                    auto port = atoi(addressPort.substr(colonPos + 1).c_str());
+                    assert(port > 0);
+                    info.port = static_cast<unsigned>(port);
                 } else {
                     info.endpoint = addressPort;
                     info.port = 80;

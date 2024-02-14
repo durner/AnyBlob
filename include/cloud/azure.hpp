@@ -31,7 +31,7 @@ class Azure : public Provider {
         /// The container name
         std::string container;
         /// The port
-        int port;
+        uint32_t port;
     };
 
     /// The secret

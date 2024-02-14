@@ -29,7 +29,7 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TaskedSendReceiverGroup::TaskedSendReceiverGroup(uint64_t chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _cv(), _mutex()
+TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _cv(), _mutex()
 // Initializes the global submissions and completions
 {
     TLSContext::initOpenSSL();
@@ -313,7 +313,11 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
         if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests) {
             local ? emplaceLocalRequest() : emplaceNewRequest();
         }
-        count += _socketWrapper->submit();
+        auto cnt = _socketWrapper->submit();
+        if (cnt < 0)
+            throw runtime_error("io_uring_submit error: " + to_string(-cnt));
+        else
+            count += static_cast<unsigned>(cnt);
 
         auto empty = local ? _submissions.empty() : _group._submissions.empty();
         if (oneQueueInvocation && empty && !count) {

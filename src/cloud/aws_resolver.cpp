@@ -26,7 +26,7 @@ AWSResolver::AWSResolver(unsigned entries) : Resolver(entries), _mtuCache()
 unsigned AWSResolver::resolve(string hostname, string port, bool& oldAddress)
 // Resolve the request
 {
-    auto addrPos = _addrCtr % _addrString.size();
+    auto addrPos = _addrCtr % static_cast<unsigned>(_addrString.size());
     auto curCtr = _addrString[addrPos].second--;
     auto hostString = hostname + ":" + port;
     // Reuses old address
@@ -45,13 +45,13 @@ unsigned AWSResolver::resolve(string hostname, string port, bool& oldAddress)
         _addr[addrPos].reset(temp);
         if (!Resolver::tld(hostname).compare("amazonaws.com")) {
             struct sockaddr_in* p = reinterpret_cast<sockaddr_in*>(_addr[addrPos]->ai_addr);
-            int ipAsInt = p->sin_addr.s_addr;
+            auto ipAsInt = p->sin_addr.s_addr;
             auto it = _mtuCache.find(ipAsInt);
             if (it != _mtuCache.end()) {
                 if (it->second)
-                    _addrString[addrPos] = {hostString, numeric_limits<int>::max()};
+                    _addrString[addrPos] = {move(hostString), numeric_limits<int>::max()};
                 else
-                    _addrString[addrPos] = {hostString, 12};
+                    _addrString[addrPos] = {move(hostString), 12};
             } else {
                 char ipv4[INET_ADDRSTRLEN];
                 inet_ntop(AF_INET, &p->sin_addr, ipv4, INET_ADDRSTRLEN);
@@ -60,14 +60,14 @@ unsigned AWSResolver::resolve(string hostname, string port, bool& oldAddress)
                 auto res = system(cmd.c_str());
                 if (!res) {
                     _mtuCache.emplace(ipAsInt, true);
-                    _addrString[addrPos] = {hostString, numeric_limits<int>::max()};
+                    _addrString[addrPos] = {move(hostString), numeric_limits<int>::max()};
                 } else {
                     _mtuCache.emplace(ipAsInt, false);
-                    _addrString[addrPos] = {hostString, 12};
+                    _addrString[addrPos] = {move(hostString), 12};
                 }
             }
         } else {
-            _addrString[addrPos] = {hostString, 12};
+            _addrString[addrPos] = {move(hostString), 12};
         }
         oldAddress = false;
     }

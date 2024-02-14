@@ -17,7 +17,7 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-string_view Resolver::tld(const string& domain)
+string_view Resolver::tld(string_view domain)
 // String prefix
 {
     auto pos = domain.find_last_of('.');
@@ -45,7 +45,7 @@ Resolver::Resolver(unsigned entries)
 unsigned Resolver::resolve(string hostname, string port, bool& oldAddress)
 // Resolve the request
 {
-    auto addrPos = _addrCtr % _addrString.size();
+    auto addrPos = _addrCtr % static_cast<unsigned>(_addrString.size());
     auto curCtr = _addrString[addrPos].second--;
     auto hostString = hostname + ":" + port;
     oldAddress = true;
@@ -61,7 +61,7 @@ unsigned Resolver::resolve(string hostname, string port, bool& oldAddress)
             throw runtime_error("hostname getaddrinfo error");
         }
         _addr[addrPos].reset(temp);
-        _addrString[addrPos] = {hostString, 12};
+        _addrString[addrPos] = {move(hostString), 12};
         oldAddress = false;
     }
     return addrPos;

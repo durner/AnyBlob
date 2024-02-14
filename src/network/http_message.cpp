@@ -68,7 +68,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                 auto length = static_cast<int64_t>(originalMessage->message->size()) - sendBufferOffset;
                 if (originalMessage->putLength > 0 && sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size())) {
                     ptr = originalMessage->putData + sendBufferOffset - originalMessage->message->size();
-                    length = originalMessage->putLength + originalMessage->message->size() - sendBufferOffset;
+                    length = static_cast<int64_t>(originalMessage->putLength + originalMessage->message->size()) - sendBufferOffset;
                 }
                 request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, length, fd, IOUringSocket::EventType::write, this});
                 if (length <= static_cast<int64_t>(chunkSize))
@@ -89,13 +89,13 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                     return execute(socket);
                 } else if (request->length > 0) {
                     // resize according to real downloaded size
-                    receive.resize(receive.size() - (chunkSize - request->length));
+                    receive.resize(receive.size() - (chunkSize - static_cast<uint64_t>(request->length)));
                     receiveBufferOffset += request->length;
 
                     try {
                         // check whether finished http
-                        if (HTTPHelper::finished(receive.data(), receiveBufferOffset, info)) {
-                            socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, sendBufferOffset + receiveBufferOffset);
+                        if (HTTPHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
+                            socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                             originalMessage->result.size = info->length;
                             originalMessage->result.offset = info->headerLength;
                             state = MessageState::Finished;
@@ -118,7 +118,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                 }
                 // resize and grow capacity
                 if (receive.capacity() < receive.size() + chunkSize && info) {
-                    receive.reserve(max(info->length + info->headerLength + chunkSize, static_cast<uint64_t>(receive.capacity() * 1.5)));
+                    receive.reserve(max(info->length + info->headerLength + chunkSize, receive.capacity() + receive.capacity() / 2));
                 }
             }
             receive.resize(receive.size() + chunkSize);

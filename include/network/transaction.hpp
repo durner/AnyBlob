@@ -57,10 +57,10 @@ class Transaction {
         /// The state
         std::atomic<State> state;
         /// The error message id
-        std::atomic<int> errorMessageId;
+        std::atomic<uint64_t> errorMessageId;
 
         /// The constructor
-        explicit MultipartUpload(int parts) : messages(parts + 1), eTags(parts), outstanding(parts), state(State::Default) {}
+        explicit MultipartUpload(uint16_t parts) : messages(parts + 1), eTags(parts), outstanding(static_cast<int>(parts)), state(State::Default) {}
         /// Copy constructor
         MultipartUpload(MultipartUpload& other) = delete;
         /// Move constructor
@@ -167,7 +167,7 @@ class Transaction {
     inline void putObjectRequestMultiPart(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         auto splitSize = _provider->multipartUploadSize();
-        auto parts = (size / splitSize) + ((size % splitSize) ? 1u : 0u);
+        uint16_t parts = static_cast<uint16_t>((size / splitSize) + ((size % splitSize) ? 1u : 0u));
         _multipartUploads.emplace_back(parts);
         auto position = _multipartUploads.size() - 1;
 
@@ -178,7 +178,7 @@ class Transaction {
             }
             _multipartUploads[position].uploadId = _provider->getUploadId(initalRequestResult.getResult());
             auto offset = 0ull;
-            for (auto i = 1ull; i <= parts; i++) {
+            for (uint16_t i = 1; i <= parts; i++) {
                 auto finishMultipart = [&callback, &initalRequestResult, position, remotePath, traceId, i, parts, this](network::MessageResult& result) {
                     if (!result.success()) [[unlikely]] {
                         _multipartUploads[position].errorMessageId = i - 1;

@@ -1,4 +1,5 @@
 #pragma once
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -45,7 +46,8 @@ class DataVector {
 
     /// Constructor from other pointers
     constexpr DataVector(T* start, T* end) : _capacity(0), _size(0) {
-        resize(end - start);
+        assert(end - start >= 0);
+        resize(static_cast<uint64_t>(end - start));
         std::memcpy(data(), start, size() * sizeof(T));
     }
 
@@ -55,22 +57,22 @@ class DataVector {
     }
 
     /// Get the data
-    [[ nodiscard ]] constexpr T* data() {
+    [[nodiscard]] constexpr T* data() {
         return _data;
     }
 
     /// Get the data
-    [[ nodiscard ]] constexpr const T* cdata() const {
+    [[nodiscard]] constexpr const T* cdata() const {
         return _data;
     }
 
     /// Get the size
-    [[ nodiscard ]] constexpr uint64_t size() const {
+    [[nodiscard]] constexpr uint64_t size() const {
         return _size;
     }
 
     /// Get the capacity
-    [[ nodiscard ]] constexpr uint64_t capacity() const {
+    [[nodiscard]] constexpr uint64_t capacity() const {
         return _capacity;
     }
 
@@ -80,7 +82,7 @@ class DataVector {
     }
 
     /// Is the data owned
-    [[ nodiscard ]] constexpr bool owned() {
+    [[nodiscard]] constexpr bool owned() {
         return _dataOwned || !_capacity;
     }
 
@@ -107,7 +109,7 @@ class DataVector {
     }
 
     /// Transfer the ownership of the data
-    [[ nodiscard ]] constexpr std::unique_ptr<T[]> transferBuffer() {
+    [[nodiscard]] constexpr std::unique_ptr<T[]> transferBuffer() {
         return move(_dataOwned);
     }
 };

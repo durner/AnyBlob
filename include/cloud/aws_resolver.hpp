@@ -16,7 +16,7 @@ namespace cloud {
 /// Implements the AWS Resolver logic
 class AWSResolver : public network::Resolver {
     /// The good mtu cache
-    std::unordered_map<int, bool> _mtuCache;
+    std::unordered_map<unsigned, bool> _mtuCache;
 
     public:
     /// The constructor

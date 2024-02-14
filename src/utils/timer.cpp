@@ -46,7 +46,7 @@ void Timer::stop(Steps s)
 {
     _loadTracker[s].reset();
     auto time = chrono::duration_cast<chrono::nanoseconds>(chrono::steady_clock::now() - _currentTimer[s]).count();
-    _totalTimer[s] += time;
+    _totalTimer[s] += static_cast<uint64_t>(time);
 }
 //---------------------------------------------------------------------------
 void Timer::printResult(ostream& s)
@@ -62,7 +62,7 @@ void Timer::printResult(ostream& s)
         total += it.second;
     }
     for (auto it : _totalTimer) {
-        s << reverseSteps[it.first] << "," << static_cast<double>(it.second) / total << "," << static_cast<double>(it.second) / (1000 * 1000);
+        s << reverseSteps[it.first] << "," << static_cast<double>(it.second) / static_cast<double>(total) << "," << static_cast<double>(it.second) / (1000 * 1000);
         auto elem = _totalLoad.find(it.first);
         if (elem != _totalLoad.end())
             s << "," << elem->second->at(0)->userTime << "," << elem->second->at(0)->sysTime << "," << elem->second->at(0)->elapsedTime << "," << elem->second->at(0)->activeTimeAllProcesses << "," << elem->second->at(0)->idleTimeAllProcesses;

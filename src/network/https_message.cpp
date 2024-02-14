@@ -2,11 +2,13 @@
 #include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
 #include "utils/timer.hpp"
+#include <cassert>
 #include <memory>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <utility>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023
@@ -68,7 +70,7 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
             auto length = static_cast<int64_t>(originalMessage->message->size()) - sendBufferOffset;
             if (originalMessage->putLength > 0 && sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size())) {
                 ptr = originalMessage->putData + sendBufferOffset - originalMessage->message->size();
-                length = originalMessage->putLength + originalMessage->message->size() - sendBufferOffset;
+                length = static_cast<int64_t>(originalMessage->putLength + originalMessage->message->size()) - sendBufferOffset;
             }
 
             int64_t result = 0;
@@ -92,13 +94,14 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
         case MessageState::Receiving: {
             auto& receive = originalMessage->result.getDataVector();
             int64_t result = 0;
-            auto status = tlsLayer->recv(socket, reinterpret_cast<char*>(receive.data() + receiveBufferOffset), chunkSize, result);
+            assert(in_range<int64_t>(chunkSize));
+            auto status = tlsLayer->recv(socket, reinterpret_cast<char*>(receive.data() + receiveBufferOffset), static_cast<int64_t>(chunkSize), result);
             state = MessageState::Receiving;
             if (status == TLSConnection::Progress::Finished) {
-                receive.resize(receive.size() - (chunkSize - result));
+                receive.resize(receive.size() - (chunkSize - static_cast<uint64_t>(result)));
                 receiveBufferOffset += result;
                 try {
-                    if (HTTPHelper::finished(receive.data(), receiveBufferOffset, info)) {
+                    if (HTTPHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
                         originalMessage->result.size = info->length;
                         originalMessage->result.offset = info->headerLength;
                         state = MessageState::TLSShutdown;
@@ -106,7 +109,7 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
                     } else {
                         // resize and grow capacity
                         if (receive.capacity() < receive.size() + chunkSize && info) {
-                            receive.reserve(max(info->length + info->headerLength + chunkSize, static_cast<uint64_t>(receive.capacity() * 1.5)));
+                            receive.reserve(max(info->length + info->headerLength + chunkSize, receive.capacity() + receive.capacity() / 2));
                         }
                         receive.resize(receive.size() + chunkSize);
                         return execute(socket);
@@ -127,7 +130,7 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
             auto status = tlsLayer->shutdown(socket);
             // The request was successful even if the shutdown fails
             if (status == TLSConnection::Progress::Finished || status == TLSConnection::Progress::Aborted) {
-                socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, sendBufferOffset + receiveBufferOffset);
+                socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                 state = MessageState::Finished;
                 return MessageState::Finished;
             } else {

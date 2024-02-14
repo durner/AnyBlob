@@ -26,14 +26,14 @@ using namespace std;
 //---------------------------------------------------------------------------
 TEST_CASE("send_receiver") {
     PerfEventBlock e;
-    auto concurrency = 8;
+    auto concurrency = 8u;
     uint64_t length = 4096u;
 
     TaskedSendReceiverGroup group;
     group.setConcurrentRequests(concurrency);
 
     vector<unique_ptr<OriginalMessage>> msgs;
-    for (auto i = 0; i < concurrency; i++) {
+    for (auto i = 0u; i < concurrency; i++) {
         auto message = make_unique<utils::DataVector<uint8_t>>(length);
         string str = "GET / HTTP/1.1\r\nHost: db.cs.tum.edu\r\nConnection: keep-alive\r\n\r\n";
         memcpy(message->data(), str.data(), str.length());

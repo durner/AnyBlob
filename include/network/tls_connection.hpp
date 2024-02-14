@@ -53,17 +53,17 @@ class TLSConnection {
     /// The state
     struct State {
         /// Bytes wanted to write from internal bio (used for send)
-        int internalBioWrite;
+        size_t internalBioWrite;
         /// Bytes read from network bio (used for send)
-        int networkBioRead;
+        int64_t networkBioRead;
         /// Bytes written to socket (used for send)
-        int socketWrite;
+        size_t socketWrite;
         /// Bytes wanted to read from internal bio (used for recv)
-        int internalBioRead;
-        // Bytes written to network bio (used for recv)
-        int networkBioWrite;
+        size_t internalBioRead;
+        /// Bytes written to network bio (used for recv)
+        int64_t networkBioWrite;
         /// Bytes read fromsocket (used for recv)
-        int socketRead;
+        size_t socketRead;
         /// The progress
         Progress progress;
 

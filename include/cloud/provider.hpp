@@ -58,7 +58,7 @@ public:
         /// The endpoint
         std::string endpoint = "";
         /// The port
-        int port = 80;
+        uint32_t port = 80;
     };
 
     /// Instance struct

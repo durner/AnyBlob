@@ -34,7 +34,7 @@ class GCP : public Provider {
         /// The gcp region
         std::string region;
         /// The gcp port
-        int port;
+        uint32_t port;
     };
 
     /// The secret

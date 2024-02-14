@@ -33,10 +33,10 @@ struct Config {
     constexpr auto bandwidth() const { return network; }
     /// Get the number of requests per core
     constexpr auto coreRequests() const { return coreConcurreny; }
+    /// Get the number of retriever threads to saturate bandwidth
+    constexpr auto retrievers() const { return (network + coreThroughput - 1) / coreThroughput; }
     /// Get the total outstanding requests
     constexpr auto totalRequests() const { return retrievers() * coreRequests(); }
-    /// Get the number of retriever threads to saturate bandwidth
-    constexpr unsigned retrievers() const { return std::ceil(static_cast<double>(network) / coreThroughput); }
 };
 //---------------------------------------------------------------------------
 } // namespace network

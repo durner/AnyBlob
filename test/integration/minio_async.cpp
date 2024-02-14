@@ -35,10 +35,10 @@ TEST_CASE("MinIO Asynchronous Integration") {
     REQUIRE(key);
     REQUIRE(secret);
 
-    auto stringGen = [](auto len) {
+    auto stringGen = [](size_t len) {
         static constexpr auto chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
         auto resultString = string(len, '\0');
-        generate_n(begin(resultString), len, [&]() { return chars[rand() % strlen(chars)]; });
+        generate_n(begin(resultString), len, [&]() { return chars[static_cast<unsigned>(rand()) % strlen(chars)]; });
         return resultString;
     };
 

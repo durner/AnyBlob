@@ -116,13 +116,13 @@ class IOUringSocket {
     void addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver);
 
     /// Prepare a submission (sqe) send
-    io_uring_sqe* send_prep(const Request* req, int32_t msg_flags = 0, int32_t flags = 0);
+    io_uring_sqe* send_prep(const Request* req, int32_t msg_flags = 0, uint8_t flags = 0);
     /// Prepare a submission (sqe) recv
-    io_uring_sqe* recv_prep(Request* req, int32_t msg_flags = 0, int32_t flags = 0);
+    io_uring_sqe* recv_prep(Request* req, int32_t msg_flags = 0, uint8_t flags = 0);
     /// Prepare a submission (sqe) send with timeout
-    io_uring_sqe* send_prep_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0, int32_t flags = 0);
+    io_uring_sqe* send_prep_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0, uint8_t flags = 0);
     /// Prepare a submission (sqe) recv with timeout
-    io_uring_sqe* recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0, int32_t flags = 0);
+    io_uring_sqe* recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0, uint8_t flags = 0);
 
     /// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests
     uint32_t submitCompleteAll(uint32_t events, std::vector<IOUringSocket::Request*>& completions);

@@ -36,7 +36,7 @@ class AWS : public Provider {
         /// The custom endpoint
         std::string endpoint;
         /// The port
-        int port = 80;
+        uint32_t port = 80;
     };
 
     /// The secret

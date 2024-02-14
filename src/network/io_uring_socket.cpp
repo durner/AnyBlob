@@ -1,4 +1,5 @@
 #include "network/io_uring_socket.hpp"
+#include <cassert>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -13,7 +14,7 @@
 #include <unistd.h>
 #ifndef ANYBLOB_LIBCXX_COMPAT
 #include "network/throughput_resolver.hpp"
-#endif 
+#endif
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -292,31 +293,34 @@ void IOUringSocket::addResolver(const string& hostname, unique_ptr<Resolver> res
     _resolverCache.emplace(string(Resolver::tld(hostname)), move(resolver));
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::send_prep(const Request* req, int32_t msg_flags, int32_t flags)
+io_uring_sqe* IOUringSocket::send_prep(const Request* req, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) send
 {
+    assert(req->length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_send(sqe, req->fd, req->data.cdata, req->length, msg_flags);
+    io_uring_prep_send(sqe, req->fd, req->data.cdata, static_cast<uint64_t>(req->length), msg_flags);
     sqe->flags |= flags;
     sqe->user_data = reinterpret_cast<uintptr_t>(req);
     return sqe;
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::recv_prep(Request* req, int32_t msg_flags, int32_t flags)
+io_uring_sqe* IOUringSocket::recv_prep(Request* req, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) recv
 {
+    assert(req->length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_recv(sqe, req->fd, req->data.data, req->length, msg_flags);
+    io_uring_prep_recv(sqe, req->fd, req->data.data, static_cast<uint64_t>(req->length), msg_flags);
     sqe->flags |= flags;
     sqe->user_data = reinterpret_cast<uintptr_t>(req);
     return sqe;
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::send_prep_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags, int32_t flags)
+io_uring_sqe* IOUringSocket::send_prep_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) send with relative timeout
 {
+    assert(req->length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_send(sqe, req->fd, req->data.cdata, req->length, msg_flags);
+    io_uring_prep_send(sqe, req->fd, req->data.cdata, static_cast<uint64_t>(req->length), msg_flags);
     sqe->flags |= flags | IOSQE_IO_LINK;
     sqe->user_data = reinterpret_cast<uintptr_t>(req);
     auto timeoutSqe = io_uring_get_sqe(&_uring);
@@ -325,11 +329,12 @@ io_uring_sqe* IOUringSocket::send_prep_to(const Request* req, __kernel_timespec*
     return sqe;
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags, int32_t flags)
+io_uring_sqe* IOUringSocket::recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) recv with relative timeout
 {
+    assert(req->length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_recv(sqe, req->fd, req->data.data, req->length, msg_flags);
+    io_uring_prep_recv(sqe, req->fd, req->data.data, static_cast<uint64_t>(req->length), msg_flags);
     sqe->flags |= flags | IOSQE_IO_LINK;
     sqe->user_data = reinterpret_cast<uintptr_t>(req);
     auto timeoutSqe = io_uring_get_sqe(&_uring);

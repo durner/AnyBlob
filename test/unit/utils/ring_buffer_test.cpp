@@ -30,11 +30,11 @@ TEST_CASE("ring_buffer") {
 //---------------------------------------------------------------------------
 TEST_CASE("single_threaded_insert_multi_threaded_consume") {
     RingBuffer<uint64_t> rb(1000);
-    for (int i = 0; i < 1000; i++) {
+    for (auto i = 0u; i < 1000u; i++) {
         REQUIRE(rb.insert<true>(i) != ~0ull);
     }
     std::vector<std::thread> threads;
-    for (int i = 0; i < 10; i++) {
+    for (auto i = 0u; i < 10u; i++) {
         threads.push_back(std::thread([&] {
             for (int j = 0; j < 100; j++) {
                 REQUIRE(rb.consume<true>().value() < 1000ul);
@@ -50,9 +50,9 @@ TEST_CASE("single_threaded_insert_multi_threaded_consume") {
 TEST_CASE("multi_threaded_ring_buffer") {
     RingBuffer<uint64_t> rb(1000);
     std::vector<std::thread> threads;
-    for (int i = 0; i < 10; i++) {
+    for (auto i = 0u; i < 10u; i++) {
         threads.push_back(std::thread([&] {
-            for (int j = 0; j < 100; j++) {
+            for (auto j = 0u; j < 100u; j++) {
                 REQUIRE(rb.insert<true>(j) != ~0ull);
             }
         }));
@@ -60,7 +60,7 @@ TEST_CASE("multi_threaded_ring_buffer") {
     for (auto& th : threads) {
         th.join();
     }
-    for (int i = 0; i < 1000; i++) {
+    for (auto i = 0u; i < 1000u; i++) {
         REQUIRE(rb.consume().value() < 100ul);
     }
     REQUIRE(!rb.consume().has_value());
@@ -71,7 +71,7 @@ TEST_CASE("multi_threaded_ring_buffer_multi_threaded_consume") {
     std::vector<std::thread> threads;
     for (int i = 0; i < 10; i++) {
         threads.push_back(std::thread([&] {
-            for (int j = 0; j < 100; j++) {
+            for (auto j = 0u; j < 100u; j++) {
                 REQUIRE(rb.insert<true>(j) != ~0ull);
             }
         }));
@@ -83,7 +83,7 @@ TEST_CASE("multi_threaded_ring_buffer_multi_threaded_consume") {
     threads.clear();
     for (int i = 0; i < 10; i++) {
         threads.push_back(std::thread([&] {
-            for (int j = 0; j < 100; j++) {
+            for (auto j = 0u; j < 100u; j++) {
                 REQUIRE(rb.consume<true>().value() < 100ul);
             }
         }));
