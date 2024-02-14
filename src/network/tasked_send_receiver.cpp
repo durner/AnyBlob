@@ -29,7 +29,7 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _cv(), _mutex()
+TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _tcpSettings(make_unique<ConnectionManager::TCPSettings>()), _cv(), _mutex()
 // Initializes the global submissions and completions
 {
     TLSContext::initOpenSSL();
@@ -138,10 +138,9 @@ bool TaskedSendReceiverHandle::sendReceive(bool oneQueueInvocation)
     return true;
 }
 //---------------------------------------------------------------------------
-TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _submissions(), _next(nullptr), _socketWrapper(make_unique<IOUringSocket>(group._concurrentRequests << 2)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
+TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _submissions(), _next(nullptr), _connectionManager(make_unique<ConnectionManager>(group._concurrentRequests << 2, group._cacheEntries)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
 // The constructor
 {
-    _context = make_unique<TLSContext>();
 }
 //---------------------------------------------------------------------------
 void TaskedSendReceiver::run()
@@ -152,13 +151,6 @@ void TaskedSendReceiver::run()
     } catch (const exception& e) {
         cerr << e.what() << endl;
     };
-}
-//---------------------------------------------------------------------------
-int32_t TaskedSendReceiver::connect(const string& hostname, uint32_t port)
-// Connect to the socket
-{
-    IOUringSocket::TCPSettings tcpSettings;
-    return _socketWrapper->connect(hostname, port, tcpSettings);
 }
 //---------------------------------------------------------------------------
 bool TaskedSendReceiver::send(OriginalMessage* msg)
@@ -191,7 +183,7 @@ unique_ptr<utils::DataVector<uint8_t>> TaskedSendReceiver::getReused()
 void TaskedSendReceiver::addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver)
 // Adds a resolver
 {
-    _socketWrapper->addResolver(hostname, move(resolver));
+    _connectionManager->addResolver(hostname, move(resolver));
 }
 //--------------------------------------------------------------------------
 void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
@@ -211,7 +203,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 break;
 
             auto original = val.value();
-            auto messageTask = MessageTask::buildMessageTask(original, *_context, _group._chunkSize);
+            auto messageTask = MessageTask::buildMessageTask(original, *_group._tcpSettings, _group._chunkSize);
             assert(messageTask.get());
 
             if (!original->result.getDataVector().capacity()) {
@@ -224,7 +216,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 (*_timings)[original->traceId].start = chrono::steady_clock::now();
 
             // Start the message process
-            if (messageTask->execute(*_socketWrapper) == MessageState::Aborted) {
+            if (messageTask->execute(*_connectionManager) == MessageState::Aborted) {
                 if (messageTask->originalMessage->requiresFinish())
                     messageTask->originalMessage->finish();
                 continue;
@@ -242,7 +234,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
         while (!_submissions.empty()) {
             OriginalMessage* original = _submissions.front();
             _submissions.pop();
-            auto messageTask = MessageTask::buildMessageTask(original, *_context, _group._chunkSize);
+            auto messageTask = MessageTask::buildMessageTask(original, *_group._tcpSettings, _group._chunkSize);
             assert(messageTask.get());
 
             if (!original->result.getDataVector().capacity()) {
@@ -255,7 +247,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 (*_timings)[original->traceId].start = chrono::steady_clock::now();
 
             // Start the message process
-            if (messageTask->execute(*_socketWrapper) == MessageState::Aborted) {
+            if (messageTask->execute(*_connectionManager) == MessageState::Aborted) {
                 if (messageTask->originalMessage->requiresFinish())
                     messageTask->originalMessage->finish();
                 continue;
@@ -274,7 +266,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             // get cqe
             IOUringSocket::Request* req;
             try {
-                req = _socketWrapper->complete();
+                req = _connectionManager->getSocketConnection().complete();
             } catch (const exception& e) {
                 continue;
             }
@@ -288,7 +280,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             // get the task
             auto task = reinterpret_cast<MessageTask*>(req->messageTask);
             // execute next task
-            auto status = task->execute(*_socketWrapper);
+            auto status = task->execute(*_connectionManager);
             // check if finished
             if (status == MessageState::Finished || status == MessageState::Aborted) {
                 for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
@@ -313,7 +305,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
         if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests) {
             local ? emplaceLocalRequest() : emplaceNewRequest();
         }
-        auto cnt = _socketWrapper->submit();
+        auto cnt = _connectionManager->getSocketConnection().submit();
         if (cnt < 0)
             throw runtime_error("io_uring_submit error: " + to_string(-cnt));
         else
@@ -332,7 +324,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
 int32_t TaskedSendReceiver::submitRequests()
 // Submits the queue
 {
-    return _socketWrapper->submit();
+    return _connectionManager->getSocketConnection().submit();
 }
 //---------------------------------------------------------------------------
 } // namespace network

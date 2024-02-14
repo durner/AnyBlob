@@ -1,5 +1,6 @@
 #pragma once
 #include "network/config.hpp"
+#include "network/connection_manager.hpp"
 #include "network/io_uring_socket.hpp"
 #include "network/message_task.hpp"
 #include "network/tls_context.hpp"
@@ -56,6 +57,10 @@ class TaskedSendReceiverGroup {
     uint64_t _chunkSize;
     /// The queue maximum for each TaskedSendReceiver
     unsigned _concurrentRequests;
+    /// The maximum dns cache size
+    unsigned _cacheEntries = 32;
+    /// The TCP settings
+    std::unique_ptr<ConnectionManager::TCPSettings> _tcpSettings;
 
     /// Condition variable to stop wasting wait cycles
     std::condition_variable _cv;
@@ -108,12 +113,10 @@ class TaskedSendReceiver {
     /// Implicitly handle the unused send receivers
     std::atomic<TaskedSendReceiver*> _next;
 
-    /// The socket wrapper
-    std::unique_ptr<IOUringSocket> _socketWrapper;
+    /// The connection manager
+    std::unique_ptr<ConnectionManager> _connectionManager;
     /// The current tasks
     std::vector<std::unique_ptr<MessageTask>> _messageTasks;
-    /// The tls context
-    std::unique_ptr<TLSContext> _context;
     /// Timing infos
     std::vector<utils::TimingHelper>* _timings;
     /// Stops the daemon
@@ -156,8 +159,6 @@ class TaskedSendReceiver {
     private:
     /// Submits queue and waits for result
     void sendReceive(bool local = false, bool oneQueueInvocation = true);
-    /// Connect to the socket return fd
-    [[nodiscard]] int32_t connect(const std::string& hostname, uint32_t port);
     /// Submits the queue
     [[nodiscard]] int32_t submitRequests();
 

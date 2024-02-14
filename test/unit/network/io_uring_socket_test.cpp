@@ -1,6 +1,6 @@
 #include "catch2/single_include/catch2/catch.hpp"
 #include "cloud/aws_resolver.hpp"
-#include "network/io_uring_socket.hpp"
+#include "network/connection_manager.hpp"
 #include "perfevent/PerfEvent.hpp"
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -16,9 +16,9 @@ namespace test {
 //---------------------------------------------------------------------------
 TEST_CASE("io_uring_socket") {
     PerfEventBlock e;
-    IOUringSocket io(10, 0);
-    IOUringSocket::TCPSettings tcpSettings;
-    REQUIRE(io.connect("db.in.tum.de", 80, tcpSettings) > 0);
+    ConnectionManager io (10, 10);
+    ConnectionManager::TCPSettings tcpSettings;
+    REQUIRE(io.connect("db.in.tum.de", 80, false, tcpSettings) > 0);
 }
 //---------------------------------------------------------------------------
 } // namespace test

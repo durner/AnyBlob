@@ -1,5 +1,6 @@
 #include "cloud/aws.hpp"
 #include "cloud/aws_resolver.hpp"
+#include "cloud/http.hpp"
 #include "network/http_helper.hpp"
 #include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
@@ -56,7 +57,11 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendRece
 {
     if (_type == Provider::CloudService::AWS) {
         auto message = downloadInstanceInfo();
-        auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+        RemoteInfo info;
+        info.endpoint = getIAMAddress();
+        info.port = getIAMPort();
+        HTTP http(info);
+        auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
         sendReceiver.sendSync(originalMsg.get());
         sendReceiver.processSync();
         auto& content = originalMsg->result.getDataVector();
@@ -76,7 +81,11 @@ string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
 // Uses the send receiver to get the region
 {
     auto message = downloadInstanceInfo("placement/region");
-    auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+    RemoteInfo info;
+    info.endpoint = getIAMAddress();
+    info.port = getIAMPort();
+    HTTP http(info);
+    auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     sendReceiver.sendSync(originalMsg.get());
     sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();
@@ -226,7 +235,11 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
                 if (validKeys(180))
                     return;
                 auto message = downloadIAMUser();
-                auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+                RemoteInfo info;
+                info.endpoint = getIAMAddress();
+                info.port = getIAMPort();
+                HTTP http(info);
+                auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
                 sendReceiver.sendSync(originalMsg.get());
                 sendReceiver.processSync();
                 auto& content = originalMsg->result.getDataVector();
@@ -234,7 +247,7 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
                 auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
                 string iamUser;
                 message = downloadSecret(s, iamUser);
-                originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+                originalMsg = make_unique<network::OriginalMessage>(move(message), http);
                 sendReceiver.sendSync(originalMsg.get());
                 sendReceiver.processSync();
                 auto& secretContent = originalMsg->result.getDataVector();
@@ -255,7 +268,11 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
                     return;
 
                 auto message = getSessionToken();
-                auto originalMsg = make_unique<network::OriginalMessage>(move(message), _settings.bucket + ".s3.amazonaws.com", getPort());
+                RemoteInfo info;
+                info.endpoint = _settings.bucket + ".s3.amazonaws.com";
+                info.port = getPort();
+                HTTP http(info);
+                auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
                 sendReceiver.sendSync(originalMsg.get());
                 sendReceiver.processSync();
                 auto& secretContent = originalMsg->result.getDataVector();

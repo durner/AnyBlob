@@ -38,14 +38,14 @@ class DataVector {
     }
 
     /// Copy constructor
-    constexpr DataVector(DataVector& rhs) : _capacity(0), _size(0) {
+    constexpr DataVector(DataVector& rhs) : _capacity(0), _size(0), _data(nullptr) {
         reserve(rhs._capacity);
         _size = rhs._size;
         std::memcpy(data(), rhs.data(), size() * sizeof(T));
     }
 
     /// Constructor from other pointers
-    constexpr DataVector(const T* start, const T* end) : _capacity(0), _size(0) {
+    constexpr DataVector(const T* start, const T* end) : _capacity(0), _size(0), _data(nullptr) {
         assert(end - start >= 0);
         resize(static_cast<uint64_t>(end - start));
         std::memcpy(data(), start, size() * sizeof(T));

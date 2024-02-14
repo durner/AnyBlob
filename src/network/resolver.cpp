@@ -42,7 +42,7 @@ Resolver::Resolver(unsigned entries)
     _addrCtr = 0;
 }
 //---------------------------------------------------------------------------
-unsigned Resolver::resolve(string hostname, string port, bool& oldAddress)
+const addrinfo* Resolver::resolve(string hostname, string port, bool& oldAddress)
 // Resolve the request
 {
     auto addrPos = _addrCtr % static_cast<unsigned>(_addrString.size());
@@ -64,7 +64,7 @@ unsigned Resolver::resolve(string hostname, string port, bool& oldAddress)
         _addrString[addrPos] = {move(hostString), 12};
         oldAddress = false;
     }
-    return addrPos;
+    return _addr[addrPos].get();
 }
 //---------------------------------------------------------------------------
 }; // namespace network

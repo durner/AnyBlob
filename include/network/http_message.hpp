@@ -14,21 +14,17 @@ namespace network {
 //---------------------------------------------------------------------------
 /// Implements a http message roundtrip
 struct HTTPMessage : public MessageTask {
-    /// The receive chunk size
-    uint64_t chunkSize;
-    /// The tcp settings
-    IOUringSocket::TCPSettings tcpSettings;
     /// HTTP info header
     std::unique_ptr<HttpHelper::Info> info;
 
     /// The constructor
-    HTTPMessage(OriginalMessage* sendingMessage, uint64_t chunkSize);
+    HTTPMessage(OriginalMessage* sendingMessage, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunkSize);
     /// The destructor
     ~HTTPMessage() override = default;
     /// The message excecute callback
-    MessageState execute(IOUringSocket& socket) override;
+    MessageState execute(ConnectionManager& connectionManager) override;
     /// Reset for restart
-    void reset(IOUringSocket& socket, bool aborted);
+    void reset(ConnectionManager& connectionManager, bool aborted);
 };
 //---------------------------------------------------------------------------
 } // namespace network

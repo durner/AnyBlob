@@ -43,11 +43,11 @@ class ThroughputResolver : public network::Resolver {
 
     public:
     /// The constructor
-    explicit ThroughputResolver(unsigned entries);
+    explicit ThroughputResolver(unsigned cacheEntries);
     /// The address resolving
-    virtual unsigned resolve(std::string hostname, std::string port, bool& reuse) override;
+    virtual const addrinfo* resolve(std::string hostname, std::string port, bool& reuse) override;
     /// Start the timing
-    virtual void startSocket(int fd, unsigned ipAsInt) override;
+    virtual void startSocket(int fd) override;
     /// Stop the timing
     virtual void stopSocket(int fd, uint64_t bytes) override;
     /// Clears the used server from the cache

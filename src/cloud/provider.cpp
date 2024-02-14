@@ -2,6 +2,7 @@
 #include "cloud/aws.hpp"
 #include "cloud/azure.hpp"
 #include "cloud/gcp.hpp"
+#include "cloud/http.hpp"
 #include "cloud/ibm.hpp"
 #include "cloud/minio.hpp"
 #include "cloud/oracle.hpp"
@@ -60,7 +61,7 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
         if (fileName.starts_with(remoteFile[i])) {
             // Handle cloud provider the same except MinIO includes endpoint
             auto sub = fileName.substr(remoteFile[i].size());
-            if (!remoteFile[i].compare("minio://")) {
+            if (!remoteFile[i].compare("http://") || !remoteFile[i].compare("https://") || !remoteFile[i].compare("minio://")) {
                 auto pos = sub.find('/');
                 auto addressPort = sub.substr(0, pos);
                 if (auto colonPos = addressPort.find(':'); colonPos != string::npos) {
@@ -70,7 +71,7 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
                     info.port = static_cast<unsigned>(port);
                 } else {
                     info.endpoint = addressPort;
-                    info.port = 80;
+                    info.port = remoteFile[i].compare("https://") ? 80 : 443;
                 }
                 sub = sub.substr(pos + 1);
             }
@@ -228,6 +229,14 @@ unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, 
         case anyblob::cloud::Provider::CloudService::MinIO: {
             auto minio = make_unique<anyblob::cloud::MinIO>(info, keyId, secret);
             return minio;
+        }
+        case anyblob::cloud::Provider::CloudService::HTTP: {
+            auto http = make_unique<anyblob::cloud::HTTP>(info);
+            return http;
+        }
+        case anyblob::cloud::Provider::CloudService::HTTPS: {
+            auto http = make_unique<anyblob::cloud::HTTP>(info);
+            return http;
         }
         default: {
             throw runtime_error("Local requests are still unsupported!");

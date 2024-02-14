@@ -14,8 +14,8 @@ namespace anyblob {
 namespace network {
 //---------------------------------------------------------------------------
 struct HTTPSMessage;
-class IOUringSocket;
 class TLSContext;
+class ConnectionManager;
 //---------------------------------------------------------------------------
 /// The TLS Interface
 //---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ class TLSConnection {
         }
     };
     /// The corresponding
-    HTTPSMessage& _message;
+    HTTPSMessage* _message;
     /// The SSL context
     TLSContext& _context;
     /// The SSL connection
@@ -91,36 +91,38 @@ class TLSConnection {
     std::unique_ptr<char[]> _buffer;
     /// The state
     State _state;
+    /// Already conencted
+    bool _connected;
 
     public:
     /// The constructor
-    TLSConnection(HTTPSMessage& message, TLSContext& context);
+    TLSConnection(TLSContext& context);
 
     /// The destructor
     ~TLSConnection();
 
     // Initialze SSL
-    [[nodiscard]] bool init();
+    [[nodiscard]] bool init(HTTPSMessage* message);
     // Initialze SSL
     void destroy();
     /// Get the SSL/TLS context
     [[nodiscard]] inline TLSContext& getContext() const { return _context; }
 
     /// Recv a TLS encrypted message
-    [[nodiscard]] Progress recv(IOUringSocket& socket, char* buffer, int64_t bufferLength, int64_t& resultLength);
+    [[nodiscard]] Progress recv(ConnectionManager& connectionManager, char* buffer, int64_t bufferLength, int64_t& resultLength);
     /// Send a TLS encrypted message
-    [[nodiscard]] Progress send(IOUringSocket& socket, const char* buffer, int64_t bufferLength, int64_t& resultLength);
+    [[nodiscard]] Progress send(ConnectionManager& connectionManager, const char* buffer, int64_t bufferLength, int64_t& resultLength);
     /// SSL/TLS connect
-    [[nodiscard]] Progress connect(IOUringSocket& socket);
+    [[nodiscard]] Progress connect(ConnectionManager& connectionManager);
     /// SSL/TLS shutdown
-    [[nodiscard]] Progress shutdown(IOUringSocket& socket, bool failedOnce = false);
+    [[nodiscard]] Progress shutdown(ConnectionManager& connectionManager, bool failedOnce = false);
 
     private:
     /// Helper function that handles the SSL_op calls
     template <typename F>
-    Progress operationHelper(IOUringSocket& socket, F&& func, int64_t& result);
+    Progress operationHelper(ConnectionManager& connectionManager, F&& func, int64_t& result);
     /// The processing of the shadow tls layer
-    Progress process(IOUringSocket& socket);
+    Progress process(ConnectionManager& connectionManager);
 };
 //---------------------------------------------------------------------------
 } // namespace network

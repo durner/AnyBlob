@@ -19,7 +19,7 @@ namespace network {
 //---------------------------------------------------------------------------
 class IOUringSocket;
 //---------------------------------------------------------------------------
-/// The addr resolver and cacher
+/// The addr resolver and cacher, which is not thread safe
 class Resolver {
     protected:
     /// The addr info
@@ -33,13 +33,11 @@ class Resolver {
     /// The constructor
     explicit Resolver(unsigned entries);
     /// The address resolving
-    virtual unsigned resolve(std::string hostname, std::string port, bool& oldAddress);
-    /// Increment the addr ctr
-    void increment() { _addrCtr++; }
-    /// Erase the current cache
-    void erase() { _addrString[_addrCtr % _addrString.size()].second = 0; }
-    /// Start the timing
-    virtual void startSocket(int /*fd*/, unsigned /*ipAsInt*/) {}
+    virtual const addrinfo* resolve(std::string hostname, std::string port, bool& oldAddress);
+    /// Reset the current cache bucket
+    void resetBucket() { _addrString[_addrCtr % _addrString.size()].second = 0; }
+    /// Start the timing and advance to the next cache bucket
+    virtual void startSocket(int /*fd*/) { _addrCtr++; }
     /// Stop the timing
     virtual void stopSocket(int /*fd*/, uint64_t /*bytes*/) {}
     /// Shutdown of the socket should clear the same addresses

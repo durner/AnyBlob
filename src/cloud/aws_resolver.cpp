@@ -23,7 +23,7 @@ AWSResolver::AWSResolver(unsigned entries) : Resolver(entries), _mtuCache()
 {
 }
 //---------------------------------------------------------------------------
-unsigned AWSResolver::resolve(string hostname, string port, bool& oldAddress)
+const addrinfo* AWSResolver::resolve(string hostname, string port, bool& oldAddress)
 // Resolve the request
 {
     auto addrPos = _addrCtr % static_cast<unsigned>(_addrString.size());
@@ -70,7 +70,7 @@ unsigned AWSResolver::resolve(string hostname, string port, bool& oldAddress)
         }
         oldAddress = false;
     }
-    return addrPos;
+    return _addr[addrPos].get();
 }
 //---------------------------------------------------------------------------
 }; // namespace cloud

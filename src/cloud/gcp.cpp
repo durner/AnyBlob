@@ -1,4 +1,5 @@
 #include "cloud/gcp.hpp"
+#include "cloud/http.hpp"
 #include "cloud/gcp_signer.hpp"
 #include "network/http_helper.hpp"
 #include "network/original_message.hpp"
@@ -44,7 +45,11 @@ Provider::Instance GCP::getInstanceDetails(network::TaskedSendReceiver& sendRece
 // Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo();
-    auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+    RemoteInfo info;
+    info.endpoint = getIAMAddress();
+    info.port = getIAMPort();
+    HTTP http(info);
+    auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     sendReceiver.sendSync(originalMsg.get());
     sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();
@@ -63,7 +68,11 @@ string GCP::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
 // Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo("zone");
-    auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+    RemoteInfo info;
+    info.endpoint = getIAMAddress();
+    info.port = getIAMPort();
+    HTTP http(info);
+    auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     sendReceiver.sendSync(originalMsg.get());
     sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();

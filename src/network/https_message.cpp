@@ -1,4 +1,5 @@
 #include "network/https_message.hpp"
+#include "network/connection_manager.hpp"
 #include "network/http_response.hpp"
 #include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
@@ -23,43 +24,44 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-HTTPSMessage::HTTPSMessage(OriginalMessage* message, TLSContext& context, uint64_t chunkSize) : HTTPMessage(message, chunkSize)
+HTTPSMessage::HTTPSMessage(OriginalMessage* message, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunkSize) : HTTPMessage(message, tcpSettings, chunkSize)
 // The constructor
 {
     type = Type::HTTPS;
-    tlsLayer = make_unique<TLSConnection>(*this, context);
 }
 //---------------------------------------------------------------------------
-MessageState HTTPSMessage::execute(IOUringSocket& socket)
+MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
 // executes the task
 {
     auto& state = originalMessage->result.state;
     switch (state) {
         case MessageState::Init: {
             try {
-                fd = socket.connect(originalMessage->hostname, originalMessage->port, tcpSettings);
+                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), true, tcpSettings);
             } catch (exception& /*e*/) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
                 state = MessageState::Aborted;
                 return state;
             }
-            if (!tlsLayer->init()) {
+            tlsLayer = connectionManager.getTLSConnection(fd);
+            if (!tlsLayer->init(this)) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
-                reset(socket, failures++ > failuresMax);
-                return execute(socket);
+                reset(connectionManager, failures++ > failuresMax);
+                return execute(connectionManager);
             }
             state = MessageState::TLSHandshake;
             sendBufferOffset = 0;
         } // fallthrough
         case MessageState::TLSHandshake: {
             // Handshake procedure
-            auto status = tlsLayer->connect(socket);
+            // TODO: Think about active sessions
+            auto status = tlsLayer->connect(connectionManager);
             if (status == TLSConnection::Progress::Finished) {
                 state = MessageState::InitSending;
             } else if (status == TLSConnection::Progress::Aborted) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
-                reset(socket, failures++ > failuresMax);
-                return execute(socket);
+                reset(connectionManager, failures++ > failuresMax);
+                return execute(connectionManager);
             } else {
                 return state;
             }
@@ -75,7 +77,7 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
             }
 
             int64_t result = 0;
-            auto status = tlsLayer->send(socket, reinterpret_cast<const char*>(ptr), length, result);
+            auto status = tlsLayer->send(connectionManager, reinterpret_cast<const char*>(ptr), length, result);
             if (status == TLSConnection::Progress::Finished) {
                 sendBufferOffset += result;
                 if (sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size() + originalMessage->putLength)) {
@@ -84,10 +86,10 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
                     originalMessage->result.getDataVector().clear();
                     originalMessage->result.getDataVector().resize(originalMessage->result.getDataVector().size() + chunkSize);
                 }
-                return execute(socket);
+                return execute(connectionManager);
             } else if (status == TLSConnection::Progress::Aborted) {
-                reset(socket, failures++ > failuresMax);
-                return execute(socket);
+                reset(connectionManager, failures++ > failuresMax);
+                return execute(connectionManager);
             }
             return state;
         }
@@ -96,7 +98,7 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
             auto& receive = originalMessage->result.getDataVector();
             int64_t result = 0;
             assert(in_range<int64_t>(chunkSize));
-            auto status = tlsLayer->recv(socket, reinterpret_cast<char*>(receive.data() + receiveBufferOffset), static_cast<int64_t>(chunkSize), result);
+            auto status = tlsLayer->recv(connectionManager, reinterpret_cast<char*>(receive.data() + receiveBufferOffset), static_cast<int64_t>(chunkSize), result);
             state = MessageState::Receiving;
             if (status == TLSConnection::Progress::Finished) {
                 receive.resize(receive.size() - (chunkSize - static_cast<uint64_t>(result)));
@@ -108,35 +110,36 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
                             state = MessageState::TLSShutdown;
                         } else {
                             originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
-                            reset(socket, true);
+                            reset(connectionManager, true);
                         }
+                        // TODO: Decide if to cache the session
                         state = MessageState::TLSShutdown;
-                        return execute(socket);
+                        return execute(connectionManager);
                     } else {
                         // resize and grow capacity
                         if (receive.capacity() < receive.size() + chunkSize && info) {
                             receive.reserve(max(info->length + info->headerLength + chunkSize, receive.capacity() + receive.capacity() / 2));
                         }
                         receive.resize(receive.size() + chunkSize);
-                        return execute(socket);
+                        return execute(connectionManager);
                     }
                 } catch (exception&) {
                     originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
-                    reset(socket, failures++ > failuresMax);
-                    return execute(socket);
+                    reset(connectionManager, failures++ > failuresMax);
+                    return execute(connectionManager);
                 }
             } else if (status == TLSConnection::Progress::Aborted) {
-                reset(socket, failures++ > failuresMax);
-                return execute(socket);
+                reset(connectionManager, failures++ > failuresMax);
+                return execute(connectionManager);
             }
             return state;
         }
         case MessageState::TLSShutdown: {
             // Shutdown procedure
-            auto status = tlsLayer->shutdown(socket);
+            auto status = tlsLayer->shutdown(connectionManager);
             // The request was successful even if the shutdown fails
             if (status == TLSConnection::Progress::Finished || status == TLSConnection::Progress::Aborted) {
-                socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
+                connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                 state = MessageState::Finished;
                 return MessageState::Finished;
             } else {
@@ -153,11 +156,11 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
     return state;
 }
 //---------------------------------------------------------------------------
-void HTTPSMessage::reset(IOUringSocket& socket, bool aborted)
+void HTTPSMessage::reset(ConnectionManager& connectionManager, bool aborted)
 // Reset for restart
 {
-    tlsLayer = make_unique<TLSConnection>(*this, tlsLayer->getContext());
-    HTTPMessage::reset(socket, aborted);
+    // TODO: tlsLayer = make_unique<TLSConnection>(*this, tlsLayer->getContext());
+    HTTPMessage::reset(connectionManager, aborted);
 }
 //---------------------------------------------------------------------------
 } // namespace network
