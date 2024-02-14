@@ -13,23 +13,21 @@
 namespace anyblob {
 namespace network {
 //---------------------------------------------------------------------------
-class TLSContext;
-//---------------------------------------------------------------------------
 /// Implements a https message roundtrip
 struct HTTPSMessage : public HTTPMessage {
+    /// The tls layer
+    TLSConnection* tlsLayer;
     /// The fd
-    int fd;
-    /// The TLSLayer
-    std::unique_ptr<TLSConnection> tlsLayer;
+    int32_t fd;
 
     /// The constructor
-    HTTPSMessage(OriginalMessage* sendingMessage, TLSContext& context, uint64_t chunkSize);
+    HTTPSMessage(OriginalMessage* sendingMessage, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunksize);
     /// The destructor
     ~HTTPSMessage() override = default;
     /// The message excecute callback
-    MessageState execute(IOUringSocket& socket) override;
+    MessageState execute(ConnectionManager& connectionManager) override;
     /// Reset for restart
-    void reset(IOUringSocket& socket, bool aborted);
+    void reset(ConnectionManager& socket, bool aborted);
 };
 //---------------------------------------------------------------------------
 } // namespace network

@@ -1,6 +1,8 @@
 #pragma once
+#include "cloud/provider.hpp"
 #include "network/http_helper.hpp"
 #include "network/io_uring_socket.hpp"
+#include "network/connection_manager.hpp"
 #include "network/original_message.hpp"
 #include "utils/data_vector.hpp"
 #include <memory>
@@ -22,6 +24,7 @@ class Timer;
 //---------------------------------------------------------------------------
 namespace network {
 class TLSContext;
+class ConnectionManager;
 //---------------------------------------------------------------------------
 /// This implements a message task
 /// After each execute invocation a new request was added to the uring queue and requires submission
@@ -34,12 +37,16 @@ struct MessageTask {
 
     /// Original sending message
     OriginalMessage* originalMessage;
+    /// The TCP Settings
+    ConnectionManager::TCPSettings& tcpSettings;
     /// Send message
     std::unique_ptr<IOUringSocket::Request> request;
     /// The reduced offset in the send buffers
     int64_t sendBufferOffset;
     /// The reduced offset in the receive buffers
     int64_t receiveBufferOffset;
+    /// The chunksize
+    uint32_t chunkSize;
     /// The failures
     uint16_t failures;
     /// The message task class
@@ -49,16 +56,16 @@ struct MessageTask {
     static constexpr uint16_t failuresMax = 32;
 
     /// The pure virtual  callback
-    virtual MessageState execute(IOUringSocket& socket) = 0;
+    virtual MessageState execute(ConnectionManager& connectionManager) = 0;
     /// The pure virtual destuctor
     virtual ~MessageTask(){};
 
     /// Builds the message task according to the sending message
     template <typename... Args>
-    static std::unique_ptr<MessageTask> buildMessageTask(OriginalMessage* sendingMessage, TLSContext& context, Args&&... args) {
+    static std::unique_ptr<MessageTask> buildMessageTask(OriginalMessage* sendingMessage, Args&&... args) {
         std::string_view s(reinterpret_cast<char*>(sendingMessage->message->data()), sendingMessage->message->size());
-        if (s.find("HTTP") != std::string_view::npos && sendingMessage->port == 443) {
-            return std::make_unique<HTTPSMessage>(sendingMessage, context, std::forward<Args>(args)...);
+        if (s.find("HTTP") != std::string_view::npos && sendingMessage->provider.getPort() == 443) {
+            return std::make_unique<HTTPSMessage>(sendingMessage, std::forward<Args>(args)...);
         } else if (s.find("HTTP") != std::string_view::npos) {
             return std::make_unique<HTTPMessage>(sendingMessage, std::forward<Args>(args)...);
         }
@@ -67,7 +74,7 @@ struct MessageTask {
 
     protected:
     /// The constructor
-    MessageTask(OriginalMessage* sendingMessage);
+    MessageTask(OriginalMessage* sendingMessage, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunkSize);
 };
 //---------------------------------------------------------------------------
 } // namespace network

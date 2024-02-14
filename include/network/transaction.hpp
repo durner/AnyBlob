@@ -115,7 +115,7 @@ class Transaction {
     inline bool getObjectRequest(const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
-        auto originalMsg = std::make_unique<network::OriginalMessage>(_provider->getRequest(remotePath, range), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        auto originalMsg = std::make_unique<network::OriginalMessage>(_provider->getRequest(remotePath, range), *_provider, result, capacity, traceId);
         if (!originalMsg)
             return false;
         _messages.push_back(std::move(originalMsg));
@@ -128,7 +128,7 @@ class Transaction {
     inline bool getObjectRequest(Callback&& callback, const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
-        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(callback), _provider->getRequest(remotePath, range), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(callback), _provider->getRequest(remotePath, range), *_provider, result, capacity, traceId);
         if (!originalMsg)
             return false;
         _messages.push_back(std::move(originalMsg));
@@ -142,7 +142,7 @@ class Transaction {
         if (_provider->multipartUploadSize() && size > _provider->multipartUploadSize())
             return putObjectRequestMultiPart(remotePath, data, size, result, capacity, traceId);
         auto object = std::string_view(data, size);
-        auto originalMsg = std::make_unique<network::OriginalMessage>(_provider->putRequest(remotePath, object), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        auto originalMsg = std::make_unique<network::OriginalMessage>(_provider->putRequest(remotePath, object), *_provider, result, capacity, traceId);
         originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data), size);
         if (!originalMsg)
             return false;
@@ -158,7 +158,7 @@ class Transaction {
         if (_provider->multipartUploadSize() && size > _provider->multipartUploadSize())
             return putObjectRequestMultiPart(std::forward<Callback>(callback), remotePath, data, size, result, capacity, traceId);
         auto object = std::string_view(data, size);
-        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(callback), _provider->putRequest(remotePath, object), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(callback), _provider->putRequest(remotePath, object), *_provider, result, capacity, traceId);
         originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data), size);
         if (!originalMsg)
             return false;
@@ -170,7 +170,7 @@ class Transaction {
     inline bool deleteObjectRequest(const std::string& remotePath, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
-        auto originalMsg = std::make_unique<network::OriginalMessage>(_provider->deleteRequest(remotePath), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        auto originalMsg = std::make_unique<network::OriginalMessage>(_provider->deleteRequest(remotePath), *_provider, result, capacity, traceId);
         if (!originalMsg)
             return false;
         _messages.push_back(std::move(originalMsg));
@@ -182,7 +182,7 @@ class Transaction {
     inline bool deleteObjectRequest(Callback&& callback, const std::string& remotePath, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
-        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(callback), _provider->deleteRequest(remotePath), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        auto originalMsg = std::make_unique<network::OriginalCallbackMessage<Callback>>(std::forward<Callback>(callback), _provider->deleteRequest(remotePath), *_provider, result, capacity, traceId);
         if (!originalMsg)
             return false;
         _messages.push_back(std::move(originalMsg));
@@ -234,7 +234,7 @@ class Transaction {
                                 _completedMultiparts++;
                                 callback(initalRequestResult);
                             };
-                            auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags, *content), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                            auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags, *content), *_provider, nullptr, 0, traceId);
                             originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(content->data()), content->size());
                             _multipartUploads[position].messages[parts] = std::move(originalMsg);
                         } else {
@@ -244,7 +244,7 @@ class Transaction {
                                 _completedMultiparts++;
                                 callback(initalRequestResult);
                             };
-                            auto originalMsg = makeCallbackMessage(std::move(finished), _provider->deleteRequestGeneric(remotePath, _multipartUploads[position].uploadId), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                            auto originalMsg = makeCallbackMessage(std::move(finished), _provider->deleteRequestGeneric(remotePath, _multipartUploads[position].uploadId), *_provider, nullptr, 0, traceId);
                             _multipartUploads[position].messages[parts] = std::move(originalMsg);
                         }
                         _multipartUploads[position].state = MultipartUpload::State::Validating;
@@ -252,7 +252,7 @@ class Transaction {
                 };
                 auto partSize = (i != parts) ? splitSize : size - offset;
                 auto object = std::string_view(data + offset, partSize);
-                auto originalMsg = makeCallbackMessage(std::move(finishMultipart), _provider->putRequestGeneric(remotePath, object, i, _multipartUploads[position].uploadId), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                auto originalMsg = makeCallbackMessage(std::move(finishMultipart), _provider->putRequestGeneric(remotePath, object, i, _multipartUploads[position].uploadId), *_provider, nullptr, 0, traceId);
                 originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(data + offset), partSize);
                 _multipartUploads[position].messages[i - 1] = std::move(originalMsg);
                 offset += partSize;
@@ -260,7 +260,7 @@ class Transaction {
             _multipartUploads[position].state = MultipartUpload::State::Sending;
         };
 
-        auto originalMsg = makeCallbackMessage(std::move(uploadMessages), _provider->createMultiPartRequest(remotePath), _provider->getAddress(), _provider->getPort(), result, capacity, traceId);
+        auto originalMsg = makeCallbackMessage(std::move(uploadMessages), _provider->createMultiPartRequest(remotePath), *_provider, result, capacity, traceId);
         if (!originalMsg)
             return false;
         _messages.push_back(std::move(originalMsg));

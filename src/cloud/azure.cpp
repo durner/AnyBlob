@@ -1,9 +1,10 @@
 #include "cloud/azure.hpp"
 #include "cloud/azure_signer.hpp"
+#include "cloud/http.hpp"
 #include "network/http_helper.hpp"
 #include "network/original_message.hpp"
-#include "network/tasked_send_receiver.hpp"
 #include "network/resolver.hpp"
+#include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
 #include <algorithm>
 #include <chrono>
@@ -51,7 +52,11 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiver& sendRe
 // Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo();
-    auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+    RemoteInfo info;
+    info.endpoint = getIAMAddress();
+    info.port = getIAMPort();
+    HTTP http(info);
+    auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     sendReceiver.sendSync(originalMsg.get());
     sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();
@@ -76,7 +81,11 @@ string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
 // Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo();
-    auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
+    RemoteInfo info;
+    info.endpoint = getIAMAddress();
+    info.port = getIAMPort();
+    HTTP http(info);
+    auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     sendReceiver.sendSync(originalMsg.get());
     sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();

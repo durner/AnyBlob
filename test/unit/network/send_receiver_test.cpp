@@ -1,4 +1,6 @@
 #include "catch2/single_include/catch2/catch.hpp"
+#include "cloud/provider.hpp"
+#include "cloud/http.hpp"
 #include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "perfevent/PerfEvent.hpp"
@@ -27,25 +29,22 @@ using namespace std;
 TEST_CASE("send_receiver") {
     PerfEventBlock e;
     auto concurrency = 8u;
-    uint64_t length = 4096u;
 
     TaskedSendReceiverGroup group;
     group.setConcurrentRequests(concurrency);
 
+    auto provider = cloud::Provider::makeProvider("http://db.cs.tum.edu");
+    auto tlsProvider = cloud::Provider::makeProvider("https://db.cs.tum.edu");
+
+
     vector<unique_ptr<OriginalMessage>> msgs;
     for (auto i = 0u; i < concurrency; i++) {
-        auto message = make_unique<utils::DataVector<uint8_t>>(length);
-        string str = "GET / HTTP/1.1\r\nHost: db.cs.tum.edu\r\nConnection: keep-alive\r\n\r\n";
-        memcpy(message->data(), str.data(), str.length());
-        message->resize(str.length());
-        msgs.emplace_back(new OriginalMessage{move(message), "db.cs.tum.edu", 80});
+        auto range = std::pair<uint64_t, uint64_t>(0, 0);
+        string file = "";
+        msgs.emplace_back(new OriginalMessage{provider->getRequest(file, range), *provider});
         verify(group.send(msgs.back().get()));
 
-        message = make_unique<utils::DataVector<uint8_t>>(length);
-        str = "GET / HTTP/1.1\r\nHost: db.in.tum.de\r\nConnection: keep-alive\r\n\r\n";
-        memcpy(message->data(), str.data(), str.length());
-        message->resize(str.length());
-        msgs.emplace_back(new OriginalMessage{move(message), "db.in.tum.de", 443});
+        msgs.emplace_back(new OriginalMessage{tlsProvider->getRequest(file, range), *tlsProvider});
         verify(group.send(msgs.back().get()));
     }
 

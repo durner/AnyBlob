@@ -18,12 +18,18 @@ namespace utils {
 class Timer;
 }; // namespace utils
 //---------------------------------------------------------------------------
+namespace cloud {
+class Provider;
+}; // namespace cloud
+//---------------------------------------------------------------------------
 namespace network {
 //---------------------------------------------------------------------------
 /// This is the original request message struct
 struct OriginalMessage {
     /// The message
     std::unique_ptr<utils::DataVector<uint8_t>> message;
+    /// The provider that knows the address, the port and, optionally signed the messsage
+    cloud::Provider& provider;
     /// The result
     MessageResult result;
 
@@ -36,13 +42,8 @@ struct OriginalMessage {
     /// Optional trace info
     uint64_t traceId;
 
-    /// The hostname
-    std::string hostname;
-    /// The port
-    uint32_t port;
-
     /// The constructor
-    OriginalMessage(std::unique_ptr<utils::DataVector<uint8_t>> message, std::string_view hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : message(std::move(message)), result(receiveBuffer, bufferSize), putData(nullptr), putLength(), traceId(traceId), hostname(hostname), port(port) {}
+    OriginalMessage(std::unique_ptr<utils::DataVector<uint8_t>> message, cloud::Provider& provider, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : message(std::move(message)), provider(provider), result(receiveBuffer, bufferSize), putData(nullptr), putLength(), traceId(traceId) {}
 
     /// The destructor
     virtual ~OriginalMessage() = default;
@@ -72,7 +73,7 @@ struct OriginalCallbackMessage : public OriginalMessage {
     Callback callback;
 
     /// The constructor
-    OriginalCallbackMessage(Callback&& callback, std::unique_ptr<utils::DataVector<uint8_t>> message, std::string_view hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : OriginalMessage(std::move(message), hostname, port, receiveBuffer, bufferSize, traceId), callback(std::forward<Callback>(callback)) {}
+    OriginalCallbackMessage(Callback&& callback, std::unique_ptr<utils::DataVector<uint8_t>> message, cloud::Provider& provider, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : OriginalMessage(std::move(message), provider, receiveBuffer, bufferSize, traceId), callback(std::forward<Callback>(callback)) {}
 
     /// The destructor
     virtual ~OriginalCallbackMessage() override = default;

@@ -1,4 +1,5 @@
 #include "network/http_message.hpp"
+#include "network/connection_manager.hpp"
 #include "network/http_response.hpp"
 #include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
@@ -17,13 +18,13 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-HTTPMessage::HTTPMessage(OriginalMessage* message, uint64_t chunkSize) : MessageTask(message), chunkSize(chunkSize), info()
+HTTPMessage::HTTPMessage(OriginalMessage* message, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunkSize) : MessageTask(message, tcpSettings, chunkSize), info()
 // The constructor
 {
     type = Type::HTTP;
 }
 //---------------------------------------------------------------------------
-MessageState HTTPMessage::execute(IOUringSocket& socket)
+MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
 // executes the task
 {
     int32_t fd = -1;
@@ -31,7 +32,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
     switch (state) {
         case MessageState::Init: {
             try {
-                fd = socket.connect(originalMessage->hostname, originalMessage->port, tcpSettings);
+                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), false, tcpSettings);
             } catch (exception& /*e*/) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
                 state = MessageState::Aborted;
@@ -51,15 +52,15 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
                     else
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
-                    reset(socket, failures++ > failuresMax);
-                    return execute(socket);
+                    reset(connectionManager, failures++ > failuresMax);
+                    return execute(connectionManager);
                 }
 
                 if (sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size() + originalMessage->putLength)) {
                     state = MessageState::InitReceiving;
                     receiveBufferOffset = 0;
                     originalMessage->result.getDataVector().clear();
-                    return execute(socket);
+                    return execute(connectionManager);
                 }
             }
             state = MessageState::Sending;
@@ -73,9 +74,9 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                 }
                 request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, length, fd, IOUringSocket::EventType::write, this});
                 if (length <= static_cast<int64_t>(chunkSize))
-                    socket.send_prep_to(request.get(), &tcpSettings.kernelTimeout);
+                    connectionManager.getSocketConnection().send_prep_to(request.get(), &tcpSettings.kernelTimeout);
                 else
-                    socket.send_prep(request.get());
+                    connectionManager.getSocketConnection().send_prep(request.get());
             }
             break;
         }
@@ -86,8 +87,8 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
             if (state != MessageState::InitReceiving) {
                 if (request->length == 0) {
                     originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Empty);
-                    reset(socket, failures++ > failuresMax);
-                    return execute(socket);
+                    reset(connectionManager, failures++ > failuresMax);
+                    return execute(connectionManager);
                 } else if (request->length > 0) {
                     // resize according to real downloaded size
                     receive.resize(receive.size() - (chunkSize - static_cast<uint64_t>(request->length)));
@@ -96,7 +97,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                     try {
                         // check whether finished http
                         if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
-                            socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
+                            connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                             originalMessage->result.response = move(info);
                             if (HttpResponse::checkSuccess(originalMessage->result.response->response.code)) {
                                 state = MessageState::Finished;
@@ -108,16 +109,16 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                         }
                     } catch (exception&) {
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
-                        reset(socket, failures++ > failuresMax);
-                        return execute(socket);
+                        reset(connectionManager, failures++ > failuresMax);
+                        return execute(connectionManager);
                     }
                 } else if (request->length != -EINPROGRESS && request->length != -EAGAIN) {
                     if (request->length == -ECANCELED || request->length == -EINTR)
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
                     else
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Recv);
-                    reset(socket, failures++ > failuresMax);
-                    return execute(socket);
+                    reset(connectionManager, failures++ > failuresMax);
+                    return execute(connectionManager);
                 } else {
                     receive.resize(receive.size() - chunkSize);
                 }
@@ -128,7 +129,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
             }
             receive.resize(receive.size() + chunkSize);
             request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = receive.data() + receiveBufferOffset}, static_cast<int64_t>(chunkSize), request->fd, IOUringSocket::EventType::read, this});
-            socket.recv_prep_to(request.get(), &tcpSettings.kernelTimeout, tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+            connectionManager.getSocketConnection().recv_prep_to(request.get(), &tcpSettings.kernelTimeout, tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
             state = MessageState::Receiving;
             break;
         }
@@ -142,7 +143,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
     return state;
 }
 //---------------------------------------------------------------------------
-void HTTPMessage::reset(IOUringSocket& socket, bool aborted)
+void HTTPMessage::reset(ConnectionManager& connectionManager, bool aborted)
 // Reset for restart
 {
     if (!aborted) {
@@ -154,7 +155,7 @@ void HTTPMessage::reset(IOUringSocket& socket, bool aborted)
     } else {
         originalMessage->result.state = MessageState::Aborted;
     }
-    socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, 0, true);
+    connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, 0, true);
 }
 //---------------------------------------------------------------------------
 } // namespace network

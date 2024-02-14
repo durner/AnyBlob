@@ -6,6 +6,6 @@ runs:
     steps:
       # Install dependencies
       - name: Install dependencies
-        run: sudo apt update && sudo apt install liburing-dev openssl libssl-dev libjemalloc-dev lld
+        run: sudo apt update && sudo apt install liburing-dev openssl libssl-dev libjemalloc-dev lld && sudo sysctl -w vm.mmap_rnd_bits=28
         shell: bash
 

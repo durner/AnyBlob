@@ -1,12 +1,12 @@
 #include "network/tls_connection.hpp"
 #include "network/https_message.hpp"
 #include "network/tls_context.hpp"
+#include <cassert>
+#include <utility>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
-#include <cassert>
-#include <utility>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023
@@ -20,10 +20,9 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TLSConnection::TLSConnection(HTTPSMessage& message, TLSContext& context) : _message(message), _context(context), _ssl(nullptr), _state()
+TLSConnection::TLSConnection(TLSContext& context) : _message(nullptr), _context(context), _ssl(nullptr), _state(), _connected(false)
 // The consturctor
 {
-    _buffer = make_unique<char[]>(message.chunkSize);
 }
 //---------------------------------------------------------------------------
 TLSConnection::~TLSConnection()
@@ -32,22 +31,35 @@ TLSConnection::~TLSConnection()
     destroy();
 }
 //---------------------------------------------------------------------------
-bool TLSConnection::init()
+bool TLSConnection::init(HTTPSMessage* message)
 // Initialze SSL
 {
-    if (!_context._ctx) {
-        _message.originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
-        return false;
+    if (!_message) {
+        _message = message;
+        if (!_context._ctx) {
+            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+            return false;
+        }
+        _ssl = SSL_new(_context._ctx);
+        if (!_ssl) {
+            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+            return false;
+        }
+        SSL_set_connect_state(_ssl);
+        BIO_new_bio_pair(&_internalBio, _message->chunkSize, &_networkBio, _message->chunkSize);
+        SSL_set_bio(_ssl, _internalBio, _internalBio);
+        // TODO: disable reuse for now
+        // _context.reuseSession(_message->fd, _ssl);
+    } else {
+        _message = message;
+        BIO_free(_networkBio);
+        BIO_free(_internalBio);
+        BIO_new_bio_pair(&_internalBio, _message->chunkSize, &_networkBio, _message->chunkSize);
+        SSL_set_bio(_ssl, _internalBio, _internalBio);
+        _connected = true;
     }
-    _ssl = SSL_new(_context._ctx);
-    if (!_ssl) {
-        _message.originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
-        return false;
-    }
-    SSL_set_connect_state(_ssl);
-    BIO_new_bio_pair(&_internalBio, _message.chunkSize, &_networkBio, _message.chunkSize);
-    SSL_set_bio(_ssl, _internalBio, _internalBio);
-    _context.reuseSession(_message.fd, _ssl);
+    _message = message;
+    _buffer = make_unique<char[]>(_message->chunkSize);
     return true;
 }
 //---------------------------------------------------------------------------
@@ -63,7 +75,7 @@ void TLSConnection::destroy()
 }
 //---------------------------------------------------------------------------
 template <typename F>
-TLSConnection::Progress TLSConnection::operationHelper(IOUringSocket& socket, F&& func, int64_t& result)
+TLSConnection::Progress TLSConnection::operationHelper(ConnectionManager& connectionManager, F&& func, int64_t& result)
 // Helper function that handles the SSL_op calls
 {
     if (_state.progress == Progress::Finished || _state.progress == Progress::Init) {
@@ -77,7 +89,7 @@ TLSConnection::Progress TLSConnection::operationHelper(IOUringSocket& socket, F&
             case SSL_ERROR_WANT_WRITE: // fallthrough
             case SSL_ERROR_WANT_READ: {
                 _state.progress = Progress::SendingInit;
-                if (process(socket) != Progress::Aborted)
+                if (process(connectionManager) != Progress::Aborted)
                     return Progress::Progress;
                 return Progress::Aborted;
             }
@@ -88,15 +100,15 @@ TLSConnection::Progress TLSConnection::operationHelper(IOUringSocket& socket, F&
     } else if (_state.progress == Progress::Aborted) {
         return Progress::Aborted;
     } else {
-        process(socket);
+        process(connectionManager);
         if (_state.progress != Progress::Finished && _state.progress != Progress::Aborted)
             return Progress::Progress;
         else
-            return operationHelper(socket, func, result);
+            return operationHelper(connectionManager, func, result);
     }
 }
 //---------------------------------------------------------------------------
-TLSConnection::Progress TLSConnection::recv(IOUringSocket& socket, char* buffer, int64_t bufferLength, int64_t& resultLength)
+TLSConnection::Progress TLSConnection::recv(ConnectionManager& connectionManager, char* buffer, int64_t bufferLength, int64_t& resultLength)
 // Recv a TLS encrypted message
 {
     assert(in_range<int>(bufferLength));
@@ -104,10 +116,10 @@ TLSConnection::Progress TLSConnection::recv(IOUringSocket& socket, char* buffer,
     auto sslRead = [ssl, buffer, bufferLength = static_cast<int>(bufferLength)]() {
         return SSL_read(ssl, buffer, bufferLength);
     };
-    return operationHelper(socket, sslRead, resultLength);
+    return operationHelper(connectionManager, sslRead, resultLength);
 }
 //---------------------------------------------------------------------------
-TLSConnection::Progress TLSConnection::send(IOUringSocket& socket, const char* buffer, int64_t bufferLength, int64_t& resultLength)
+TLSConnection::Progress TLSConnection::send(ConnectionManager& connectionManager, const char* buffer, int64_t bufferLength, int64_t& resultLength)
 // Send a TLS encrypted message
 {
     assert(in_range<int>(bufferLength));
@@ -115,21 +127,24 @@ TLSConnection::Progress TLSConnection::send(IOUringSocket& socket, const char* b
     auto sslWrite = [ssl, buffer, bufferLength = static_cast<int>(bufferLength)]() {
         return SSL_write(ssl, buffer, bufferLength);
     };
-    return operationHelper(socket, sslWrite, resultLength);
+    return operationHelper(connectionManager, sslWrite, resultLength);
 }
 //---------------------------------------------------------------------------
-TLSConnection::Progress TLSConnection::connect(IOUringSocket& socket)
+TLSConnection::Progress TLSConnection::connect(ConnectionManager& connectionManager)
 // SSL/TLS connect
 {
-    int64_t unused;
-    auto ssl = this->_ssl;
-    auto sslConnect = [ssl]() {
-        return SSL_connect(ssl);
-    };
-    return operationHelper(socket, sslConnect, unused);
+    if (!_connected) {
+        int64_t unused;
+        auto ssl = this->_ssl;
+        auto sslConnect = [ssl]() {
+            return SSL_connect(ssl);
+        };
+        return operationHelper(connectionManager, sslConnect, unused);
+    }
+    return _state.progress;
 }
 //---------------------------------------------------------------------------
-TLSConnection::Progress TLSConnection::shutdown(IOUringSocket& socket, bool failedOnce)
+TLSConnection::Progress TLSConnection::shutdown(ConnectionManager& connectionManager, bool failedOnce)
 // SSL/TLS shutdown
 {
     int64_t unused;
@@ -137,21 +152,21 @@ TLSConnection::Progress TLSConnection::shutdown(IOUringSocket& socket, bool fail
     auto sslShutdown = [ssl]() {
         return SSL_shutdown(ssl);
     };
-    auto status = operationHelper(socket, sslShutdown, unused);
+    auto status = operationHelper(connectionManager, sslShutdown, unused);
     if (status == Progress::Finished) {
-        _context.cacheSession(_message.fd, ssl);
+        _context.cacheSession(_message->fd, ssl);
     } else if (status == Progress::Aborted) {
         if (!failedOnce) [[likely]] {
             status = Progress::Init;
-            return shutdown(socket, true);
+            return shutdown(connectionManager, true);
         } else {
-            _context.dropSession(_message.fd);
+            _context.dropSession(_message->fd);
         }
     }
     return status;
 }
 //---------------------------------------------------------------------------
-TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
+TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionManager)
 // Workhorse for sending and receiving the ssl encrypted messages using the shadow stack
 {
     switch (_state.progress) {
@@ -160,7 +175,7 @@ TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
             _state.reset();
             _state.internalBioWrite = BIO_ctrl_pending(_networkBio);
             if (_state.internalBioWrite) {
-                auto readSize = _message.chunkSize > _state.internalBioWrite ? _state.internalBioWrite : _message.chunkSize;
+                auto readSize = _message->chunkSize > _state.internalBioWrite ? _state.internalBioWrite : _message->chunkSize;
                 assert(in_range<int>(readSize));
                 _state.networkBioRead = BIO_read(_networkBio, _buffer.get(), static_cast<int>(readSize));
             }
@@ -170,13 +185,13 @@ TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
             if (_state.internalBioWrite) {
                 // Not the first send part, so check request result
                 if (_state.progress == Progress::Sending) {
-                    if (_message.request->length > 0) {
-                        _state.socketWrite += static_cast<uint64_t>(_message.request->length);
-                    } else if (_message.request->length != -EINPROGRESS && _message.request->length != -EAGAIN) {
-                        if (_message.request->length == -ECANCELED || _message.request->length == -EINTR)
-                            _message.originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
+                    if (_message->request->length > 0) {
+                        _state.socketWrite += static_cast<uint64_t>(_message->request->length);
+                    } else if (_message->request->length != -EINPROGRESS && _message->request->length != -EAGAIN) {
+                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR)
+                            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
                         else
-                            _message.originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
+                            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
                         _state.progress = Progress::Aborted;
                         return _state.progress;
                     }
@@ -186,19 +201,15 @@ TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
                     _state.progress = Progress::Sending;
                     auto writeSize = static_cast<size_t>(_state.networkBioRead) - _state.socketWrite;
                     const uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketWrite;
-                    _message.request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, static_cast<int64_t>(writeSize), _message.fd, IOUringSocket::EventType::write, &_message});
-                    if (writeSize <= _message.chunkSize)
-                        socket.send_prep_to(_message.request.get(), &_message.tcpSettings.kernelTimeout);
+                    _message->request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, static_cast<int64_t>(writeSize), _message->fd, IOUringSocket::EventType::write, _message});
+                    if (writeSize <= _message->chunkSize)
+                        connectionManager.getSocketConnection().send_prep_to(_message->request.get(), &_message->tcpSettings.kernelTimeout);
                     else
-                        socket.send_prep(_message.request.get());
+                        connectionManager.getSocketConnection().send_prep(_message->request.get());
                     return _state.progress;
                 } else {
                     _state.progress = Progress::ReceivingInit;
                 }
-            } else if (_state.internalBioWrite) {
-                _state.progress = Progress::SendingInit;
-                _state.networkBioRead = 0;
-                _state.socketWrite = 0;
             } else {
                 _state.progress = Progress::ReceivingInit;
             }
@@ -212,41 +223,36 @@ TLSConnection::Progress TLSConnection::process(IOUringSocket& socket)
             if (_state.internalBioRead) {
                 // Not the first send part, so check request result
                 if (_state.progress == Progress::Receiving) {
-                    if (_message.request->length == 0) {
-                        _message.originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Empty);
+                    if (_message->request->length == 0) {
+                        _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Empty);
                         _state.progress = Progress::Aborted;
                         return _state.progress;
-                    } else if (_message.request->length > 0) {
-                        assert(in_range<int>(_message.request->length));
-                        _state.networkBioWrite += BIO_write(_networkBio, _buffer.get() + _state.socketRead, static_cast<int>(_message.request->length));
-                        _state.socketRead += static_cast<size_t>(_message.request->length);
+                    } else if (_message->request->length > 0) {
+                        assert(in_range<int>(_message->request->length));
+                        _state.networkBioWrite += BIO_write(_networkBio, _buffer.get() + _state.socketRead, static_cast<int>(_message->request->length));
+                        _state.socketRead += static_cast<size_t>(_message->request->length);
                         assert(_state.networkBioWrite >= 0 && static_cast<size_t>(_state.networkBioWrite) == _state.socketRead);
-                    } else if (_message.request->length != -EINPROGRESS && _message.request->length != -EAGAIN) {
-                        if (_message.request->length == -ECANCELED || _message.request->length == -EINTR)
-                            _message.originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
+                    } else if (_message->request->length != -EINPROGRESS && _message->request->length != -EAGAIN) {
+                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR)
+                            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
                         else
-                            _message.originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Recv);
+                            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Recv);
                         _state.progress = Progress::Aborted;
                         return _state.progress;
                     }
                 }
                 if (!_state.networkBioWrite || (_state.networkBioWrite >= 0 && static_cast<size_t>(_state.networkBioWrite) != _state.socketRead)) {
                     _state.progress = Progress::Receiving;
-                    uint64_t readSize = _message.chunkSize > (_state.internalBioRead - _state.socketRead) ? _state.internalBioRead - _state.socketRead : _message.chunkSize;
+                    uint64_t readSize = _message->chunkSize > (_state.internalBioRead - _state.socketRead) ? _state.internalBioRead - _state.socketRead : _message->chunkSize;
                     uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketRead;
                     assert(in_range<int64_t>(readSize));
-                    _message.request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = ptr}, static_cast<int64_t>(readSize), _message.fd, IOUringSocket::EventType::read, &_message});
-                    socket.recv_prep_to(_message.request.get(), &_message.tcpSettings.kernelTimeout, _message.tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+                    _message->request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = ptr}, static_cast<int64_t>(readSize), _message->fd, IOUringSocket::EventType::read, _message});
+                    connectionManager.getSocketConnection().recv_prep_to(_message->request.get(), &_message->tcpSettings.kernelTimeout, _message->tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
                     return _state.progress;
                 } else {
                     _state.progress = Progress::Finished;
                     return _state.progress;
                 }
-            } else if (_state.internalBioRead) {
-                _state.progress = Progress::ReceivingInit;
-                _state.networkBioWrite = 0;
-                _state.socketRead = 0;
-                return _state.progress;
             } else {
                 _state.progress = Progress::Finished;
                 return _state.progress;

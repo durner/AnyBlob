@@ -30,20 +30,22 @@ namespace cloud {
 class Provider {
     public:
     /// The remote prefixes count
-    static constexpr unsigned remoteFileCount = 6;
+    static constexpr unsigned remoteFileCount = 8;
     /// The remote prefixes
-    static constexpr std::string_view remoteFile[] = {"s3://", "azure://", "gcp://", "oci://", "ibm://", "minio://"};
+    static constexpr std::string_view remoteFile[] = { "http://", "https://", "s3://", "azure://", "gcp://", "oci://", "ibm://", "minio://"};
     /// Are we currently testing the provdiers
     static bool testEnviornment;
 
     /// The cloud service enum
     enum class CloudService : uint8_t {
-        AWS = 0,
-        Azure = 1,
-        GCP = 2,
-        Oracle = 3,
-        IBM = 4,
-        MinIO = 5,
+        HTTP = 0,
+        HTTPS = 1,
+        AWS = 2,
+        Azure = 3,
+        GCP = 4,
+        Oracle = 5,
+        IBM = 6,
+        MinIO = 7,
         Local = 255
     };
 
@@ -76,7 +78,14 @@ class Provider {
     };
 
     protected:
+    /// The type
     CloudService _type;
+    /// Initialize secret
+    virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}
+    /// Get a local copy of the global secret
+    virtual void getSecret() {}
+
+    public:
     /// Builds the http request for downloading a blob or listing a directory
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const = 0;
     /// Builds the http request for putting an object without the actual data (header only according to the data and length provided)
@@ -98,13 +107,9 @@ class Provider {
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& /*filePath*/) const;
     /// Builds the http request for completing multipart put objects
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& /*filePath*/, std::string_view /*uploadId*/, const std::vector<std::string>& /*etags*/, std::string& /*eTagsContent*/) const;
+    /// Supports resigning?
+    [[nodiscard]] virtual bool supportsResigning() const { return false; }
 
-    /// Initialize secret
-    virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}
-    /// Get a local copy of the global secret
-    virtual void getSecret() {}
-
-    public:
     /// The destructor
     virtual ~Provider() noexcept = default;
     /// Gets the cloud provider type
@@ -125,7 +130,7 @@ class Provider {
     [[nodiscard]] static std::vector<std::string> parseCSVRow(std::string_view body);
 
     /// Create a provider (keyId is access email for GCP/Azure)
-    [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = true, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
+    [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = false, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
 
     /// Init the resolver for specific provider
     virtual void initResolver(network::TaskedSendReceiver& /*sendReceiver*/) {}

@@ -25,7 +25,7 @@ ThroughputResolver::ThroughputResolver(unsigned entries) : Resolver(entries), _t
     _throughput.resize(_maxHistory);
 }
 //---------------------------------------------------------------------------
-unsigned ThroughputResolver::resolve(string hostname, string port, bool& reuse)
+const addrinfo* ThroughputResolver::resolve(string hostname, string port, bool& reuse)
 // Resolve the request
 {
     auto modulo = static_cast<unsigned>(_addrString.size() < 8 ? _addrString.size() : 8);
@@ -48,17 +48,17 @@ unsigned ThroughputResolver::resolve(string hostname, string port, bool& reuse)
         reuse = false;
     }
     reuse = true;
-    return addrPos;
+    return _addr[addrPos].get();
 }
 //---------------------------------------------------------------------------
-void ThroughputResolver::startSocket(int fd, unsigned addrPos)
+void ThroughputResolver::startSocket(int fd)
 // Start a socket
 {
-    _fdMap.emplace(fd, make_pair(addrPos, chrono::steady_clock::now()));
+    _fdMap.emplace(fd, make_pair(_addrCtr++, chrono::steady_clock::now()));
 }
 //---------------------------------------------------------------------------
 void ThroughputResolver::shutdownSocket(int fd)
-// Start a socket
+// Shutdown a socket and clear the dns cache
 {
     auto it = _fdMap.find(fd);
     if (it != _fdMap.end()) {

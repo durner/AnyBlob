@@ -12,7 +12,7 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-MessageTask::MessageTask(OriginalMessage* message) : originalMessage(message), sendBufferOffset(0), receiveBufferOffset(0), failures(0)
+MessageTask::MessageTask(OriginalMessage* message, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunkSize) : originalMessage(message), tcpSettings(tcpSettings), sendBufferOffset(0), receiveBufferOffset(0), chunkSize(chunkSize), failures(0)
 // The constructor
 {
 }

@@ -13,16 +13,16 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------
-/// Implements the AWS Resolver logic
+/// Implements the AWS resolver logic
 class AWSResolver : public network::Resolver {
     /// The good mtu cache
     std::unordered_map<unsigned, bool> _mtuCache;
 
     public:
     /// The constructor
-    explicit AWSResolver(unsigned entries);
+    explicit AWSResolver(unsigned cacheEntries);
     /// The address resolving
-    virtual unsigned resolve(std::string hostname, std::string port, bool& reuse) override;
+    virtual const addrinfo* resolve(std::string hostname, std::string port, bool& reuse) override;
     /// The destructor
     virtual ~AWSResolver() noexcept = default;
 };

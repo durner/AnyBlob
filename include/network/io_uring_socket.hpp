@@ -1,13 +1,8 @@
 #pragma once
-#include "network/resolver.hpp"
 #include <memory>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 #include <liburing.h>
-#include <netdb.h>
-#include <netinet/tcp.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -30,43 +25,6 @@ class IOUringSocket {
     enum class EventType : uint32_t {
         read = 0,
         write = 1
-    };
-
-    /// The tcp settings
-    struct TCPSettings {
-        /// flag for nonBlocking
-        int nonBlocking = 1;
-        /// flag for noDelay
-        int noDelay = 0;
-        /// flag for recv no wait
-        int recvNoWait = 0;
-        /// flag for keepAlive
-        int keepAlive = 1;
-        /// time for tcp keepIdle
-        int keepIdle = 1;
-        /// time for tcp keepIntvl
-        int keepIntvl = 1;
-        /// probe count
-        int keepCnt = 1;
-        /// recv buffer for tcp
-        int recvBuffer = 0;
-        /// Maximum segment size
-        int mss = 0;
-        /// Reuse port
-        int reusePorts = 0;
-        /// Lingering of tcp packets
-        int linger = 1;
-        /// The timeout in usec
-        int timeout = 500 * 1000;
-        /// Reuse sockets
-        int reuse = 0;
-        /// The kernel timeout parameter
-        __kernel_timespec kernelTimeout;
-
-        TCPSettings() {
-            kernelTimeout.tv_sec = 0;
-            kernelTimeout.tv_nsec = timeout * 1000;
-        }
     };
 
     /// The request message
@@ -92,28 +50,14 @@ class IOUringSocket {
     private:
     /// The uring buffer
     struct io_uring _uring;
-    /// The tcp socket
-    std::unordered_set<int32_t> _fdSockets;
     /// The event id for the uring
     int _eventId;
-    /// The fd cache
-    std::unordered_multimap<std::string, int32_t> _fdCache;
-    /// Resolver
-    std::unordered_map<std::string, std::unique_ptr<Resolver>> _resolverCache;
 
     public:
     /// The IO Uring Socket Constructor
     explicit IOUringSocket(uint32_t entries, int32_t flags = 0);
     /// The destructor
     ~IOUringSocket();
-
-    /// Creates a new socket connection
-    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port, const TCPSettings& tcpSettings, int retryLimit = 16);
-    /// Disconnects the socket
-    void disconnect(int32_t fd, std::string hostname = "", uint32_t port = 0, const TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
-
-    /// Add resolver
-    void addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver);
 
     /// Prepare a submission (sqe) send
     io_uring_sqe* send_prep(const Request* req, int32_t msg_flags = 0, uint8_t flags = 0);
@@ -136,8 +80,6 @@ class IOUringSocket {
     void seen(io_uring_cqe* cqe);
     /// Wait for a new cqe event arriving
     void wait();
-    /// Checks for a timeout
-    bool checkTimeout(int fd, const TCPSettings& settings);
 
     /// Submit uring to the kernel and return the number of submitted entries
     int32_t submit();
