@@ -19,7 +19,7 @@ struct HTTPMessage : public MessageTask {
     /// The tcp settings
     IOUringSocket::TCPSettings tcpSettings;
     /// HTTP info header
-    std::unique_ptr<HTTPHelper::Info> info;
+    std::unique_ptr<HttpHelper::Info> info;
 
     /// The constructor
     HTTPMessage(OriginalMessage* sendingMessage, uint64_t chunkSize);

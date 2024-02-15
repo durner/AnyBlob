@@ -175,7 +175,7 @@ unique_ptr<utils::DataVector<uint8_t>> Provider::createMultiPartRequest(const st
     return nullptr;
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> Provider::completeMultiPartRequest(const string& /*filePath*/, string_view /*uploadId*/, const vector<string>& /*etags*/) const
+unique_ptr<utils::DataVector<uint8_t>> Provider::completeMultiPartRequest(const string& /*filePath*/, string_view /*uploadId*/, const vector<string>& /*etags*/, string& /*content*/) const
 // Builds the http request for completing multipart put objects
 {
     return nullptr;

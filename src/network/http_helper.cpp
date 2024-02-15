@@ -17,7 +17,7 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-HTTPHelper::Info HTTPHelper::detect(string_view header)
+HttpHelper::Info HttpHelper::detect(string_view header)
 // Detect the protocol
 {
     static constexpr auto unknown = Info{0, 0, Protocol::Unknown, Encoding::Unknown};
@@ -68,7 +68,7 @@ HTTPHelper::Info HTTPHelper::detect(string_view header)
     return info;
 }
 //---------------------------------------------------------------------------
-string_view HTTPHelper::retrieveContent(const uint8_t* data, uint64_t length, unique_ptr<Info>& info)
+string_view HttpHelper::retrieveContent(const uint8_t* data, uint64_t length, unique_ptr<Info>& info)
 // Retrieve the content without http meta info, note that this changes data
 {
     string_view sv(reinterpret_cast<const char*>(data), length);
@@ -79,7 +79,7 @@ string_view HTTPHelper::retrieveContent(const uint8_t* data, uint64_t length, un
     return {};
 }
 //---------------------------------------------------------------------------
-bool HTTPHelper::finished(const uint8_t* data, uint64_t length, unique_ptr<Info>& info)
+bool HttpHelper::finished(const uint8_t* data, uint64_t length, unique_ptr<Info>& info)
 // Detect end / content
 {
     if (!info) {

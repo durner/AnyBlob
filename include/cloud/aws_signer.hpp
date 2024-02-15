@@ -1,5 +1,5 @@
 #pragma once
-#include <map>
+#include "network/http_request.hpp"
 #include <memory>
 #include <string>
 //---------------------------------------------------------------------------
@@ -17,40 +17,23 @@ namespace cloud {
 /// It follows the v4 docu: https://docs.aws.amazon.com/general/latest/gr/sigv4_signing.html
 class AWSSigner {
     public:
-    struct Request {
-        /// The method
-        std::string method;
-        /// The type
-        std::string type;
-        /// The path - needs to be RFC 3986 conform
-        std::string path;
-        /// The queries - need to be RFC 3986 conform
-        std::map<std::string, std::string> queries;
-        /// The headers - need to be without trailing and leading whitespaces
-        std::map<std::string, std::string> headers;
-        /// The signed headers
-        std::string signedHeaders;
-        /// The payload hash
-        std::string payloadHash;
-        /// The unowned body data
-        const uint8_t* bodyData;
-        /// The unowned body length
-        uint64_t bodyLength;
-    };
-
     struct StringToSign {
         /// The canonical request
-        Request& request;
-        /// The request sha
-        std::string& requestSHA;
+        network::HttpRequest& request;
         /// The region
         std::string region;
         /// The service
         std::string service;
+        /// The request sha
+        std::string requestSHA;
+        /// The signed headers
+        std::string signedHeaders;
+        /// The payload hash
+        std::string payloadHash;
     };
 
     /// Creates the canonical request from the input
-    [[nodiscard]] static std::pair<std::string, std::string> createCanonicalRequest(Request& request);
+    static void encodeCanonicalRequest(network::HttpRequest& request, StringToSign& stringToSign, const uint8_t* bodyData = nullptr, uint64_t bodyLength = 0);
     /// Calculates the signature
     [[nodiscard]] static std::string createSignedRequest(const std::string& keyId, const std::string& secret, const StringToSign& stringToSign);
 

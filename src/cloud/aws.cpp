@@ -61,8 +61,8 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendRece
         sendReceiver.sendSync(originalMsg.get());
         sendReceiver.processSync();
         auto& content = originalMsg->result.getDataVector();
-        unique_ptr<network::HTTPHelper::Info> infoPtr;
-        auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+        unique_ptr<network::HttpHelper::Info> infoPtr;
+        auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
 
         for (auto& instance : AWSInstance::getInstanceDetails())
             if (!instance.type.compare(s))
@@ -81,8 +81,8 @@ string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
     sendReceiver.sendSync(originalMsg.get());
     sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();
-    unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+    unique_ptr<network::HttpHelper::Info> infoPtr;
+    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
     return string(s);
 }
 //---------------------------------------------------------------------------
@@ -234,8 +234,8 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
                 sendReceiver.sendSync(originalMsg.get());
                 sendReceiver.processSync();
                 auto& content = originalMsg->result.getDataVector();
-                unique_ptr<network::HTTPHelper::Info> infoPtr;
-                auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+                unique_ptr<network::HttpHelper::Info> infoPtr;
+                auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
                 string iamUser;
                 message = downloadSecret(s, iamUser);
                 originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
@@ -243,7 +243,7 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
                 sendReceiver.processSync();
                 auto& secretContent = originalMsg->result.getDataVector();
                 infoPtr.reset();
-                s = network::HTTPHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
+                s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
                 updateSecret(s, iamUser);
                 _mutex.unlock();
             }
@@ -263,8 +263,8 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
                 sendReceiver.sendSync(originalMsg.get());
                 sendReceiver.processSync();
                 auto& secretContent = originalMsg->result.getDataVector();
-                unique_ptr<network::HTTPHelper::Info> infoPtr;
-                auto s = network::HTTPHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
+                unique_ptr<network::HttpHelper::Info> infoPtr;
+                auto s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
                 updateSessionToken(s);
                 _mutex.unlock();
             }
@@ -295,7 +295,7 @@ void AWS::initResolver(network::TaskedSendReceiver& sendReceiver)
     }
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(AWSSigner::Request& request, string_view payload, bool initHeaders) const
+unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(network::HttpRequest& request, const uint8_t* bodyData, uint64_t bodyLength, bool initHeaders) const
 // Creates and signs the request
 {
     shared_ptr<Secret> secret;
@@ -313,14 +313,14 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(AWSSigner::Request& req
         }
     }
 
-    auto canonical = AWSSigner::createCanonicalRequest(request);
-    AWSSigner::StringToSign stringToSign = {.request = request, .requestSHA = canonical.second, .region = _settings.region, .service = "s3"};
-    auto httpHeader = request.method + " ";
-    httpHeader += AWSSigner::createSignedRequest(secret->keyId, secret->secret, stringToSign) + " " + request.type + "\r\n";
+    AWSSigner::StringToSign stringToSign = {.request = request, .region = _settings.region, .service = "s3", .requestSHA = "", .signedHeaders = "", .payloadHash = ""};
+    AWSSigner::encodeCanonicalRequest(request, stringToSign, bodyData, bodyLength);
+    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    httpHeader += " ";
+    httpHeader += AWSSigner::createSignedRequest(secret->keyId, secret->secret, stringToSign) + " " + network::HttpRequest::getRequestType(request) + "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
-    httpHeader += payload;
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
@@ -330,17 +330,15 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
     if (!validKeys() || (_settings.zonal && !validSession()))
         return nullptr;
 
-    AWSSigner::Request request;
-    request.method = "GET";
-    request.type = "HTTP/1.1";
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::GET;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
         request.path = "/" + filePath;
     else
         request.path = "/" + _settings.bucket + "/" + filePath;
-    request.bodyData = nullptr;
-    request.bodyLength = 0;
 
     if (range.first != range.second) {
         stringstream rangeString;
@@ -357,10 +355,10 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& file
     if (!validKeys() || (_settings.zonal && !validSession()))
         return nullptr;
 
-    AWSSigner::Request request;
-    request.method = "PUT";
-    request.type = "HTTP/1.1";
-    request.bodyData = reinterpret_cast<const uint8_t*>(object.data());
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::PUT;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
+    auto bodyData = reinterpret_cast<const uint8_t*>(object.data());
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
@@ -374,11 +372,11 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& file
         request.queries.emplace("uploadId", uploadId);
     }
 
-    request.bodyLength = object.size();
+    auto bodyLength = object.size();
     request.headers.emplace("Host", getAddress());
-    request.headers.emplace("Content-Length", to_string(request.bodyLength));
+    request.headers.emplace("Content-Length", to_string(bodyLength));
 
-    return buildRequest(request);
+    return buildRequest(request, bodyData, bodyLength);
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequestGeneric(const string& filePath, string_view uploadId) const
@@ -387,9 +385,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequestGeneric(const string& f
     if (!validKeys() || (_settings.zonal && !validSession()))
         return nullptr;
 
-    AWSSigner::Request request;
-    request.method = "DELETE";
-    request.type = "HTTP/1.1";
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::DELETE;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
@@ -402,9 +400,6 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequestGeneric(const string& f
         request.queries.emplace("uploadId", uploadId);
     }
 
-    request.bodyData = nullptr;
-    request.bodyLength = 0;
-
     return buildRequest(request);
 }
 //---------------------------------------------------------------------------
@@ -414,9 +409,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::createMultiPartRequest(const string&
     if (!validKeys() || (_settings.zonal && !validSession()))
         return nullptr;
 
-    AWSSigner::Request request;
-    request.method = "POST";
-    request.type = "HTTP/1.1";
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::POST;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
@@ -424,20 +419,18 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::createMultiPartRequest(const string&
     else
         request.path = "/" + _settings.bucket + "/" + filePath;
     request.queries.emplace("uploads", "");
-    request.bodyData = nullptr;
-    request.bodyLength = 0;
     request.headers.emplace("Host", getAddress());
 
     return buildRequest(request);
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const string& filePath, string_view uploadId, const std::vector<std::string>& etags) const
+unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const string& filePath, string_view uploadId, const std::vector<std::string>& etags, string& content) const
 // Builds the http request for completing multipart upload objects
 {
     if (!validKeys() || (_settings.zonal && !validSession()))
         return nullptr;
 
-    string content = "<CompleteMultipartUpload>\n";
+    content = "<CompleteMultipartUpload>\n";
     for (auto i = 0ull; i < etags.size(); i++) {
         content += "<Part>\n<PartNumber>";
         content += to_string(i + 1);
@@ -447,9 +440,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const strin
     }
     content += "</CompleteMultipartUpload>\n";
 
-    AWSSigner::Request request;
-    request.method = "POST";
-    request.type = "HTTP/1.1";
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::POST;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
@@ -458,11 +451,11 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const strin
         request.path = "/" + _settings.bucket + "/" + filePath;
 
     request.queries.emplace("uploadId", uploadId);
-    request.bodyData = reinterpret_cast<const uint8_t*>(content.data());
-    request.bodyLength = content.size();
-    request.headers.emplace("Content-Length", to_string(content.size()));
+    auto bodyData = reinterpret_cast<const uint8_t*>(content.data());
+    auto bodyLength = content.size();
+    request.headers.emplace("Content-Length", to_string(bodyLength));
 
-    return buildRequest(request, content);
+    return buildRequest(request, bodyData, bodyLength);
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::getSessionToken(string_view type) const
@@ -471,20 +464,18 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getSessionToken(string_view type) co
     if (!validKeys())
         return nullptr;
 
-    AWSSigner::Request request;
-    request.method = "GET";
-    request.type = "HTTP/1.1";
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::GET;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
     request.path = "/";
     request.queries.emplace("session", "");
-    request.bodyData = nullptr;
-    request.bodyLength = 0;
     request.headers.emplace("Host", _settings.bucket + ".s3.amazonaws.com");
     request.headers.emplace("x-amz-create-session-mode", type);
     request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
     if (!_secret->token.empty())
         request.headers.emplace("x-amz-security-token", _secret->token);
 
-    return buildRequest(request, "", false);
+    return buildRequest(request, nullptr, 0, false);
 }
 //---------------------------------------------------------------------------
 uint32_t AWS::getPort() const

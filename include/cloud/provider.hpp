@@ -97,7 +97,7 @@ class Provider {
     /// Builds the http request for creating multipart put objects
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& /*filePath*/) const;
     /// Builds the http request for completing multipart put objects
-    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& /*filePath*/, std::string_view /*uploadId*/, const std::vector<std::string>& /*etags*/) const;
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& /*filePath*/, std::string_view /*uploadId*/, const std::vector<std::string>& /*etags*/, std::string& /*eTagsContent*/) const;
 
     /// Initialize secret
     virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}

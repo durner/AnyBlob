@@ -94,7 +94,7 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
 
                     try {
                         // check whether finished http
-                        if (HTTPHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
+                        if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
                             socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                             originalMessage->result.size = info->length;
                             originalMessage->result.offset = info->headerLength;

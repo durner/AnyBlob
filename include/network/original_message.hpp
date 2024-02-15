@@ -27,22 +27,22 @@ struct OriginalMessage {
     /// The result
     MessageResult result;
 
-    /// The hostname
-    std::string hostname;
-    /// The port
-    uint32_t port;
-
-    /// Optional trace info
-    uint64_t traceId;
-
     /// If it is a put request store the additional data
     /// The raw data ptr for put requests
     const uint8_t* putData;
     /// The length
     uint64_t putLength;
 
+    /// Optional trace info
+    uint64_t traceId;
+
+    /// The hostname
+    std::string hostname;
+    /// The port
+    uint32_t port;
+
     /// The constructor
-    OriginalMessage(std::unique_ptr<utils::DataVector<uint8_t>> message, std::string_view hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : message(std::move(message)), result(receiveBuffer, bufferSize), hostname(hostname), port(port), traceId(traceId), putData(nullptr), putLength() {}
+    OriginalMessage(std::unique_ptr<utils::DataVector<uint8_t>> message, std::string_view hostname, uint32_t port, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : message(std::move(message)), result(receiveBuffer, bufferSize), putData(nullptr), putLength(), traceId(traceId), hostname(hostname), port(port) {}
 
     /// The destructor
     virtual ~OriginalMessage() = default;

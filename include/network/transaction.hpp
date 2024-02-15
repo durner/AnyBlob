@@ -224,7 +224,9 @@ class Transaction {
                     }
                     if (_multipartUploads[position].outstanding.fetch_sub(1) == 1) {
                         if (_multipartUploads[position].state != MultipartUpload::State::Aborted) [[likely]] {
-                            auto finished = [&callback, &initalRequestResult, this](network::MessageResult& result) {
+                            auto contentData = std::make_unique<std::string>();
+                            auto content = contentData.get();
+                            auto finished = [&callback, &initalRequestResult, contentPtr = move(contentData), this](network::MessageResult& result) mutable {
                                 if (!result.success()) {
                                     initalRequestResult.state = network::MessageState::Cancelled;
                                     initalRequestResult.originError = &result;
@@ -232,7 +234,8 @@ class Transaction {
                                 _completedMultiparts++;
                                 std::forward<Callback>(callback)(initalRequestResult);
                             };
-                            auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                            auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags, *content), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
+                            originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(content->data()), content->size());
                             _multipartUploads[position].messages[parts] = std::move(originalMsg);
                         } else {
                             auto finished = [&callback, &initalRequestResult, position, this](network::MessageResult& /*result*/) {
