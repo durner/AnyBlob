@@ -18,14 +18,14 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-string AzureSigner::createSignedRequest(const string& accountName, const string& privateRSA, Request& request)
+string AzureSigner::createSignedRequest(const string& accountName, const string& privateRSA, network::HttpRequest& request)
 // Creates the canonical request
 {
     auto decodedKey = utils::base64Decode(reinterpret_cast<const uint8_t*>(privateRSA.data()), privateRSA.size());
 
     stringstream requestStream;
     // canonicalize request method
-    requestStream << request.method << "\n";
+    requestStream << network::HttpRequest::getRequestMethod(request) << "\n";
 
     // Set the version
     request.headers.emplace("x-ms-version", "2015-02-21");

@@ -55,8 +55,8 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiver& sendRe
     sendReceiver.sendSync(originalMsg.get());
     sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();
-    unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+    unique_ptr<network::HttpHelper::Info> infoPtr;
+    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
 
     string needle = "\"vmSize\" : \"";
     auto pos = s.find(needle);
@@ -80,8 +80,8 @@ string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
     sendReceiver.sendSync(originalMsg.get());
     sendReceiver.processSync();
     auto& content = originalMsg->result.getDataVector();
-    unique_ptr<network::HTTPHelper::Info> infoPtr;
-    auto s = network::HTTPHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+    unique_ptr<network::HttpHelper::Info> infoPtr;
+    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
 
     string needle = "\"location\" : \"";
     auto pos = s.find(needle);
@@ -97,12 +97,10 @@ string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
 unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
 // Builds the http request for downloading a blob
 {
-    AzureSigner::Request request;
-    request.method = "GET";
-    request.type = "HTTP/1.1";
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::GET;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
     request.path = "/" + _settings.container + "/" + filePath;
-    request.bodyData = nullptr;
-    request.bodyLength = 0;
 
     request.headers.emplace("x-ms-date", testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp());
     request.headers.emplace("Host", getAddress());
@@ -114,7 +112,10 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
 
     request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
 
-    auto httpHeader = request.method + " " + request.path + " " + request.type + "\r\n";
+    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    httpHeader += " " + request.path + " ";
+    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
@@ -125,22 +126,24 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
 unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath, string_view object) const
 // Builds the http request for putting objects without the object data itself
 {
-    AzureSigner::Request request;
-    request.method = "PUT";
-    request.type = "HTTP/1.1";
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::PUT;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
     request.path = "/" + _settings.container + "/" + filePath;
-    request.bodyData = reinterpret_cast<const uint8_t*>(object.data());
-    request.bodyLength = object.size();
+    auto bodyLength = object.size();
 
     auto date = testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp();
     request.headers.emplace("x-ms-date", date);
     request.headers.emplace("x-ms-blob-type", "BlockBlob");
     request.headers.emplace("Host", getAddress());
-    request.headers.emplace("Content-Length", to_string(request.bodyLength));
+    request.headers.emplace("Content-Length", to_string(bodyLength));
 
     request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
 
-    auto httpHeader = request.method + " " + request.path + " " + request.type + "\r\n";
+    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    httpHeader += " " + request.path + " ";
+    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
@@ -151,12 +154,10 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath,
 unique_ptr<utils::DataVector<uint8_t>> Azure::deleteRequest(const string& filePath) const
 // Builds the http request for deleting objects
 {
-    AzureSigner::Request request;
-    request.method = "DELETE";
-    request.type = "HTTP/1.1";
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::DELETE;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
     request.path = "/" + _settings.container + "/" + filePath;
-    request.bodyData = nullptr;
-    request.bodyLength = 0;
 
     auto date = testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp();
     request.headers.emplace("x-ms-date", date);
@@ -164,7 +165,10 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::deleteRequest(const string& filePa
 
     request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
 
-    auto httpHeader = request.method + " " + request.path + " " + request.type + "\r\n";
+    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    httpHeader += " " + request.path + " ";
+    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";

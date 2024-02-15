@@ -14,7 +14,7 @@ namespace anyblob {
 namespace network {
 //---------------------------------------------------------------------------
 /// Implements an helper to resolve http requests
-class HTTPHelper {
+class HttpHelper {
     public:
     /// The protocol detected by the helper
     enum class Protocol : uint8_t {

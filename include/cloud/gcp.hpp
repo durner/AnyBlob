@@ -92,7 +92,7 @@ class GCP : public Provider {
     /// Builds the http request for creating multipart put objects
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& filePath) const override;
     /// Builds the http request for completing multipart put objects
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& filePath, std::string_view uploadId, const std::vector<std::string>& etags) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& filePath, std::string_view uploadId, const std::vector<std::string>& etags, std::string& content) const override;
 
     /// Get the address of the server
     [[nodiscard]] std::string getAddress() const override;

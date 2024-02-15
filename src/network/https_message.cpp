@@ -101,7 +101,7 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
                 receive.resize(receive.size() - (chunkSize - static_cast<uint64_t>(result)));
                 receiveBufferOffset += result;
                 try {
-                    if (HTTPHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
+                    if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
                         originalMessage->result.size = info->length;
                         originalMessage->result.offset = info->headerLength;
                         state = MessageState::TLSShutdown;

@@ -18,13 +18,13 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-pair<string, string> AWSSigner::createCanonicalRequest(Request& request)
+void AWSSigner::encodeCanonicalRequest(network::HttpRequest& request, StringToSign& stringToSign, const uint8_t* bodyData, uint64_t bodyLength)
 // Creates the canonical request (task 1)
 // https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
 {
     stringstream requestStream;
     // Step 1, canonicalize request method
-    requestStream << request.method << "\n";
+    requestStream << network::HttpRequest::getRequestMethod(request) << "\n";
 
     // Step 2, canonicalize request path; assume that path is RFC 3986 conform
     if (request.path.empty())
@@ -43,21 +43,21 @@ pair<string, string> AWSSigner::createCanonicalRequest(Request& request)
     }
     requestStream << "\n";
 
-    if (request.bodyLength <= (1 << 10)) {
+    if (bodyLength <= (1 << 10)) {
         // Step 6, create sha256 payload string, earlier because of https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
-        request.payloadHash = utils::sha256Encode(request.bodyData, request.bodyLength);
-        request.headers.emplace("x-amz-content-sha256", request.payloadHash);
+        stringToSign.payloadHash = utils::sha256Encode(bodyData, bodyLength);
+        request.headers.emplace("x-amz-content-sha256", stringToSign.payloadHash);
 
         // Step 6a, content-md5 for put
-        if ((request.method == "PUT" || request.method == "POST")) {
-            auto md5 = utils::md5Encode(request.bodyData, request.bodyLength);
+        if ((request.method == network::HttpRequest::Method::PUT || request.method == network::HttpRequest::Method::POST)) {
+            auto md5 = utils::md5Encode(bodyData, bodyLength);
             auto encodedResult = utils::base64Encode(reinterpret_cast<unsigned char*>(md5.data()), MD5_DIGEST_LENGTH);
             request.headers.emplace("Content-MD5", encodedResult);
         }
     } else {
         string unsignedPayload = "UNSIGNED-PAYLOAD";
-        request.payloadHash = "UNSIGNED-PAYLOAD";
-        request.headers.emplace("x-amz-content-sha256", request.payloadHash);
+        stringToSign.payloadHash = "UNSIGNED-PAYLOAD";
+        request.headers.emplace("x-amz-content-sha256", stringToSign.payloadHash);
     }
 
     // Step 4, canonicalize headers, assume no unnecessary whitespaces in header
@@ -84,17 +84,17 @@ pair<string, string> AWSSigner::createCanonicalRequest(Request& request)
             if (++it != sorted.end())
                 signedRequests << ";";
         }
-        request.signedHeaders = signedRequests.str();
-        requestStream << request.signedHeaders;
+        stringToSign.signedHeaders = signedRequests.str();
+        requestStream << stringToSign.signedHeaders;
     }
     requestStream << "\n";
 
     // Step 6 continuing
-    requestStream << request.payloadHash;
+    requestStream << stringToSign.payloadHash;
 
     // Step 7, create sha256 request string and return both the request and the sha256 request string
     auto requestString = requestStream.str();
-    return {requestString, utils::sha256Encode(reinterpret_cast<uint8_t*>(requestString.data()), requestString.length())};
+    stringToSign.requestSHA = utils::sha256Encode(reinterpret_cast<uint8_t*>(requestString.data()), requestString.length());
 }
 //---------------------------------------------------------------------------
 string AWSSigner::createStringToSign(const StringToSign& stringToSign)
@@ -138,7 +138,7 @@ string AWSSigner::createSignedRequest(const string& keyId, const string& secret,
     // https://docs.aws.amazon.com/general/latest/gr/sigv4-add-signature-to-request.html (task 4)
     stringstream authorization;
     authorization << "AWS4-HMAC-SHA256"
-                  << " Credential=" << keyId << "/" << date << "/" << stringToSign.region << "/" << stringToSign.service << "/" << kRequest << ", SignedHeaders=" << stringToSign.request.signedHeaders << ", Signature=" << signature;
+                  << " Credential=" << keyId << "/" << date << "/" << stringToSign.region << "/" << stringToSign.service << "/" << kRequest << ", SignedHeaders=" << stringToSign.signedHeaders << ", Signature=" << signature;
 
     stringToSign.request.headers.emplace("Authorization", authorization.str());
 

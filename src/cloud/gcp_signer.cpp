@@ -18,12 +18,12 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const string& privateRSA, Request& request, const StringToSign& stringToSign)
+string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const string& privateRSA, network::HttpRequest& request, StringToSign& stringToSign)
 // Creates the canonical request
 {
     stringstream requestStream;
     // canonicalize request method
-    requestStream << request.method << "\n";
+    requestStream << network::HttpRequest::getRequestMethod(request) << "\n";
 
     // canonicalize request path; assume that path is RFC 3986 conform
     if (request.path.empty())
@@ -54,7 +54,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
             if (++it != sorted.end())
                 signedRequests << ";";
         }
-        request.signedHeaders = signedRequests.str();
+        stringToSign.signedHeaders = signedRequests.str();
     }
     sorted.clear();
 
@@ -68,7 +68,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
     request.queries.emplace("X-Goog-Algorithm", "GOOG4-RSA-SHA256");
     request.queries.emplace("X-Goog-Credential", serviceAccountEmail + "/" + credentialScope.str());
     request.queries.emplace("X-Goog-Expires", "3600");
-    request.queries.emplace("X-Goog-SignedHeaders", request.signedHeaders);
+    request.queries.emplace("X-Goog-SignedHeaders", stringToSign.signedHeaders);
 
     if (request.queries.size()) {
         auto it = request.queries.begin();
@@ -92,7 +92,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
     }
     requestStream << query.str() << "\n";
     requestStream << headers.str() << "\n";
-    requestStream << request.signedHeaders << "\n";
+    requestStream << stringToSign.signedHeaders << "\n";
     requestStream << "UNSIGNED-PAYLOAD";
 
     // create sha256 request string and return both the request and the sha256 request string

@@ -79,7 +79,6 @@ class AWS : public Provider {
     /// The session secret
     thread_local static std::shared_ptr<Secret> _sessionSecret;
 
-
     public:
     /// Get instance details
     [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
@@ -131,7 +130,7 @@ class AWS : public Provider {
     [[nodiscard]] uint64_t multipartUploadSize() const override { return _multipartUploadSize; }
 
     /// Creates the generic http request and signs it
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> buildRequest(AWSSigner::Request& request, std::string_view payload = "", bool initHeaders = true) const;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> buildRequest(network::HttpRequest& request, const uint8_t* bodyData = nullptr, uint64_t bodyLength = 0, bool initHeaders = true) const;
     /// Builds the http request for downloading a blob or listing the directory
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
@@ -149,7 +148,7 @@ class AWS : public Provider {
     /// Builds the http request for creating multipart put objects
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> createMultiPartRequest(const std::string& filePath) const override;
     /// Builds the http request for completing multipart put objects
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& filePath, std::string_view uploadId, const std::vector<std::string>& etags) const override;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& filePath, std::string_view uploadId, const std::vector<std::string>& etags, std::string& content) const override;
     /// Builds the http request for getting the session token objects
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getSessionToken(std::string_view type = "ReadWrite") const;
     /// Get the address of the server
