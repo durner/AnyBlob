@@ -46,8 +46,8 @@ struct HttpRequest {
     std::string path;
 
     /// Get the request method
-    static constexpr auto getRequestMethod(const HttpRequest& request) {
-        switch (request.method) {
+    static constexpr auto getRequestMethod(const Method& method) {
+        switch (method) {
             case Method::GET: return "GET";
             case Method::PUT: return "PUT";
             case Method::POST: return "POST";
@@ -56,8 +56,8 @@ struct HttpRequest {
         }
     }
     /// Get the request type
-    static constexpr auto getRequestType(const HttpRequest& request) {
-        switch (request.type) {
+    static constexpr auto getRequestType(const Type& type) {
+        switch (type) {
             case Type::HTTP_1_0: return "HTTP/1.0";
             case Type::HTTP_1_1: return "HTTP/1.1";
             default: return "";

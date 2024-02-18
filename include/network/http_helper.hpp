@@ -1,4 +1,5 @@
 #pragma once
+#include "network/http_response.hpp"
 #include <cstdint>
 #include <memory>
 #include <string_view>
@@ -16,17 +17,6 @@ namespace network {
 /// Implements an helper to resolve http requests
 class HttpHelper {
     public:
-    /// The protocol detected by the helper
-    enum class Protocol : uint8_t {
-        Invalid,
-        Unknown,
-        HTTP_1_0_OK,
-        HTTP_1_1_Partial,
-        HTTP_1_1_OK,
-        HTTP_1_1_Created,
-        HTTP_1_1_No_Content
-    };
-
     /// The encoding
     enum class Encoding : uint8_t {
         Unknown,
@@ -35,12 +25,12 @@ class HttpHelper {
     };
 
     struct Info {
+        /// The response header
+        HttpResponse response;
         /// The maximum length
         uint64_t length;
         /// The header length
         uint32_t headerLength;
-        /// The protocol
-        Protocol protocol;
         /// The encoding
         Encoding encoding;
     };

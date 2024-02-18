@@ -40,7 +40,8 @@ HttpRequest HttpRequest::deserialize(string_view data)
     while (true) {
         auto pos = data.find(strNewline);
         if (pos == data.npos)
-            break;
+            throw runtime_error("Invalid HttpRequest: Incomplete header!");
+
         line = data.substr(0, pos);
         data = data.substr(pos + strNewline.size());
         if (line.empty()) {
@@ -50,22 +51,19 @@ HttpRequest HttpRequest::deserialize(string_view data)
                 throw runtime_error("Invalid HttpRequest: Missing first line!");
         }
         if (firstLine) {
+            firstLine = false;
             // parse method
             if (line.starts_with(strGet)) {
-                firstLine = false;
-                request.method = HttpRequest::Method::GET;
+                request.method = Method::GET;
                 line = line.substr(strGet.size());
             } else if (line.starts_with(strPost)) {
-                firstLine = false;
-                request.method = HttpRequest::Method::POST;
+                request.method = Method::POST;
                 line = line.substr(strPost.size());
             } else if (line.starts_with(strPut)) {
-                firstLine = false;
-                request.method = HttpRequest::Method::PUT;
+                request.method = Method::PUT;
                 line = line.substr(strPut.size());
             } else if (line.starts_with(strDelete)) {
-                firstLine = false;
-                request.method = HttpRequest::Method::DELETE;
+                request.method = Method::DELETE;
                 line = line.substr(strDelete.size());
             } else {
                 throw runtime_error("Invalid HttpRequest: Needs to start with request method!");
@@ -91,7 +89,7 @@ HttpRequest HttpRequest::deserialize(string_view data)
                     if (queryPos == queries.npos)
                         query = queries;
                     else
-                        query = queries.substr(0, queryPos); // skip the ? or the &
+                        query = queries.substr(0, queryPos);
 
                     // split between key and value (value might be unnecassary)
                     auto keyPos = query.find(strQuerySeperator);
@@ -113,9 +111,9 @@ HttpRequest HttpRequest::deserialize(string_view data)
 
             // the http type
             if (line.starts_with(strHttp1_0)) {
-                request.type = HttpRequest::Type::HTTP_1_0;
+                request.type = Type::HTTP_1_0;
             } else if (line.starts_with(strHttp1_1)) {
-                request.type = HttpRequest::Type::HTTP_1_1;
+                request.type = Type::HTTP_1_1;
             } else {
                 throw runtime_error("Invalid HttpRequest: Needs to be a HTTP type 1.0 or 1.1!");
             }
@@ -139,7 +137,7 @@ HttpRequest HttpRequest::deserialize(string_view data)
 unique_ptr<utils::DataVector<uint8_t>> HttpRequest::serialize(const HttpRequest& request)
 // Serialize an http header
 {
-    string httpHeader = getRequestMethod(request);
+    string httpHeader = getRequestMethod(request.method);
     httpHeader += " " + request.path;
     if (request.queries.size())
          httpHeader += "?";
@@ -150,7 +148,7 @@ unique_ptr<utils::DataVector<uint8_t>> HttpRequest::serialize(const HttpRequest&
             httpHeader += "&";
     }
     httpHeader += " ";
-    httpHeader += getRequestType(request);
+    httpHeader += getRequestType(request.type);
     httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";

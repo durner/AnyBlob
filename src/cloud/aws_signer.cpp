@@ -24,7 +24,7 @@ void AWSSigner::encodeCanonicalRequest(network::HttpRequest& request, StringToSi
 {
     stringstream requestStream;
     // Step 1, canonicalize request method
-    requestStream << network::HttpRequest::getRequestMethod(request) << "\n";
+    requestStream << network::HttpRequest::getRequestMethod(request.method) << "\n";
 
     // Step 2, canonicalize request path; assume that path is RFC 3986 conform
     if (request.path.empty())

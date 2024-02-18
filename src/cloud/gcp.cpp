@@ -94,9 +94,9 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, c
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
     request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
 
-    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " " + request.path + " ";
-    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
@@ -129,9 +129,9 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& file
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
     request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
 
-    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " " + request.path + " ";
-    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
@@ -160,9 +160,9 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequestGeneric(const string& f
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
     request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
 
-    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " " + request.path + " ";
-    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
@@ -188,9 +188,9 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::createMultiPartRequest(const string&
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
     request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
 
-    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " " + request.path + " ";
-    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
@@ -227,9 +227,9 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::completeMultiPartRequest(const strin
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
     request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
 
-    string httpHeaderMessage = network::HttpRequest::getRequestMethod(request);
+    string httpHeaderMessage = network::HttpRequest::getRequestMethod(request.method);
     httpHeaderMessage += " " + request.path + " ";
-    httpHeaderMessage += network::HttpRequest::getRequestType(request);
+    httpHeaderMessage += network::HttpRequest::getRequestType(request.type);
     httpHeaderMessage += "\r\n";
 
     for (auto& h : request.headers)
