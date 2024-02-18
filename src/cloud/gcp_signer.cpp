@@ -23,7 +23,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
 {
     stringstream requestStream;
     // canonicalize request method
-    requestStream << network::HttpRequest::getRequestMethod(request) << "\n";
+    requestStream << network::HttpRequest::getRequestMethod(request.method) << "\n";
 
     // canonicalize request path; assume that path is RFC 3986 conform
     if (request.path.empty())

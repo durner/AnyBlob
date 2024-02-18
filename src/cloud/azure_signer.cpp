@@ -25,7 +25,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
 
     stringstream requestStream;
     // canonicalize request method
-    requestStream << network::HttpRequest::getRequestMethod(request) << "\n";
+    requestStream << network::HttpRequest::getRequestMethod(request.method) << "\n";
 
     // Set the version
     request.headers.emplace("x-ms-version", "2015-02-21");

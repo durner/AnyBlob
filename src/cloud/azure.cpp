@@ -112,9 +112,9 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
 
     request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
 
-    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " " + request.path + " ";
-    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
@@ -140,9 +140,9 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath,
 
     request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
 
-    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " " + request.path + " ";
-    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
@@ -165,9 +165,9 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::deleteRequest(const string& filePa
 
     request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
 
-    string httpHeader = network::HttpRequest::getRequestMethod(request);
+    string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " " + request.path + " ";
-    httpHeader += network::HttpRequest::getRequestType(request);
+    httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
     for (auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
