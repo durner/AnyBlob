@@ -45,6 +45,9 @@ pair<unique_ptr<uint8_t[]>, uint64_t> base64Decode(const uint8_t* input, uint64_
     assert(in_range<int>(length));
     auto baseLength = 3 * length / 4;
     auto buffer = make_unique<uint8_t[]>(baseLength + 1);
+    if (!length) {
+        return {move(buffer), 0};
+    }
     auto decodeLength = EVP_DecodeBlock(reinterpret_cast<unsigned char*>(buffer.get()), input, static_cast<int>(length));
     if (decodeLength < 0 || static_cast<unsigned>(decodeLength) != baseLength)
         throw runtime_error("OpenSSL Error!");
