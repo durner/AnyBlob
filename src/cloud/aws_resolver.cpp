@@ -55,7 +55,6 @@ unsigned AWSResolver::resolve(string hostname, string port, bool& oldAddress)
             } else {
                 char ipv4[INET_ADDRSTRLEN];
                 inet_ntop(AF_INET, &p->sin_addr, ipv4, INET_ADDRSTRLEN);
-                string ip(ipv4);
                 string cmd = "timeout 0.01 ping -s 1473 -D " + string(ipv4) + " -c 1 >>/dev/null 2>>/dev/null";
                 auto res = system(cmd.c_str());
                 if (!res) {

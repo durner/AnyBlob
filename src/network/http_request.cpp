@@ -150,7 +150,7 @@ unique_ptr<utils::DataVector<uint8_t>> HttpRequest::serialize(const HttpRequest&
     httpHeader += " ";
     httpHeader += getRequestType(request.type);
     httpHeader += "\r\n";
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));

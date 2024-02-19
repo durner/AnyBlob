@@ -80,7 +80,7 @@ class MessageResult {
     /// The constructor with buffer input
     MessageResult(uint8_t* data, uint64_t size);
     /// The constructor with buffer input
-    MessageResult(utils::DataVector<uint8_t>* dataVector);
+    explicit MessageResult(utils::DataVector<uint8_t>* dataVector);
 
     /// Get the result
     [[nodiscard]] const std::string_view getResult() const;

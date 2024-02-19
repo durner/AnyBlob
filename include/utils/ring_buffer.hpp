@@ -64,7 +64,7 @@ class RingBuffer {
 
     public:
     /// The constructor
-    constexpr RingBuffer(uint64_t size) : _buffer(new T[size]()), _size(size) {}
+    constexpr explicit RingBuffer(uint64_t size) : _buffer(new T[size]()), _size(size) {}
 
     /// Insert a tuple into buffer
     template <bool wait = false>

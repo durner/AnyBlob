@@ -34,7 +34,6 @@ static string buildAMZTimestamp()
 unique_ptr<utils::DataVector<uint8_t>> GCP::downloadInstanceInfo(const string& info)
 // Builds the info http request
 {
-    string protocol = "http://";
     string httpHeader = "GET /computeMetadata/v1/instance/" + info + " HTTP/1.1\r\nHost: ";
     httpHeader += getIAMAddress();
     httpHeader += "\r\nMetadata-Flavor: Google\r\n\r\n";
@@ -98,7 +97,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, c
     httpHeader += " " + request.path + " ";
     httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
 
@@ -133,7 +132,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& file
     httpHeader += " " + request.path + " ";
     httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
 
@@ -164,7 +163,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequestGeneric(const string& f
     httpHeader += " " + request.path + " ";
     httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
 
@@ -192,7 +191,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::createMultiPartRequest(const string&
     httpHeader += " " + request.path + " ";
     httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
 
@@ -232,7 +231,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::completeMultiPartRequest(const strin
     httpHeaderMessage += network::HttpRequest::getRequestType(request.type);
     httpHeaderMessage += "\r\n";
 
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeaderMessage += h.first + ": " + h.second + "\r\n";
     httpHeaderMessage += "\r\n" + content;
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeaderMessage.data()), reinterpret_cast<uint8_t*>(httpHeaderMessage.data() + httpHeaderMessage.size()));

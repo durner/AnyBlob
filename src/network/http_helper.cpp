@@ -29,6 +29,7 @@ HttpHelper::Info HttpHelper::detect(string_view header)
     static constexpr string_view contentLength = "Content-Length";
     static constexpr string_view headerEnd = "\r\n\r\n";
 
+    info.encoding = Encoding::Unknown;
     for (auto& keyValue : info.response.headers) {
         if (transferEncoding == keyValue.first && chunkedEncoding == keyValue.second) {
             info.encoding = Encoding::ChunkedEncoding;
@@ -44,7 +45,7 @@ HttpHelper::Info HttpHelper::detect(string_view header)
         }
     }
 
-    if (!info.headerLength)
+    if (info.encoding == Encoding::Unknown)
         throw runtime_error("Unsupported HTTP encoding protocol");
 
     return info;

@@ -64,7 +64,7 @@ class TaskedSendReceiverGroup {
 
     public:
     /// Initializes the global submissions and completions
-    TaskedSendReceiverGroup(unsigned chunkSize = 64u * 1024, uint64_t submissions = std::thread::hardware_concurrency() * submissionPerCore, uint64_t reuse = 0);
+    explicit TaskedSendReceiverGroup(unsigned chunkSize = 64u * 1024, uint64_t submissions = std::thread::hardware_concurrency() * submissionPerCore, uint64_t reuse = 0);
     /// Destructor
     ~TaskedSendReceiverGroup();
 
@@ -121,7 +121,7 @@ class TaskedSendReceiver {
 
     public:
     /// The constructor
-    TaskedSendReceiver(TaskedSendReceiverGroup& group);
+    explicit TaskedSendReceiver(TaskedSendReceiverGroup& group);
 
     /// Get the group
     [[nodiscard]] const TaskedSendReceiverGroup* getGroup() const { return &_group; }
@@ -157,7 +157,7 @@ class TaskedSendReceiver {
     /// Submits queue and waits for result
     void sendReceive(bool local = false, bool oneQueueInvocation = true);
     /// Connect to the socket return fd
-    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port);
+    [[nodiscard]] int32_t connect(const std::string& hostname, uint32_t port);
     /// Submits the queue
     [[nodiscard]] int32_t submitRequests();
 
@@ -176,7 +176,7 @@ class TaskedSendReceiverHandle {
     /// Default constructor is deleted
     TaskedSendReceiverHandle() = delete;
     /// Consturctor
-    TaskedSendReceiverHandle(TaskedSendReceiverGroup* group);
+    explicit TaskedSendReceiverHandle(TaskedSendReceiverGroup* group);
     /// Delete copy
     TaskedSendReceiverHandle(TaskedSendReceiverHandle& other) = delete;
     /// Delete copy assignment

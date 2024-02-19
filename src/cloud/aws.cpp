@@ -45,7 +45,6 @@ static int64_t convertIAMTimestamp(string awsTimestamp)
 unique_ptr<utils::DataVector<uint8_t>> AWS::downloadInstanceInfo(const string& info)
 // Builds the info http request
 {
-    string protocol = "http://";
     string httpHeader = "GET /latest/meta-data/" + info + " HTTP/1.1\r\nHost: ";
     httpHeader += getIAMAddress();
     httpHeader += "\r\n\r\n";
@@ -89,7 +88,6 @@ string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
 unique_ptr<utils::DataVector<uint8_t>> AWS::downloadIAMUser() const
 // Builds the secret http request
 {
-    string protocol = "http://";
     string httpHeader = "GET /latest/meta-data/iam/security-credentials HTTP/1.1\r\nHost: ";
     httpHeader += getIAMAddress();
     httpHeader += "\r\n\r\n";
@@ -100,7 +98,6 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content, 
 // Builds the secret http request
 {
     auto pos = content.find("\n");
-    string protocol = "http://";
     string httpHeader = "GET /latest/meta-data/iam/security-credentials/";
     if (!content.substr(0, pos).size())
         return nullptr;
@@ -228,7 +225,6 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
                 _secret = _globalSecret;
                 if (validKeys(180))
                     return;
-                auto secret = make_shared<Secret>();
                 auto message = downloadIAMUser();
                 auto originalMsg = make_unique<network::OriginalMessage>(move(message), getIAMAddress(), getIAMPort());
                 sendReceiver.sendSync(originalMsg.get());
@@ -318,7 +314,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(network::HttpRequest& r
     string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " ";
     httpHeader += AWSSigner::createSignedRequest(secret->keyId, secret->secret, stringToSign) + " " + network::HttpRequest::getRequestType(request.type) + "\r\n";
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));

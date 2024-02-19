@@ -103,14 +103,14 @@ class IOUringSocket {
 
     public:
     /// The IO Uring Socket Constructor
-    IOUringSocket(uint32_t entries, int32_t flags = 0);
+    explicit IOUringSocket(uint32_t entries, int32_t flags = 0);
     /// The destructor
     ~IOUringSocket();
 
     /// Creates a new socket connection
-    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port, TCPSettings& tcpSettings, int retryLimit = 16);
+    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port, const TCPSettings& tcpSettings, int retryLimit = 16);
     /// Disconnects the socket
-    void disconnect(int32_t fd, std::string hostname = "", uint32_t port = 0, TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
+    void disconnect(int32_t fd, std::string hostname = "", uint32_t port = 0, const TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
 
     /// Add resolver
     void addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver);
@@ -137,7 +137,7 @@ class IOUringSocket {
     /// Wait for a new cqe event arriving
     void wait();
     /// Checks for a timeout
-    bool checkTimeout(int fd, TCPSettings& settings);
+    bool checkTimeout(int fd, const TCPSettings& settings);
 
     /// Submit uring to the kernel and return the number of submitted entries
     int32_t submit();

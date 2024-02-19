@@ -149,12 +149,12 @@ void TaskedSendReceiver::run()
 {
     try {
         sendReceive(false, false);
-    } catch (exception& e) {
+    } catch (const exception& e) {
         cerr << e.what() << endl;
     };
 }
 //---------------------------------------------------------------------------
-int32_t TaskedSendReceiver::connect(string hostname, uint32_t port)
+int32_t TaskedSendReceiver::connect(const string& hostname, uint32_t port)
 // Connect to the socket
 {
     IOUringSocket::TCPSettings tcpSettings;
@@ -275,7 +275,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             IOUringSocket::Request* req;
             try {
                 req = _socketWrapper->complete();
-            } catch (exception& e) {
+            } catch (const exception& e) {
                 continue;
             }
             // reduce count
