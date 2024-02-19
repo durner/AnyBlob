@@ -57,7 +57,7 @@ IOUringSocket::IOUringSocket(uint32_t entries, int32_t /*flags*/) : _resolverCac
 #endif
 }
 //---------------------------------------------------------------------------
-int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpSettings, int retryLimit)
+int32_t IOUringSocket::connect(string hostname, uint32_t port, const TCPSettings& tcpSettings, int retryLimit)
 // Creates a new socket connection
 {
     if (auto it = _fdCache.find(hostname); it != _fdCache.end()) {
@@ -188,7 +188,7 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
     }
 #endif
 
-    auto setTimeOut = [](int fd, TCPSettings& tcpSettings) {
+    auto setTimeOut = [](int fd, const TCPSettings& tcpSettings) {
         // Set timeout
         if (tcpSettings.timeout > 0) {
             struct timeval tv;
@@ -262,7 +262,7 @@ int32_t IOUringSocket::connect(string hostname, uint32_t port, TCPSettings& tcpS
     return fd;
 }
 //---------------------------------------------------------------------------
-void IOUringSocket::disconnect(int32_t fd, string hostname, uint32_t port, TCPSettings* tcpSettings, uint64_t bytes, bool forceShutdown)
+void IOUringSocket::disconnect(int32_t fd, string hostname, uint32_t port, const TCPSettings* tcpSettings, uint64_t bytes, bool forceShutdown)
 // Disconnects the socket
 {
     Resolver* resCache;
@@ -432,7 +432,7 @@ void IOUringSocket::wait()
         throw runtime_error("Wait error!");
 }
 //---------------------------------------------------------------------------
-bool IOUringSocket::checkTimeout(int fd, TCPSettings& tcpSettings)
+bool IOUringSocket::checkTimeout(int fd, const TCPSettings& tcpSettings)
 // Check for a timeout
 {
     pollfd p = {fd, POLLIN, 0};

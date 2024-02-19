@@ -24,7 +24,7 @@ string_view Resolver::tld(string_view domain)
     if (pos != string::npos) {
         pos = domain.substr(0, pos - 1).find_last_of('.');
         if (pos == string::npos)
-            return string_view(domain);
+            return domain;
         else
             return string_view(domain).substr(pos + 1, domain.size());
     }

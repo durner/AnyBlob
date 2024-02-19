@@ -98,8 +98,6 @@ void ThroughputResolver::stopSocket(int fd, uint64_t bytes)
             auto percentile = _throughputTree.find_by_order(maxElem / 6);
             if (percentile.m_p_nd->m_value <= throughput)
                 _addrString[it->second.first].second += 2;
-            else
-                possible = false;
         }
     }
 }

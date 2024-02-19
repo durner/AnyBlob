@@ -30,10 +30,10 @@ class DataVector {
 
     public:
     /// Constructor
-    constexpr DataVector() : _capacity(0), _size(0) {}
+    constexpr DataVector() : _capacity(0), _size(0), _data(nullptr) {}
 
     /// Constructor with size
-    constexpr DataVector(uint64_t cap) : _capacity(0), _size(0) {
+    explicit constexpr DataVector(uint64_t cap) : _capacity(0), _size(0), _data(nullptr) {
         resize(cap);
     }
 
@@ -45,7 +45,7 @@ class DataVector {
     }
 
     /// Constructor from other pointers
-    constexpr DataVector(T* start, T* end) : _capacity(0), _size(0) {
+    constexpr DataVector(const T* start, const T* end) : _capacity(0), _size(0) {
         assert(end - start >= 0);
         resize(static_cast<uint64_t>(end - start));
         std::memcpy(data(), start, size() * sizeof(T));

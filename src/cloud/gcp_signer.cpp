@@ -42,7 +42,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
             sorted.emplace(key, it->second);
             ++it;
         }
-        for (auto& h : sorted)
+        for (const auto& h : sorted)
             headers << h.first << ":" << h.second << "\n";
     }
 

@@ -106,7 +106,7 @@ class Provider {
 
     public:
     /// The destructor
-    virtual ~Provider() = default;
+    virtual ~Provider() noexcept = default;
     /// Gets the cloud provider type
     [[nodiscard]] CloudService getType() { return _type; }
     /// Is it a remote file?

@@ -55,7 +55,6 @@ void AWSSigner::encodeCanonicalRequest(network::HttpRequest& request, StringToSi
             request.headers.emplace("Content-MD5", encodedResult);
         }
     } else {
-        string unsignedPayload = "UNSIGNED-PAYLOAD";
         stringToSign.payloadHash = "UNSIGNED-PAYLOAD";
         request.headers.emplace("x-amz-content-sha256", stringToSign.payloadHash);
     }
@@ -70,7 +69,7 @@ void AWSSigner::encodeCanonicalRequest(network::HttpRequest& request, StringToSi
             sorted.emplace(val, it->second);
             ++it;
         }
-        for (auto& h : sorted)
+        for (const auto& h : sorted)
             requestStream << h.first << ":" << h.second << "\n";
     }
     requestStream << "\n";

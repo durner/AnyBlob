@@ -86,7 +86,7 @@ string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
     string needle = "\"location\" : \"";
     auto pos = s.find(needle);
     if (pos == s.npos)
-        throw;
+        throw runtime_error("Azure Region: No location found.");
     pos += needle.length();
     auto end = s.find("\"", pos);
     auto region = s.substr(pos, end - pos);
@@ -116,7 +116,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
     httpHeader += " " + request.path + " ";
     httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
 
@@ -144,7 +144,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath,
     httpHeader += " " + request.path + " ";
     httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
 
@@ -169,7 +169,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::deleteRequest(const string& filePa
     httpHeader += " " + request.path + " ";
     httpHeader += network::HttpRequest::getRequestType(request.type);
     httpHeader += "\r\n";
-    for (auto& h : request.headers)
+    for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
 
