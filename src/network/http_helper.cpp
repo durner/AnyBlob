@@ -45,8 +45,11 @@ HttpHelper::Info HttpHelper::detect(string_view header)
         }
     }
 
-    if (info.encoding == Encoding::Unknown)
+    if (info.encoding == Encoding::Unknown && !HttpResponse::withoutContent(info.response.code))
         throw runtime_error("Unsupported HTTP encoding protocol");
+
+    if (HttpResponse::withoutContent(info.response.code))
+        info.headerLength = static_cast<unsigned>(header.length());
 
     return info;
 }
@@ -69,6 +72,8 @@ bool HttpHelper::finished(const uint8_t* data, uint64_t length, unique_ptr<Info>
         string_view sv(reinterpret_cast<const char*>(data), length);
         info = make_unique<Info>(detect(sv));
     }
+    if (info && HttpResponse::withoutContent(info->response.code))
+        return true;
     switch (info->encoding) {
         case Encoding::ContentLength:
             return length >= info->headerLength + info->length;

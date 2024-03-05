@@ -1,4 +1,5 @@
 #include "network/http_message.hpp"
+#include "network/http_response.hpp"
 #include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
 #include "utils/timer.hpp"
@@ -98,8 +99,13 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                             socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                             originalMessage->result.size = info->length;
                             originalMessage->result.offset = info->headerLength;
-                            state = MessageState::Finished;
-                            return MessageState::Finished;
+                            if (HttpResponse::checkSuccess(info->response.code)) {
+                                state = MessageState::Finished;
+                            } else {
+                                originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
+                                state = MessageState::Aborted;
+                            }
+                            return state;
                         }
                     } catch (exception&) {
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
