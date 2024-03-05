@@ -82,6 +82,14 @@ struct HttpResponse {
             default: return "UNKNOWN";
         }
     }
+    /// Check for successful operation 2xx operations
+    static constexpr auto checkSuccess(const Code& code) {
+        return (code == Code::OK_200 || code == Code::CREATED_201 || code == Code::NO_CONTENT_204 || code == Code::PARTIAL_CONTENT_206);
+    }
+    /// Check if the result has no content
+    static constexpr auto withoutContent(const Code& code) {
+        return code == Code::NO_CONTENT_204;
+    }
     /// Deserialize the response
     [[nodiscard]] static HttpResponse deserialize(std::string_view data);
 };

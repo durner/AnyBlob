@@ -1,14 +1,15 @@
 #include "network/https_message.hpp"
+#include "network/http_response.hpp"
 #include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
 #include "utils/timer.hpp"
 #include <cassert>
 #include <memory>
+#include <utility>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
-#include <utility>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023
@@ -104,6 +105,12 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
                     if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
                         originalMessage->result.size = info->length;
                         originalMessage->result.offset = info->headerLength;
+                        if (HttpResponse::checkSuccess(info->response.code)) {
+                            state = MessageState::TLSShutdown;
+                        } else {
+                            originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
+                            reset(socket, true);
+                        }
                         state = MessageState::TLSShutdown;
                         return execute(socket);
                     } else {
