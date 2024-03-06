@@ -205,7 +205,7 @@ class Transaction {
         _multipartUploads.emplace_back(parts);
         auto position = _multipartUploads.size() - 1;
 
-        auto uploadMessages = [&callback, position, parts, data, remotePath, traceId, splitSize, size, this](network::MessageResult& initalRequestResult) {
+        auto uploadMessages = [callback = std::forward<Callback>(callback), position, parts, data, remotePath, traceId, splitSize, size, this](network::MessageResult& initalRequestResult) {
             if (!initalRequestResult.success()) {
                 _completedMultiparts++;
                 return;
@@ -232,7 +232,7 @@ class Transaction {
                                     initalRequestResult.originError = &result;
                                 }
                                 _completedMultiparts++;
-                                std::forward<Callback>(callback)(initalRequestResult);
+                                callback(initalRequestResult);
                             };
                             auto originalMsg = makeCallbackMessage(std::move(finished), _provider->completeMultiPartRequest(remotePath, _multipartUploads[position].uploadId, _multipartUploads[position].eTags, *content), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
                             originalMsg->setPutRequestData(reinterpret_cast<const uint8_t*>(content->data()), content->size());
@@ -242,7 +242,7 @@ class Transaction {
                                 initalRequestResult.state = network::MessageState::Cancelled;
                                 initalRequestResult.originError = &_multipartUploads[position].messages[_multipartUploads[position].errorMessageId]->result;
                                 _completedMultiparts++;
-                                std::forward<Callback>(callback)(initalRequestResult);
+                                callback(initalRequestResult);
                             };
                             auto originalMsg = makeCallbackMessage(std::move(finished), _provider->deleteRequestGeneric(remotePath, _multipartUploads[position].uploadId), _provider->getAddress(), _provider->getPort(), nullptr, 0, traceId);
                             _multipartUploads[position].messages[parts] = std::move(originalMsg);
