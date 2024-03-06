@@ -97,9 +97,8 @@ MessageState HTTPMessage::execute(IOUringSocket& socket)
                         // check whether finished http
                         if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
                             socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
-                            originalMessage->result.size = info->length;
-                            originalMessage->result.offset = info->headerLength;
-                            if (HttpResponse::checkSuccess(info->response.code)) {
+                            originalMessage->result.response = move(info);
+                            if (HttpResponse::checkSuccess(originalMessage->result.response->response.code)) {
                                 state = MessageState::Finished;
                             } else {
                                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);

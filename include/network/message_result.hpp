@@ -1,4 +1,5 @@
 #pragma once
+#include "network/http_helper.hpp"
 #include <atomic>
 #include <memory>
 #include <string_view>
@@ -63,10 +64,8 @@ class MessageResult {
     protected:
     /// The data
     std::unique_ptr<utils::DataVector<uint8_t>> dataVector;
-    /// The size of the result; the size of the message body
-    uint64_t size;
-    /// The offset of the result; the start after the message header
-    uint64_t offset;
+    /// The http response header info
+    std::unique_ptr<HttpHelper::Info> response;
     /// The error response
     const MessageResult* originError;
     /// The failure code
@@ -101,7 +100,9 @@ class MessageResult {
     /// Get the failure code
     [[nodiscard]] uint16_t getFailureCode() const;
     /// Get the error response (incl. header)
-    [[nodiscard]] std::string_view getError() const;
+    [[nodiscard]] std::string_view getErrorResponse() const;
+    /// Get the error response code
+    [[nodiscard]] std::string_view getResponseCode() const;
     /// Is the data owned by this object
     [[nodiscard]] bool owned() const;
     /// Was the request successful
