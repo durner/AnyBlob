@@ -13,13 +13,13 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-MessageResult::MessageResult() : size(), offset(), originError(nullptr), failureCode(), state(MessageState::Init)
+MessageResult::MessageResult() : response(), originError(nullptr), failureCode(), state(MessageState::Init)
 // The default constructor
 {
     dataVector = make_unique<utils::DataVector<uint8_t>>();
 }
 //---------------------------------------------------------------------------
-MessageResult::MessageResult(uint8_t* data, uint64_t size) : size(), offset(), originError(nullptr), failureCode(), state(MessageState::Init)
+MessageResult::MessageResult(uint8_t* data, uint64_t size) : response(), originError(nullptr), failureCode(), state(MessageState::Init)
 // The constructor with buffer input
 {
     if (data)
@@ -28,7 +28,7 @@ MessageResult::MessageResult(uint8_t* data, uint64_t size) : size(), offset(), o
         dataVector = make_unique<utils::DataVector<uint8_t>>();
 }
 //---------------------------------------------------------------------------
-MessageResult::MessageResult(utils::DataVector<uint8_t>* dataVector) : size(), offset(), originError(nullptr), failureCode(), state(MessageState::Init)
+MessageResult::MessageResult(utils::DataVector<uint8_t>* dataVector) : response(), originError(nullptr), failureCode(), state(MessageState::Init)
 // The constructor with buffer input
 {
     this->dataVector = unique_ptr<utils::DataVector<uint8_t>>(dataVector);
@@ -37,13 +37,13 @@ MessageResult::MessageResult(utils::DataVector<uint8_t>* dataVector) : size(), o
 const string_view MessageResult::getResult() const
 /// Get the result
 {
-    return string_view(reinterpret_cast<const char*>(dataVector->cdata()) + offset, size);
+    return string_view(reinterpret_cast<const char*>(dataVector->cdata()) + response->headerLength, response->length);
 }
 //---------------------------------------------------------------------------
 string_view MessageResult::getResult()
 /// Get the result
 {
-    return string_view(reinterpret_cast<char*>(dataVector->data()) + offset, size);
+    return string_view(reinterpret_cast<char*>(dataVector->data()) + response->headerLength, response->length);
 }
 //---------------------------------------------------------------------------
 const uint8_t* MessageResult::getData() const
@@ -67,13 +67,13 @@ unique_ptr<uint8_t[]> MessageResult::moveData()
 uint64_t MessageResult::getSize() const
 // Get the size
 {
-    return size;
+    return response->length;
 }
 //---------------------------------------------------------------------------
 uint64_t MessageResult::getOffset() const
 // Get the offset
 {
-    return offset;
+    return response->headerLength;
 }
 //---------------------------------------------------------------------------
 MessageState MessageResult::getState() const
@@ -91,11 +91,21 @@ uint16_t MessageResult::getFailureCode() const
         return failureCode;
 }
 //---------------------------------------------------------------------------
-std::string_view MessageResult::getError() const
+std::string_view MessageResult::getResponseCode() const
+// Get the failure code
+{
+    if (originError)
+        return originError->getResponseCode();
+    else
+        return HttpResponse::getResponseCode(response->response.code);
+}
+
+//---------------------------------------------------------------------------
+std::string_view MessageResult::getErrorResponse() const
 // Get the error header
 {
     if (originError)
-        return originError->getError();
+        return originError->getErrorResponse();
     else
         return string_view(reinterpret_cast<char*>(dataVector->data()), dataVector->size());
 }

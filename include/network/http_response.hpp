@@ -54,7 +54,7 @@ struct HttpResponse {
     Type type;
 
     /// Get the request method
-    static constexpr auto getResponseCode(const Code& code) noexcept {
+    static constexpr std::string_view getResponseCode(const Code& code) noexcept {
         switch (code) {
             case Code::OK_200: return "200 OK";
             case Code::CREATED_201: return "201 Created";
@@ -75,7 +75,7 @@ struct HttpResponse {
         }
     }
     /// Get the request type
-    static constexpr auto getResponseType(const Type& type) noexcept {
+    static constexpr std::string_view getResponseType(const Type& type) noexcept {
         switch (type) {
             case Type::HTTP_1_0: return "HTTP/1.0";
             case Type::HTTP_1_1: return "HTTP/1.1";

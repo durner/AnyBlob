@@ -103,9 +103,8 @@ MessageState HTTPSMessage::execute(IOUringSocket& socket)
                 receiveBufferOffset += result;
                 try {
                     if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
-                        originalMessage->result.size = info->length;
-                        originalMessage->result.offset = info->headerLength;
-                        if (HttpResponse::checkSuccess(info->response.code)) {
+                        originalMessage->result.response = move(info);
+                        if (HttpResponse::checkSuccess(originalMessage->result.response->response.code)) {
                             state = MessageState::TLSShutdown;
                         } else {
                             originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
