@@ -282,16 +282,18 @@ class S3SendReceiver {
                     req->finish();
                 else
                     _completions.push(reinterpret_cast<uintptr_t>(&req), move(req->data));
-                _cv.notify_all();
+
                 if (_timings) {
                     (*_timings)[submissionId].size = outcome.GetResult().GetContentLength();
                     (*_timings)[submissionId].finish = std::chrono::steady_clock::now();
                 }
                 submissions--;
+                _cv.notify_all();
             } else {
                 std::cout << "S3 download error - retry object!" << std::endl;
                 while (!this->send(req)) {}
                 submissions--;
+                _cv.notify_all();
             }
         });
         submissions++;

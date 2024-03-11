@@ -314,7 +314,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                         end = benchmarkSettings.requests;
                     for (uint64_t j = start; j < end; j++) {
                         auto filePath = "upload_" + benchmarkSettings.filePath + to_string(j + 1) + ".bin";
-                        auto putObjectRequest = [&putTxn, &filePath, &content, callbackUpload, &blob, i]() {
+                        auto putObjectRequest = [&putTxn, &filePath, callbackUpload, &blob, i]() {
                             return putTxn.putObjectRequest(move(callbackUpload), filePath, reinterpret_cast<const char*>(blob->data()), blob->size(), nullptr, 0, i);
                         };
                         putTxn.verifyKeyRequest(*sendReceivers.back(), move(putObjectRequest));
