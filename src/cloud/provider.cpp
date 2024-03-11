@@ -85,7 +85,7 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
             }
             if (!remoteFile[i].compare("s3://")) {
                 // Handle s3 one zone express
-                if (info.bucket.size() > 6 && info.bucket.find("--x-s3", info.bucket.size() - 7)) {
+                if (info.bucket.size() > 6 && string::npos != info.bucket.find("--x-s3", info.bucket.size() - 7)) {
                     info.zonal = true;
                 }
             }
