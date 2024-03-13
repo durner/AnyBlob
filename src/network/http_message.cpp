@@ -154,7 +154,7 @@ void HTTPMessage::reset(IOUringSocket& socket, bool aborted)
     } else {
         originalMessage->result.state = MessageState::Aborted;
     }
-    socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, true);
+    socket.disconnect(request->fd, originalMessage->hostname, originalMessage->port, &tcpSettings, 0, true);
 }
 //---------------------------------------------------------------------------
 } // namespace network
