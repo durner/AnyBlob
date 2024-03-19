@@ -100,7 +100,8 @@ HttpRequest HttpRequest::deserialize(string_view data)
                         key = query.substr(0, keyPos);
                         value = query.substr(keyPos + 1);
                     }
-                    request.queries.emplace(key, value);
+                    if (key.size() > 0)
+                        request.queries.emplace(key, value);
                     if (queryPos == queries.npos)
                         break;
                     queries = queries.substr(queryPos + 1);

@@ -182,6 +182,12 @@ unique_ptr<utils::DataVector<uint8_t>> Provider::completeMultiPartRequest(const 
     return nullptr;
 }
 //---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Provider::resignRequest(const utils::DataVector<uint8_t>& /*data*/, const uint8_t* /*bodyData*/, uint64_t /*bodyLength*/) const
+// Resigned header
+{
+    return nullptr;
+}
+//---------------------------------------------------------------------------
 network::Config Provider::getConfig(network::TaskedSendReceiver& sendReceiver)
 // Uses the send receiver to get instance configs
 {

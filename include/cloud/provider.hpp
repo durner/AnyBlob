@@ -1,8 +1,8 @@
 #pragma once
 #include <memory>
-#include <vector>
 #include <string>
 #include <string_view>
+#include <vector>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -32,7 +32,7 @@ class Provider {
     /// The remote prefixes count
     static constexpr unsigned remoteFileCount = 8;
     /// The remote prefixes
-    static constexpr std::string_view remoteFile[] = { "http://", "https://", "s3://", "azure://", "gcp://", "oci://", "ibm://", "minio://"};
+    static constexpr std::string_view remoteFile[] = {"http://", "https://", "s3://", "azure://", "gcp://", "oci://", "ibm://", "minio://"};
     /// Are we currently testing the provdiers
     static bool testEnviornment;
 
@@ -109,6 +109,8 @@ class Provider {
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> completeMultiPartRequest(const std::string& /*filePath*/, std::string_view /*uploadId*/, const std::vector<std::string>& /*etags*/, std::string& /*eTagsContent*/) const;
     /// Supports resigning?
     [[nodiscard]] virtual bool supportsResigning() const { return false; }
+    /// Reigns header
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> resignRequest(const utils::DataVector<uint8_t>& data, const uint8_t* bodyData = nullptr, uint64_t bodyLength = 0) const;
 
     /// The destructor
     virtual ~Provider() noexcept = default;
