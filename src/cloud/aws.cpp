@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <string_view>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -308,6 +309,22 @@ void AWS::initResolver(network::TaskedSendReceiver& sendReceiver)
     }
 }
 //---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::resignRequest(const utils::DataVector<uint8_t>& data, const uint8_t* bodyData, uint64_t bodyLength) const
+// Resigns the request
+{
+     if (!validKeys() || (_settings.zonal && !validSession()))
+        return nullptr;
+
+    auto header = network::HttpRequest::deserialize(string_view(reinterpret_cast<const char*>(data.cdata()), data.size()));
+    for (auto it = header.headers.begin(); it != header.headers.end();) {
+        if (it->first != "Range" && it->first != "Content-Length")
+            it = header.headers.erase(it);
+        else
+            it++;
+    }
+    return buildRequest(header, bodyData, bodyLength);
+}
+//---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(network::HttpRequest& request, const uint8_t* bodyData, uint64_t bodyLength, bool initHeaders) const
 // Creates and signs the request
 {
@@ -386,7 +403,6 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& file
     }
 
     auto bodyLength = object.size();
-    request.headers.emplace("Host", getAddress());
     request.headers.emplace("Content-Length", to_string(bodyLength));
 
     return buildRequest(request, bodyData, bodyLength);
@@ -432,7 +448,6 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::createMultiPartRequest(const string&
     else
         request.path = "/" + _settings.bucket + "/" + filePath;
     request.queries.emplace("uploads", "");
-    request.headers.emplace("Host", getAddress());
 
     return buildRequest(request);
 }
