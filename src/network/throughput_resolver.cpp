@@ -28,8 +28,7 @@ ThroughputResolver::ThroughputResolver(unsigned entries) : Resolver(entries), _t
 const addrinfo* ThroughputResolver::resolve(string hostname, string port, bool& reuse)
 // Resolve the request
 {
-    auto modulo = static_cast<unsigned>(_addrString.size() < 8 ? _addrString.size() : 8);
-    auto addrPos = _addrCtr % modulo;
+    auto addrPos = _addrCtr % _addrString.size();
     auto curCtr = _addrString[addrPos].second--;
     auto hostString = hostname + ":" + port;
     if (_addrString[addrPos].first.compare(hostString) || curCtr == 0) {
@@ -54,7 +53,7 @@ const addrinfo* ThroughputResolver::resolve(string hostname, string port, bool& 
 void ThroughputResolver::startSocket(int fd)
 // Start a socket
 {
-    _fdMap.emplace(fd, make_pair(_addrCtr++, chrono::steady_clock::now()));
+    _fdMap.emplace(fd, make_pair(_addrCtr++ % _addrString.size(), chrono::steady_clock::now()));
 }
 //---------------------------------------------------------------------------
 void ThroughputResolver::shutdownSocket(int fd)
@@ -65,7 +64,7 @@ void ThroughputResolver::shutdownSocket(int fd)
         auto pos = it->second.first;
         auto& ip = _addr[pos];
         for (auto compPos = 0u; compPos < _addr.size(); compPos++) {
-            if (!strncmp(ip->ai_addr->sa_data, _addr[compPos]->ai_addr->sa_data, 14)) {
+            if (_addr[compPos] && !strncmp(ip->ai_addr->sa_data, _addr[compPos]->ai_addr->sa_data, 14)) {
                 _addrString[compPos].second = 0;
             }
         }
