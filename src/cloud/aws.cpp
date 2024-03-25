@@ -233,8 +233,10 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
         while (true) {
             if (_mutex.try_lock()) {
                 _secret = _globalSecret;
-                if (validKeys(180))
+                if (validKeys(180)) {
+                    _mutex.unlock();
                     return;
+                }
                 auto message = downloadIAMUser();
                 RemoteInfo info;
                 info.endpoint = getIAMAddress();
@@ -265,9 +267,10 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
         while (true) {
             if (_mutex.try_lock()) {
                 _sessionSecret = _globalSessionSecret;
-                if (validSession(180))
+                if (validKeys(180)) {
+                    _mutex.unlock();
                     return;
-
+                }
                 auto message = getSessionToken();
                 RemoteInfo info;
                 info.endpoint = _settings.bucket + ".s3.amazonaws.com";
