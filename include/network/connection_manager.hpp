@@ -52,7 +52,7 @@ class ConnectionManager {
         /// The timeout in usec
         int timeout = 500 * 1000;
         /// Reuse sockets
-        int reuse = 0;
+        int reuse = 1;
         /// The kernel timeout parameter
         __kernel_timespec kernelTimeout;
 
