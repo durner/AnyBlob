@@ -54,7 +54,6 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
         } // fallthrough
         case MessageState::TLSHandshake: {
             // Handshake procedure
-            // TODO: Think about active sessions
             auto status = tlsLayer->connect(connectionManager);
             if (status == TLSConnection::Progress::Finished) {
                 state = MessageState::InitSending;
@@ -112,8 +111,14 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                             originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
                             reset(connectionManager, true);
                         }
-                        // TODO: Decide if to cache the session
-                        state = MessageState::TLSShutdown;
+                        // Decide if to cache the session
+                        if (tcpSettings.reuse) {
+                            state = MessageState::Finished;
+                            connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
+                            return state;
+                        } else {
+                            state = MessageState::TLSShutdown;
+                        }
                         return execute(connectionManager);
                     } else {
                         // resize and grow capacity
@@ -159,7 +164,6 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
 void HTTPSMessage::reset(ConnectionManager& connectionManager, bool aborted)
 // Reset for restart
 {
-    // TODO: tlsLayer = make_unique<TLSConnection>(*this, tlsLayer->getContext());
     HTTPMessage::reset(connectionManager, aborted);
 }
 //---------------------------------------------------------------------------

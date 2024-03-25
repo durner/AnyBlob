@@ -1,6 +1,6 @@
 #include "catch2/single_include/catch2/catch.hpp"
-#include "cloud/provider.hpp"
 #include "cloud/http.hpp"
+#include "cloud/provider.hpp"
 #include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "perfevent/PerfEvent.hpp"
@@ -29,6 +29,7 @@ using namespace std;
 TEST_CASE("send_receiver") {
     PerfEventBlock e;
     auto concurrency = 8u;
+    auto requests = 64u;
 
     TaskedSendReceiverGroup group;
     group.setConcurrentRequests(concurrency);
@@ -36,9 +37,8 @@ TEST_CASE("send_receiver") {
     auto provider = cloud::Provider::makeProvider("http://db.cs.tum.edu");
     auto tlsProvider = cloud::Provider::makeProvider("https://db.cs.tum.edu");
 
-
     vector<unique_ptr<OriginalMessage>> msgs;
-    for (auto i = 0u; i < concurrency; i++) {
+    for (auto i = 0u; i < requests; i++) {
         auto range = std::pair<uint64_t, uint64_t>(0, 0);
         string file = "";
         msgs.emplace_back(new OriginalMessage{provider->getRequest(file, range), *provider});

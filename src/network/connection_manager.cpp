@@ -277,8 +277,8 @@ void ConnectionManager::disconnect(int32_t fd, string hostname, uint32_t port, c
     if (forceShutdown) {
         shutdown(fd, SHUT_RDWR);
         resCache->shutdownSocket(fd);
-    }
-    if (tcpSettings && tcpSettings->reuse > 0 && hostname.length() > 0 && port) {
+        _fdSockets.erase(fd);
+    } else if (tcpSettings && tcpSettings->reuse > 0 && hostname.length() > 0 && port) {
         auto it = _fdSockets.find(fd);
         assert(it != _fdSockets.end());
         _fdCache.emplace(hostname, move(it->second));

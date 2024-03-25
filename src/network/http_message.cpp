@@ -155,6 +155,9 @@ void HTTPMessage::reset(ConnectionManager& connectionManager, bool aborted)
     } else {
         originalMessage->result.state = MessageState::Aborted;
     }
+    if ((originalMessage->result.failureCode & static_cast<uint16_t>(MessageFailureCode::HTTP)) && originalMessage->provider.supportsResigning()) {
+        originalMessage->message = originalMessage->provider.resignRequest(*originalMessage->message, originalMessage->putData, originalMessage->putLength);
+    }
     connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, 0, true);
 }
 //---------------------------------------------------------------------------
