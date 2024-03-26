@@ -123,30 +123,12 @@ class TaskedSendReceiver {
     std::atomic<bool> _stopDeamon;
 
     public:
-    /// The constructor
-    explicit TaskedSendReceiver(TaskedSendReceiverGroup& group);
-
     /// Get the group
     [[nodiscard]] const TaskedSendReceiverGroup* getGroup() const { return &_group; }
-
     /// Adds a resolver
     void addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver);
-
-    /// Adds a message to the submission queue
-    bool send(OriginalMessage* msg);
-    /// Adds a message to the submission queue
-    void sendSync(OriginalMessage* msg);
-
-    /// Process group submissions (should be used for async requests)
-    inline void process(bool oneQueueInvocation = true) { sendReceive(false, oneQueueInvocation); }
     /// Process local submissions (should be used for sync requests)
     inline void processSync(bool oneQueueInvocation = true) { sendReceive(true, oneQueueInvocation); }
-
-    /// Runs the deamon
-    void run();
-    /// Stops the deamon
-    void stop() { _stopDeamon = true; }
-
     /// Set the timings
     void setTimings(std::vector<utils::TimingHelper>* timings) {
         _timings = timings;
@@ -157,6 +139,19 @@ class TaskedSendReceiver {
     std::unique_ptr<utils::DataVector<uint8_t>> getReused();
 
     private:
+    /// Default constructor is deleted
+    TaskedSendReceiver() = delete;
+    /// Delete copy
+    TaskedSendReceiver(TaskedSendReceiver& other) = delete;
+    /// Delete copy assignment
+    TaskedSendReceiver& operator=(TaskedSendReceiver& other) = delete;
+    /// The constructor
+    explicit TaskedSendReceiver(TaskedSendReceiverGroup& group);
+
+    /// Adds a message to the submission queue
+    void sendSync(OriginalMessage* msg);
+    /// Stops the deamon
+    void stop() { _stopDeamon = true; }
     /// Submits queue and waits for result
     void sendReceive(bool local = false, bool oneQueueInvocation = true);
     /// Submits the queue
@@ -184,7 +179,7 @@ class TaskedSendReceiverHandle {
     TaskedSendReceiverHandle& operator=(TaskedSendReceiverHandle& other) = delete;
 
     /// Submits queue and waits for result
-    bool sendReceive(bool oneQueueInvocation = true);
+    bool sendReceive(bool local, bool oneQueueInvocation = true);
 
     public:
     /// Move constructor
@@ -192,10 +187,20 @@ class TaskedSendReceiverHandle {
     /// Move assignment
     TaskedSendReceiverHandle& operator=(TaskedSendReceiverHandle&& other);
 
-    /// Runs the handle, thread becomes the the TaskedSendReceiver
-    bool run();
-    /// Stops the handle thread
+    /// Process group submissions (should be used for async requests)
+    inline bool process(bool oneQueueInvocation = true) { return sendReceive(false, oneQueueInvocation); }
+    /// Process local submissions (should be used for sync requests)
+    inline bool processSync(bool oneQueueInvocation = true) { return sendReceive(true, oneQueueInvocation); }
+    /// Adds a message to the submission queue
+    bool sendSync(OriginalMessage* msg);
+    /// Stops the handle thread if deamon
     void stop();
+    /// Returns the underlying TaskedSendReceiver
+    TaskedSendReceiver* get() { return _sendReceiver; }
+    /// Returns the underlying TaskedSendReceiverGroup
+    TaskedSendReceiverGroup* getGroup() { return _group; }
+    /// Checks whether a TaskedSendReceiver is present
+    inline bool has() const { return _sendReceiver; }
 
     friend TaskedSendReceiverGroup;
 };

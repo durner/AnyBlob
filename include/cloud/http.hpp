@@ -57,7 +57,7 @@ class HTTP : public Provider {
     /// Get the port of the server
     [[nodiscard]] uint32_t getPort() const override;
     /// Get the instance details
-    [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
+    [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiver) override;
 
     friend Provider;
 };

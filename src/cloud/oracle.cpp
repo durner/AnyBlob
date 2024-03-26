@@ -14,7 +14,7 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-Provider::Instance Oracle::getInstanceDetails(network::TaskedSendReceiver& /*sendReceiver*/)
+Provider::Instance Oracle::getInstanceDetails(network::TaskedSendReceiverHandle& /*sendReceiver*/)
 // Get the instance details
 {
     // TODO: add instances and retrieve shape information

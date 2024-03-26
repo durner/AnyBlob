@@ -22,17 +22,17 @@ int main(int /*argc*/, char** /*argv*/) {
     anyblob::network::TaskedSendReceiverGroup group;
 
     // Create an AnyBlob scheduler object for the group
-    anyblob::network::TaskedSendReceiver sendReceiver(group);
+    auto sendReceiverHandle = group.getHandle();
 
     // Create the provider for the corresponding filename
     bool https = false;
-    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, https, "", "", &sendReceiver);
+    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, https, "", "", &sendReceiverHandle);
 
     // Optionally init the specialized aws resolver
-    // provider->initResolver(sendReceiver);
+    // provider->initResolver(sendReceiverHandle);
 
     // Update the concurrency according to instance settings
-    auto config = provider->getConfig(sendReceiver);
+    auto config = provider->getConfig(sendReceiverHandle);
     group.setConfig(config);
 
     // Create the get request
@@ -45,7 +45,7 @@ int main(int /*argc*/, char** /*argv*/) {
         getTxn.getObjectRequest(fileName);
 
     // Retrieve the request synchronously with the scheduler object on this thread
-    getTxn.processSync(sendReceiver);
+    getTxn.processSync(sendReceiverHandle);
 
     // Get and print the result
     for (const auto& it : getTxn) {

@@ -53,22 +53,22 @@ TEST_CASE("MinIO Asynchronous Integration") {
     anyblob::network::TaskedSendReceiverGroup group;
 
     // Create an AnyBlob scheduler object for the group
-    anyblob::network::TaskedSendReceiver sendReceiver(group);
+    auto sendReceiverHandle = group.getHandle();
 
     // Async thread
     future<void> asyncSendReceiverThread;
 
     auto runLambda = [&]() {
-        // Runs the download thread to asynchronously retrieve data
-        sendReceiver.run();
+        // Runs the download thread to asynchronously retrieve data in full daemon mode
+        sendReceiverHandle.process(false);
     };
     asyncSendReceiverThread = async(launch::async, runLambda);
 
     // Create the provider for the corresponding filename
-    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, key, secret, &sendReceiver);
+    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, key, secret, &sendReceiverHandle);
 
     // Update the concurrency according to instance settings (noop here, as minio uses default values)
-    auto config = provider->getConfig(sendReceiver);
+    auto config = provider->getConfig(sendReceiverHandle);
     group.setConfig(config);
 
     {
@@ -86,7 +86,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
             auto putObjectRequest = [&putTxn, &fileName, &content, &checkSuccess, i]() {
                 return putTxn.putObjectRequest(checkSuccess, fileName[i], content[i].data(), content[i].size());
             };
-            putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+            putTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
         }
 
         // Upload the request asynchronously
@@ -113,7 +113,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
             auto putObjectRequest = [&putTxn, &fileName, &content, &checkSuccess, i]() {
                 return putTxn.putObjectRequest(checkSuccess, fileName[i], content[i].data(), content[i].size());
             };
-            putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+            putTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
         }
 
         while (finishedMessages != 2) {
@@ -140,7 +140,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
         auto putObjectRequest = [&putTxn, &fileName, &content, callback = move(checkSuccess)]() {
             return putTxn.putObjectRequest(move(callback), fileName[1], content[1].data(), content[1].size());
         };
-        putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+        putTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
 
         while (finishedMessages != 1) {
             // Upload the new request asynchronously
@@ -179,7 +179,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
             auto getObjectRequest = [&getTxn, &currentFileName, callback = move(checkSuccess)]() {
                 return getTxn.getObjectRequest(move(callback), currentFileName);
             };
-            getTxn.verifyKeyRequest(sendReceiver, move(getObjectRequest));
+            getTxn.verifyKeyRequest(sendReceiverHandle, move(getObjectRequest));
         }
 
         // Retrieve the request asynchronously
@@ -205,7 +205,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
             auto deleteRequest = [&deleteTxn, &currentFileName, callback = move(checkSuccess)]() {
                 return deleteTxn.deleteObjectRequest(move(callback), currentFileName);
             };
-            deleteTxn.verifyKeyRequest(sendReceiver, move(deleteRequest));
+            deleteTxn.verifyKeyRequest(sendReceiverHandle, move(deleteRequest));
         }
 
         // Process the request asynchronously
@@ -217,7 +217,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
     }
 
     // Stop the send receiver daemon
-    sendReceiver.stop();
+    sendReceiverHandle.stop();
     // Join the thread
     asyncSendReceiverThread.get();
 }

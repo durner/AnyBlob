@@ -98,15 +98,15 @@ class Transaction {
     /// Sends the request messages to the task group
     bool processAsync(network::TaskedSendReceiverGroup& group);
     /// Processes the request messages
-    void processSync(TaskedSendReceiver& sendReceiver);
+    void processSync(TaskedSendReceiverHandle& sendReceiverHandle);
 
     /// Function to ensure fresh keys before creating messages
     /// This is needed to ensure valid keys before a message is requested
     /// Simply forward a task send receiver the message function and the args of this message
     template <typename Function>
-    bool verifyKeyRequest(TaskedSendReceiver& sendReceiver, Function&& func) {
+    bool verifyKeyRequest(TaskedSendReceiverHandle& sendReceiverHandle, Function&& func) {
         assert(_provider);
-        _provider->initSecret(sendReceiver);
+        _provider->initSecret(sendReceiverHandle);
         return std::forward<Function>(func)();
     }
 

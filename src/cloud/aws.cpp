@@ -53,7 +53,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadInstanceInfo(const string& i
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendReceiver)
+Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to get instance details
 {
     if (_type == Provider::CloudService::AWS) {
@@ -63,8 +63,8 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendRece
         info.port = getIAMPort();
         HTTP http(info);
         auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-        sendReceiver.sendSync(originalMsg.get());
-        sendReceiver.processSync();
+        assert(sendReceiverHandle.sendSync(originalMsg.get()));
+        assert(sendReceiverHandle.processSync());
         auto& content = originalMsg->result.getDataVector();
         unique_ptr<network::HttpHelper::Info> infoPtr;
         auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
@@ -78,7 +78,7 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiver& sendRece
     return AWSInstance{"aws", 0, 0, 0};
 }
 //---------------------------------------------------------------------------
-string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
+string AWS::getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to get the region
 {
     auto message = downloadInstanceInfo("placement/region");
@@ -87,8 +87,8 @@ string AWS::getInstanceRegion(network::TaskedSendReceiver& sendReceiver)
     info.port = getIAMPort();
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-    sendReceiver.sendSync(originalMsg.get());
-    sendReceiver.processSync();
+    assert(sendReceiverHandle.sendSync(originalMsg.get()));
+    assert(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
@@ -226,7 +226,7 @@ bool AWS::validSession(uint32_t offset) const
     return true;
 }
 //---------------------------------------------------------------------------
-void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
+void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to initialize the secret
 {
     if (_type == Provider::CloudService::AWS && !validKeys(180)) {
@@ -243,16 +243,16 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
                 info.port = getIAMPort();
                 HTTP http(info);
                 auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                sendReceiver.sendSync(originalMsg.get());
-                sendReceiver.processSync();
+                assert(sendReceiverHandle.sendSync(originalMsg.get()));
+                assert(sendReceiverHandle.processSync());
                 auto& content = originalMsg->result.getDataVector();
                 unique_ptr<network::HttpHelper::Info> infoPtr;
                 auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
                 string iamUser;
                 message = downloadSecret(s, iamUser);
                 originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                sendReceiver.sendSync(originalMsg.get());
-                sendReceiver.processSync();
+                assert(sendReceiverHandle.sendSync(originalMsg.get()));
+                assert(sendReceiverHandle.processSync());
                 auto& secretContent = originalMsg->result.getDataVector();
                 infoPtr.reset();
                 s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
@@ -277,8 +277,8 @@ void AWS::initSecret(network::TaskedSendReceiver& sendReceiver)
                 info.port = getPort();
                 HTTP http(info);
                 auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                sendReceiver.sendSync(originalMsg.get());
-                sendReceiver.processSync();
+                assert(sendReceiverHandle.sendSync(originalMsg.get()));
+                assert(sendReceiverHandle.processSync());
                 auto& secretContent = originalMsg->result.getDataVector();
                 unique_ptr<network::HttpHelper::Info> infoPtr;
                 auto s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
@@ -304,18 +304,19 @@ void AWS::getSecret()
     }
 }
 //---------------------------------------------------------------------------
-void AWS::initResolver(network::TaskedSendReceiver& sendReceiver)
+void AWS::initResolver(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Inits the resolver
 {
+    assert(sendReceiverHandle.get());
     if (_type == Provider::CloudService::AWS) {
-        sendReceiver.addResolver("amazonaws.com", unique_ptr<network::Resolver>(new cloud::AWSResolver(sendReceiver.getGroup()->getConcurrentRequests())));
+        sendReceiverHandle.get()->addResolver("amazonaws.com", unique_ptr<network::Resolver>(new cloud::AWSResolver(sendReceiverHandle.getGroup()->getConcurrentRequests())));
     }
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::resignRequest(const utils::DataVector<uint8_t>& data, const uint8_t* bodyData, uint64_t bodyLength) const
 // Resigns the request
 {
-     if (!validKeys() || (_settings.zonal && !validSession()))
+    if (!validKeys() || (_settings.zonal && !validSession()))
         return nullptr;
 
     auto header = network::HttpRequest::deserialize(string_view(reinterpret_cast<const char*>(data.cdata()), data.size()));

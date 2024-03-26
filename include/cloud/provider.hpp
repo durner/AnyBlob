@@ -15,6 +15,7 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace network {
 class TaskedSendReceiver;
+class TaskedSendReceiverHandle;
 class Transaction;
 struct Config;
 struct OriginalMessage;
@@ -81,7 +82,7 @@ class Provider {
     /// The type
     CloudService _type;
     /// Initialize secret
-    virtual void initSecret(network::TaskedSendReceiver& /*sendReceiver*/) {}
+    virtual void initSecret(network::TaskedSendReceiverHandle& /*sendReceiverHandle*/) {}
     /// Get a local copy of the global secret
     virtual void getSecret() {}
 
@@ -132,14 +133,14 @@ class Provider {
     [[nodiscard]] static std::vector<std::string> parseCSVRow(std::string_view body);
 
     /// Create a provider (keyId is access email for GCP/Azure)
-    [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = false, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiver* sendReceiver = nullptr);
+    [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = false, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiverHandle* sendReceiverHandle = nullptr);
 
     /// Init the resolver for specific provider
-    virtual void initResolver(network::TaskedSendReceiver& /*sendReceiver*/) {}
+    virtual void initResolver(network::TaskedSendReceiverHandle& /*sendReceiverHandle*/) {}
     /// Get the instance infos
-    [[nodiscard]] virtual Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) = 0;
+    [[nodiscard]] virtual Instance getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiverHandle) = 0;
     /// Get the config
-    [[nodiscard]] virtual network::Config getConfig(network::TaskedSendReceiver& sendReceiver);
+    [[nodiscard]] virtual network::Config getConfig(network::TaskedSendReceiverHandle& sendReceiverHandle);
 
     friend network::Transaction;
 };

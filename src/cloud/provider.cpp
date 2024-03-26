@@ -188,14 +188,14 @@ unique_ptr<utils::DataVector<uint8_t>> Provider::resignRequest(const utils::Data
     return nullptr;
 }
 //---------------------------------------------------------------------------
-network::Config Provider::getConfig(network::TaskedSendReceiver& sendReceiver)
+network::Config Provider::getConfig(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to get instance configs
 {
-    auto instance = getInstanceDetails(sendReceiver);
+    auto instance = getInstanceDetails(sendReceiverHandle);
     return network::Config{network::Config::defaultCoreThroughput, network::Config::defaultCoreConcurrency, instance.network};
 }
 //---------------------------------------------------------------------------
-unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, const string& keyId, const string& secret, network::TaskedSendReceiver* sendReceiver)
+unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, const string& keyId, const string& secret, network::TaskedSendReceiverHandle* sendReceiverHandle)
 // Create a provider
 {
     auto info = anyblob::cloud::Provider::getRemoteInfo(filepath);
@@ -203,20 +203,20 @@ unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, 
         info.port = 443;
     switch (info.provider) {
         case anyblob::cloud::Provider::CloudService::AWS: {
-            if (sendReceiver && info.region.empty())
-                info.region = anyblob::cloud::AWS::getInstanceRegion(*sendReceiver);
+            if (sendReceiverHandle && info.region.empty())
+                info.region = anyblob::cloud::AWS::getInstanceRegion(*sendReceiverHandle);
 
             if (keyId.empty()) {
                 auto aws = make_unique<anyblob::cloud::AWS>(info);
-                aws->initSecret(*sendReceiver);
+                aws->initSecret(*sendReceiverHandle);
                 return aws;
             }
             auto aws = make_unique<anyblob::cloud::AWS>(info, keyId, secret);
             return aws;
         }
         case anyblob::cloud::Provider::CloudService::GCP: {
-            if (sendReceiver && info.region.empty())
-                info.region = anyblob::cloud::GCP::getInstanceRegion(*sendReceiver);
+            if (sendReceiverHandle && info.region.empty())
+                info.region = anyblob::cloud::GCP::getInstanceRegion(*sendReceiverHandle);
             auto gcp = make_unique<anyblob::cloud::GCP>(info, keyId, secret);
             return gcp;
         }
