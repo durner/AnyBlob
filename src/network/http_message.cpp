@@ -35,8 +35,8 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                 fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), false, tcpSettings);
             } catch (exception& /*e*/) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
-                state = MessageState::Aborted;
-                return state;
+                reset(connectionManager, failures++ > failuresMax);
+                return execute(connectionManager);
             }
             state = MessageState::InitSending;
             sendBufferOffset = 0;
@@ -158,7 +158,8 @@ void HTTPMessage::reset(ConnectionManager& connectionManager, bool aborted)
     if ((originalMessage->result.failureCode & static_cast<uint16_t>(MessageFailureCode::HTTP)) && originalMessage->provider.supportsResigning()) {
         originalMessage->message = originalMessage->provider.resignRequest(*originalMessage->message, originalMessage->putData, originalMessage->putLength);
     }
-    connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, 0, true);
+    if (request)
+        connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, 0, true);
 }
 //---------------------------------------------------------------------------
 } // namespace network

@@ -287,7 +287,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                     if (it->get() == task) {
                         // Remove the second param with the real data
                         if (_timings) {
-                            (*_timings)[task->originalMessage->traceId].size = task->originalMessage->result.getSize();
+                            (*_timings)[task->originalMessage->traceId].size = status == MessageState::Aborted ? 0 : task->originalMessage->result.getSize();
                             (*_timings)[task->originalMessage->traceId].finish = chrono::steady_clock::now();
                         }
 

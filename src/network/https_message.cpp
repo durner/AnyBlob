@@ -40,8 +40,8 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                 fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), true, tcpSettings);
             } catch (exception& /*e*/) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
-                state = MessageState::Aborted;
-                return state;
+                reset(connectionManager, failures++ > failuresMax);
+                return execute(connectionManager);
             }
             tlsLayer = connectionManager.getTLSConnection(fd);
             if (!tlsLayer->init(this)) {
