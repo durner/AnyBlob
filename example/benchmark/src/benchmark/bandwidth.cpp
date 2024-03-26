@@ -156,23 +156,23 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
 {
     network::TaskedSendReceiverGroup group(benchmarkSettings.chunkSize, benchmarkSettings.requests << 1);
     group.setConcurrentRequests(benchmarkSettings.concurrentRequests);
-    vector<unique_ptr<network::TaskedSendReceiver>> sendReceivers;
+    vector<unique_ptr<network::TaskedSendReceiverHandle>> sendReceiverHandles;
     vector<unique_ptr<network::TaskedSendReceiverGroup>> taskGroups;
     for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
         // taskGroups.emplace_back(make_unique<network::TaskedSendReceiverGroup>(benchmarkSettings.concurrentRequests << 16));
-        sendReceivers.push_back(make_unique<network::TaskedSendReceiver>(group));
+        sendReceiverHandles.push_back(make_unique<network::TaskedSendReceiverHandle>(group.getHandle()));
     }
 
     string key = "";
     if (!benchmarkSettings.rsaKeyFile.empty())
         key = cloud::Provider::getKey(benchmarkSettings.rsaKeyFile);
-    auto cloudProvider = cloud::Provider::makeProvider(uri, benchmarkSettings.https, benchmarkSettings.account, key, sendReceivers.back().get());
+    auto cloudProvider = cloud::Provider::makeProvider(uri, benchmarkSettings.https, benchmarkSettings.account, key, sendReceiverHandles.back().get());
 
     if (cloudProvider->getType() == cloud::Provider::CloudService::AWS) {
         auto awsProvider = static_cast<cloud::AWS*>(cloudProvider.get());
         if (!benchmarkSettings.resolver.compare("aws")) {
             for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
-                awsProvider->initResolver(*sendReceivers[i].get());
+                awsProvider->initResolver(*sendReceiverHandles[i].get());
             }
         }
     }
@@ -186,7 +186,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         vector<utils::TimingHelper> timings;
         timings.resize(benchmarkSettings.requests);
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
-            sendReceivers[i]->setTimings(&timings);
+            sendReceiverHandles[i]->get()->setTimings(&timings);
         }
 
         random_device dev;
@@ -196,11 +196,11 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         atomic<uint64_t> finishedMessages = 0;
         auto enc = benchmarkSettings.encryption;
 
-        auto callback = [&finishedMessages, &sendReceivers, &enc, aesKey, aesIv](network::MessageResult& result) {
+        auto callback = [&finishedMessages, &sendReceiverHandles, &enc, aesKey, aesIv](network::MessageResult& result) {
             if (!result.success()) {
                 cerr << "Request was not successful: " << result.getFailureCode() << endl;
             } else if (enc) {
-                auto plain = sendReceivers.back()->getReused();
+                auto plain = sendReceiverHandles.back()->get()->getReused();
                 if (!plain)
                     plain = make_unique<utils::DataVector<uint8_t>>(result.getSize() + result.getOffset());
                 else
@@ -211,10 +211,10 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                 } catch (exception& e) {
                     cerr << "Request was not successful: " << e.what() << endl;
                 }
-                sendReceivers.back()->reuse(move(plain));
+                sendReceiverHandles.back()->get()->reuse(move(plain));
             }
             finishedMessages++;
-            sendReceivers.back()->reuse(result.moveDataVector());
+            sendReceiverHandles.back()->get()->reuse(result.moveDataVector());
         };
 
         network::Transaction getTxn[benchmarkSettings.concurrentThreads];
@@ -228,7 +228,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                 auto getObjectRequest = [&getTxn, &filePath, &range, i, callback]() {
                     return getTxn[0].getObjectRequest(move(callback), filePath, range, nullptr, 0, i);
                 };
-                getTxn[0].verifyKeyRequest(*sendReceivers.back(), move(getObjectRequest));
+                getTxn[0].verifyKeyRequest(*sendReceiverHandles.back(), move(getObjectRequest));
             }
         } else {
             auto createRequests = [&](uint64_t start, uint64_t end, uint64_t threadId) {
@@ -237,7 +237,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                     auto getObjectRequest = [&getTxn, &filePath, &range, i, threadId, callback]() {
                         return getTxn[threadId].getObjectRequest(move(callback), filePath, range, nullptr, 0, i);
                     };
-                    getTxn[threadId].verifyKeyRequest(*sendReceivers.back(), move(getObjectRequest));
+                    getTxn[threadId].verifyKeyRequest(*sendReceiverHandles.back(), move(getObjectRequest));
                 }
             };
             auto start = 0ull;
@@ -276,7 +276,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
 
             for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
                 auto perfEventThread = [&](uint64_t recv) {
-                    sendReceivers[recv]->run();
+                    sendReceiverHandles[recv]->process(false);
                 };
                 asyncSendReceiverThreads.push_back(async(launch::async, perfEventThread, i));
             }
@@ -317,14 +317,14 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                         auto putObjectRequest = [&putTxn, &filePath, callbackUpload, &blob, i]() {
                             return putTxn.putObjectRequest(move(callbackUpload), filePath, reinterpret_cast<const char*>(blob->data()), blob->size(), nullptr, 0, i);
                         };
-                        putTxn.verifyKeyRequest(*sendReceivers.back(), move(putObjectRequest));
+                        putTxn.verifyKeyRequest(*sendReceiverHandles.back(), move(putObjectRequest));
                     }
                 }
 
                 utils::Timer::TimerGuard guard(utils::Timer::Steps::Upload, timer.get());
 
                 for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
-                    sendReceivers[i]->setTimings(nullptr);
+                    sendReceiverHandles[i]->get()->setTimings(nullptr);
                 }
 
                 putTxn.processAsync(group);
@@ -351,7 +351,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                     report << "Uring," + string(benchmarkSettings.resolver) << "," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << to_string(benchmarkSettings.https) << "," << to_string(benchmarkSettings.encryption) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << chrono::duration_cast<chrono::microseconds>(t.recieve - t.start).count() << "," << t.size << endl;
         }
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
-            sendReceivers[i]->stop();
+            sendReceiverHandles[i]->stop();
 
         for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
             asyncSendReceiverThreads[i].get();

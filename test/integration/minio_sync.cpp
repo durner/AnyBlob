@@ -52,13 +52,13 @@ TEST_CASE("MinIO Sync Integration") {
     anyblob::network::TaskedSendReceiverGroup group;
 
     // Create an AnyBlob scheduler object for the group
-    anyblob::network::TaskedSendReceiver sendReceiver(group);
+    auto sendReceiverHandle = group.getHandle();
 
     // Create the provider for the corresponding filename
-    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, key, secret, &sendReceiver);
+    auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, key, secret, &sendReceiverHandle);
 
     // Update the concurrency according to instance settings (noop here, as minio uses default values)
-    auto config = provider->getConfig(sendReceiver);
+    auto config = provider->getConfig(sendReceiverHandle);
     group.setConfig(config);
 
     {
@@ -68,11 +68,11 @@ TEST_CASE("MinIO Sync Integration") {
             auto putObjectRequest = [&putTxn, &fileName, &content, i]() {
                 return putTxn.putObjectRequest(fileName[i], content[i].data(), content[i].size());
             };
-            putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+            putTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
         }
 
         // Upload the request synchronously with the scheduler object on this thread
-        putTxn.processSync(sendReceiver);
+        putTxn.processSync(sendReceiverHandle);
 
         // Check the upload
         for (const auto& it : putTxn) {
@@ -89,11 +89,11 @@ TEST_CASE("MinIO Sync Integration") {
             auto putObjectRequest = [&putTxn, &fileName, &content, i]() {
                 return putTxn.putObjectRequest(fileName[i], content[i].data(), content[i].size());
             };
-            putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+            putTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
         }
 
         // Upload the request synchronously with the scheduler object on this thread
-        putTxn.processSync(sendReceiver);
+        putTxn.processSync(sendReceiverHandle);
 
         // Check the upload
         for (const auto& it : putTxn) {
@@ -109,10 +109,10 @@ TEST_CASE("MinIO Sync Integration") {
         auto putObjectRequest = [&putTxn, &fileName, &content]() {
             return putTxn.putObjectRequest(fileName[1], content[1].data(), content[1].size());
         };
-        putTxn.verifyKeyRequest(sendReceiver, move(putObjectRequest));
+        putTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
 
         // Upload the request synchronously with the scheduler object on this thread
-        putTxn.processSync(sendReceiver);
+        putTxn.processSync(sendReceiverHandle);
 
         // Check the upload
         for (const auto& it : putTxn) {
@@ -128,11 +128,11 @@ TEST_CASE("MinIO Sync Integration") {
             auto getObjectRequest = [&getTxn, &currentFileName]() {
                 return getTxn.getObjectRequest(currentFileName);
             };
-            getTxn.verifyKeyRequest(sendReceiver, move(getObjectRequest));
+            getTxn.verifyKeyRequest(sendReceiverHandle, move(getObjectRequest));
         }
 
         // Retrieve the request synchronously with the scheduler object on this thread
-        getTxn.processSync(sendReceiver);
+        getTxn.processSync(sendReceiverHandle);
 
         // Get and print the result
         auto i = 0u;
@@ -163,11 +163,11 @@ TEST_CASE("MinIO Sync Integration") {
             auto deleteRequest = [&deleteTxn, &currentFileName]() {
                 return deleteTxn.deleteObjectRequest(currentFileName);
             };
-            deleteTxn.verifyKeyRequest(sendReceiver, move(deleteRequest));
+            deleteTxn.verifyKeyRequest(sendReceiverHandle, move(deleteRequest));
         }
 
         // Process the request synchronously with the scheduler object on this thread
-        deleteTxn.processSync(sendReceiver);
+        deleteTxn.processSync(sendReceiverHandle);
 
         // Check the deletion
         for (const auto& it : deleteTxn) {

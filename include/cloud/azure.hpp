@@ -56,9 +56,9 @@ class Azure : public Provider {
 
     public:
     /// Get instance details
-    [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
+    [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiver) override;
     /// Get the region of the instance
-    [[nodiscard]] static std::string getRegion(network::TaskedSendReceiver& sendReceiver);
+    [[nodiscard]] static std::string getRegion(network::TaskedSendReceiverHandle& sendReceiver);
 
     /// The constructor
     Azure(const RemoteInfo& info, const std::string& clientEmail, const std::string& key) : _settings({info.bucket, info.port}) {

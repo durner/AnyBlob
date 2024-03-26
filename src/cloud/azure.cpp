@@ -48,7 +48,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::downloadInstanceInfo()
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiver& sendReceiver)
+Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo();
@@ -57,8 +57,8 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiver& sendRe
     info.port = getIAMPort();
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-    sendReceiver.sendSync(originalMsg.get());
-    sendReceiver.processSync();
+    assert(sendReceiverHandle.sendSync(originalMsg.get()));
+    assert(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
@@ -77,7 +77,7 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiver& sendRe
     return AzureInstance{string(s), 0, 0, 0};
 }
 //---------------------------------------------------------------------------
-string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
+string Azure::getRegion(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to initialize the secret
 {
     auto message = downloadInstanceInfo();
@@ -86,8 +86,8 @@ string Azure::getRegion(network::TaskedSendReceiver& sendReceiver)
     info.port = getIAMPort();
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-    sendReceiver.sendSync(originalMsg.get());
-    sendReceiver.processSync();
+    assert(sendReceiverHandle.sendSync(originalMsg.get()));
+    assert(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);

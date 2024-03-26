@@ -13,7 +13,7 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-Provider::Instance MinIO::getInstanceDetails(network::TaskedSendReceiver& /*sendReceiver*/)
+Provider::Instance MinIO::getInstanceDetails(network::TaskedSendReceiverHandle& /*sendReceiver*/)
 // No real information for MinIO
 {
     return AWSInstance{"minio", 0, 0, 0};

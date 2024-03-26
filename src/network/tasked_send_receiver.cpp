@@ -68,17 +68,17 @@ TaskedSendReceiverHandle TaskedSendReceiverGroup::getHandle()
         head = _head;
     }
     lock_guard<mutex> lg(_resizeMutex);
-    auto& ref = _sendReceivers.emplace_back(make_unique<TaskedSendReceiver>(*this));
+    auto& ref = _sendReceivers.emplace_back(unique_ptr<TaskedSendReceiver>(new TaskedSendReceiver(*this)));
     TaskedSendReceiverHandle handle(this);
     handle._sendReceiver = ref.get();
     return handle;
 }
 //---------------------------------------------------------------------------
 void TaskedSendReceiverGroup::process(bool oneQueueInvocation)
-// Submits queue and waits for result
+// Makes the current thread a sendreceiver daeomon (as long as requests are queued if oneQueueInvocation) handling async requests
 {
     auto handle = getHandle();
-    handle.sendReceive(oneQueueInvocation);
+    handle.process(oneQueueInvocation);
 }
 //---------------------------------------------------------------------------
 TaskedSendReceiverHandle::TaskedSendReceiverHandle(TaskedSendReceiverGroup* group) : _group(group)
@@ -104,12 +104,12 @@ TaskedSendReceiverHandle& TaskedSendReceiverHandle::operator=(TaskedSendReceiver
     return *this;
 }
 //---------------------------------------------------------------------------
-bool TaskedSendReceiverHandle::run()
-// Starts the deamon
+bool TaskedSendReceiverHandle::sendSync(OriginalMessage* msg)
+// Adds a message to the submission queue
 {
     if (!_sendReceiver)
         return false;
-    _sendReceiver->run();
+    _sendReceiver->sendSync(msg);
     return true;
 }
 //---------------------------------------------------------------------------
@@ -129,34 +129,18 @@ void TaskedSendReceiverHandle::stop()
     }
 }
 //---------------------------------------------------------------------------
-bool TaskedSendReceiverHandle::sendReceive(bool oneQueueInvocation)
-// Creates a sending message with chaining IOSQE_IO_LINK, creates a receiving message, submits queue, and waits for result
+bool TaskedSendReceiverHandle::sendReceive(bool local, bool oneQueueInvocation)
+// Calls the underlying TaskedSendReceiver's sendReceive
 {
     if (!_sendReceiver)
         return false;
-    _sendReceiver->sendReceive(false, oneQueueInvocation);
+    _sendReceiver->sendReceive(local, oneQueueInvocation);
     return true;
 }
 //---------------------------------------------------------------------------
 TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _submissions(), _next(nullptr), _connectionManager(make_unique<ConnectionManager>(group._concurrentRequests << 2, group._cacheEntries)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
 // The constructor
 {
-}
-//---------------------------------------------------------------------------
-void TaskedSendReceiver::run()
-// Deamon
-{
-    try {
-        sendReceive(false, false);
-    } catch (const exception& e) {
-        cerr << e.what() << endl;
-    };
-}
-//---------------------------------------------------------------------------
-bool TaskedSendReceiver::send(OriginalMessage* msg)
-// Adds a message to the group submission queue
-{
-    return (_group._submissions.insert(msg) != ~0ull);
 }
 //---------------------------------------------------------------------------
 void TaskedSendReceiver::sendSync(OriginalMessage* msg)

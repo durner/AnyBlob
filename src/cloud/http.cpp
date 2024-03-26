@@ -98,7 +98,7 @@ string HTTP::getAddress() const
     return _settings.hostname;
 }
 //---------------------------------------------------------------------------
-Provider::Instance HTTP::getInstanceDetails(network::TaskedSendReceiver& /*sendReceiver*/)
+Provider::Instance HTTP::getInstanceDetails(network::TaskedSendReceiverHandle& /*sendReceiver*/)
 // No real information for HTTP
 {
     return Instance{"http", 0, 0, 0};

@@ -14,7 +14,7 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-Provider::Instance IBM::getInstanceDetails(network::TaskedSendReceiver& /*sendReceiver*/)
+Provider::Instance IBM::getInstanceDetails(network::TaskedSendReceiverHandle& /*sendReceiver*/)
 // IBM instance info
 {
     // TODO: add instances and retrieve VM information

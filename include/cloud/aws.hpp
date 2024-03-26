@@ -81,11 +81,11 @@ class AWS : public Provider {
 
     public:
     /// Get instance details
-    [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiver& sendReceiver) override;
+    [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiver) override;
     /// Get the region of the instance
-    [[nodiscard]] static std::string getInstanceRegion(network::TaskedSendReceiver& sendReceiver);
+    [[nodiscard]] static std::string getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiver);
     /// Init the resolver
-    void initResolver(network::TaskedSendReceiver& sendReceiver) override;
+    void initResolver(network::TaskedSendReceiverHandle& sendReceiverHandle) override;
 
     /// The constructor
     explicit AWS(const RemoteInfo& info) : _settings({info.bucket, info.region, info.endpoint, info.port, info.zonal}), _mutex() {
@@ -109,7 +109,7 @@ class AWS : public Provider {
 
     private:
     /// Initialize secret
-    void initSecret(network::TaskedSendReceiver& sendReceiver) override;
+    void initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle) override;
     /// Get a local copy of the global secret
     void getSecret() override;
     /// Builds the secret http request

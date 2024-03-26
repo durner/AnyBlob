@@ -15,28 +15,29 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-void Transaction::processSync(TaskedSendReceiver& sendReceiver)
+void Transaction::processSync(TaskedSendReceiverHandle& sendReceiverHandle)
 // Processes the request messages
 {
+    assert(sendReceiverHandle.has());
     do {
         // send the original request message
         for (; _messageCounter < _messages.size(); _messageCounter++) {
-            sendReceiver.sendSync(_messages[_messageCounter].get());
+            sendReceiverHandle.sendSync(_messages[_messageCounter].get());
         }
 
         for (auto& multipart : _multipartUploads) {
             if (multipart.state == MultipartUpload::State::Sending) {
                 for (auto i = 0ull; i < multipart.eTags.size(); i++)
-                    sendReceiver.sendSync(multipart.messages[i].get());
+                    sendReceiverHandle.sendSync(multipart.messages[i].get());
                 multipart.state = MultipartUpload::State::Default;
             } else if (multipart.state == MultipartUpload::State::Validating) {
-                sendReceiver.sendSync(multipart.messages[multipart.eTags.size()].get());
+                sendReceiverHandle.sendSync(multipart.messages[multipart.eTags.size()].get());
                 multipart.state = MultipartUpload::State::Default;
             }
         }
 
         // do the download work
-        sendReceiver.processSync();
+        sendReceiverHandle.processSync();
     } while (_multipartUploads.size() != _completedMultiparts);
 }
 //---------------------------------------------------------------------------
