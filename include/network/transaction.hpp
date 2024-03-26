@@ -96,7 +96,7 @@ class Transaction {
     /// Set the provider
     constexpr void setProvider(cloud::Provider* provider) { this->_provider = provider; }
     /// Sends the request messages to the task group
-    void processAsync(network::TaskedSendReceiverGroup& group);
+    bool processAsync(network::TaskedSendReceiverGroup& group);
     /// Processes the request messages
     void processSync(TaskedSendReceiver& sendReceiver);
 

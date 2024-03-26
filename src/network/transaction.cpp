@@ -40,23 +40,36 @@ void Transaction::processSync(TaskedSendReceiver& sendReceiver)
     } while (_multipartUploads.size() != _completedMultiparts);
 }
 //---------------------------------------------------------------------------
-void Transaction::processAsync(TaskedSendReceiverGroup& group)
+bool Transaction::processAsync(TaskedSendReceiverGroup& group)
 // Sends the request messages to the task group
 {
     // send the original request message
+    vector<network::OriginalMessage*> submissions;
+    auto multiPartSize = 0ull;
+    for (auto& multipart : _multipartUploads) {
+        multiPartSize += multipart.messages.size();
+    }
+    submissions.reserve(_messages.size() + multiPartSize);
     for (; _messageCounter < _messages.size(); _messageCounter++) {
-        while (!group.send(_messages[_messageCounter].get())) {}
+        submissions.emplace_back(_messages[_messageCounter].get());
     }
     for (auto& multipart : _multipartUploads) {
         if (multipart.state == MultipartUpload::State::Sending) {
             for (auto i = 0ull; i < multipart.eTags.size(); i++)
-                while (!group.send(multipart.messages[i].get())) {}
-            multipart.state = MultipartUpload::State::Default;
+                submissions.emplace_back(multipart.messages[i].get());
         } else if (multipart.state == MultipartUpload::State::Validating) {
-            while (!group.send(multipart.messages[multipart.eTags.size()].get())) {}
+            submissions.emplace_back(multipart.messages[multipart.eTags.size()].get());
+        }
+    }
+    auto success = group.send(submissions);
+    if (!success) [[unlikely]]
+        return success;
+    for (auto& multipart : _multipartUploads) {
+        if (multipart.state == MultipartUpload::State::Sending || multipart.state == MultipartUpload::State::Validating) {
             multipart.state = MultipartUpload::State::Default;
         }
     }
+    return success;
 }
 //---------------------------------------------------------------------------
 Transaction::Iterator::reference Transaction::Iterator::operator*() const
