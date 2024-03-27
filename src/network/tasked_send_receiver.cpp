@@ -164,10 +164,10 @@ unique_ptr<utils::DataVector<uint8_t>> TaskedSendReceiver::getReused()
     return nullptr;
 }
 //--------------------------------------------------------------------------
-void TaskedSendReceiver::addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver)
-// Adds a resolver
+void TaskedSendReceiver::addCache(const std::string& hostname, std::unique_ptr<Cache> cache)
+// Adds a hostname-specific cache
 {
-    _connectionManager->addResolver(hostname, move(resolver));
+    _connectionManager->addCache(hostname, move(cache));
 }
 //--------------------------------------------------------------------------
 void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)

@@ -3,8 +3,9 @@
 #include "network/tls_connection.hpp"
 #include "network/tls_context.hpp"
 #ifndef ANYBLOB_LIBCXX_COMPAT
-#include "network/throughput_resolver.hpp"
+#include "network/throughput_cache.hpp"
 #endif
+#include <atomic>
 #include <cassert>
 #include <cstring>
 #include <string>
@@ -28,22 +29,24 @@ namespace anyblob {
 namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
+std::atomic<unsigned> ConnectionManager::_activeConnectionManagers{0};
 //---------------------------------------------------------------------------
 ConnectionManager::SocketEntry::SocketEntry(int32_t fd, std::string hostname, unsigned port, std::unique_ptr<TLSConnection> tls) : tls(move(tls)), fd(fd), port(port), hostname(move(hostname))
 // The constructor
 {}
 //---------------------------------------------------------------------------
-ConnectionManager::ConnectionManager(unsigned uringEntries, unsigned resolverCacheEntries) : _socketWrapper(make_unique<IOUringSocket>(uringEntries)), _resolverCache()
+ConnectionManager::ConnectionManager(unsigned uringEntries, unsigned cacheEntries) : _socketWrapper(make_unique<IOUringSocket>(uringEntries)), _cache()
 // The constructor
 {
+    _activeConnectionManagers++;
     _context = make_unique<network::TLSContext>();
 #ifndef ANYBLOB_LIBCXX_COMPAT
-    // By default, use the ThroughputResolver.
-    _resolverCache.emplace("", make_unique<ThroughputResolver>(resolverCacheEntries));
+    // By default, use the ThroughputCache.
+    _cache.emplace("", make_unique<ThroughputCache>(cacheEntries));
 #else
-    // If we build in libcxx compatability mode, we need to use the default resolver.
-    // The ThroughputResolver currently does not build with libcxx.
-    _resolverCache.emplace("", make_unique<Resolver>(resolverCacheEntries));
+    // If we build in libcxx compatability mode, we need to use the default cache.
+    // The ThroughputCache currently does not build with libcxx.
+    _cache.emplace("", make_unique<Cache>(cacheEntries));
 #endif
 }
 //---------------------------------------------------------------------------
@@ -51,26 +54,32 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
 // Creates a new socket connection
 {
     if (useCache) {
-        for (auto it = _fdCache.find(hostname); it != _fdCache.end(); it++) {
+        for (auto it = _fdCache.find(hostname); it != _fdCache.end();) {
+            // loosely clean up the multimap cache
+            if (it->second->fd < 0) {
+                it = _fdCache.erase(it);
+                continue;
+            }
             if (it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
                 auto fd = it->second->fd;
                 _fdSockets.emplace(fd, move(it->second));
                 _fdCache.erase(it);
                 return fd;
             }
+            it++;
         }
     }
 
     char port_str[16] = {};
     sprintf(port_str, "%d", port);
 
-    Resolver* resCache;
-    auto tldName = string(Resolver::tld(hostname));
-    auto it = _resolverCache.find(tldName);
-    if (it != _resolverCache.end()) {
+    Cache* resCache;
+    auto tldName = string(Cache::tld(hostname));
+    auto it = _cache.find(tldName);
+    if (it != _cache.end()) {
         resCache = it->second.get();
     } else {
-        resCache = _resolverCache.find("")->second.get();
+        resCache = _cache.find("")->second.get();
     }
 
     // Did we use
@@ -265,13 +274,13 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
 void ConnectionManager::disconnect(int32_t fd, string hostname, uint32_t port, const TCPSettings* tcpSettings, uint64_t bytes, bool forceShutdown)
 // Disconnects the socket
 {
-    Resolver* resCache;
-    auto tldName = string(Resolver::tld(hostname));
-    auto it = _resolverCache.find(tldName);
-    if (it != _resolverCache.end()) {
+    Cache* resCache;
+    auto tldName = string(Cache::tld(hostname));
+    auto it = _cache.find(tldName);
+    if (it != _cache.end()) {
         resCache = it->second.get();
     } else {
-        resCache = _resolverCache.find("")->second.get();
+        resCache = _cache.find("")->second.get();
     }
     resCache->stopSocket(fd, bytes);
     if (forceShutdown) {
@@ -281,6 +290,15 @@ void ConnectionManager::disconnect(int32_t fd, string hostname, uint32_t port, c
     } else if (tcpSettings && tcpSettings->reuse > 0 && hostname.length() > 0 && port) {
         auto it = _fdSockets.find(fd);
         assert(it != _fdSockets.end());
+        auto* socketEntry = it->second.get();
+        _fdQueue.push_back(socketEntry);
+        auto cacheEntries = (_maxCachedFds / _activeConnectionManagers) + 1;
+        while (_fdQueue.size() > cacheEntries) {
+            socketEntry = _fdQueue.front();
+            close(socketEntry->fd);
+            socketEntry->fd = -1;
+            _fdQueue.pop_front();
+        }
         _fdCache.emplace(hostname, move(it->second));
         _fdSockets.erase(it);
     } else {
@@ -289,10 +307,10 @@ void ConnectionManager::disconnect(int32_t fd, string hostname, uint32_t port, c
     }
 }
 //---------------------------------------------------------------------------
-void ConnectionManager::addResolver(const string& hostname, unique_ptr<Resolver> resolver)
-// Add resolver
+void ConnectionManager::addCache(const string& hostname, unique_ptr<Cache> cache)
+// Add cache
 {
-    _resolverCache.emplace(string(Resolver::tld(hostname)), move(resolver));
+    _cache.emplace(string(Cache::tld(hostname)), move(cache));
 }
 //---------------------------------------------------------------------------
 bool ConnectionManager::checkTimeout(int fd, const TCPSettings& tcpSettings)
@@ -321,7 +339,9 @@ ConnectionManager::~ConnectionManager()
     for (auto& f : _fdSockets)
         close(f.first);
     for (auto& f : _fdCache)
-        close(f.second->fd);
+        if (f.second->fd >= 0)
+            close(f.second->fd);
+    _activeConnectionManagers--;
 }
 //---------------------------------------------------------------------------
 } // namespace network

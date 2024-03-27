@@ -33,7 +33,7 @@ namespace network {
 //---------------------------------------------------------------------------
 class TaskedSendReceiver;
 class TaskedSendReceiverHandle;
-class Resolver;
+class Cache;
 struct OriginalMessage;
 //---------------------------------------------------------------------------
 /// Shared submission and completions queue with multiple TaskedSendReceivers
@@ -125,8 +125,8 @@ class TaskedSendReceiver {
     public:
     /// Get the group
     [[nodiscard]] const TaskedSendReceiverGroup* getGroup() const { return &_group; }
-    /// Adds a resolver
-    void addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver);
+    /// Adds a domain-specific cache
+    void addCache(const std::string& hostname, std::unique_ptr<Cache> cache);
     /// Process local submissions (should be used for sync requests)
     inline void processSync(bool oneQueueInvocation = true) { sendReceive(true, oneQueueInvocation); }
     /// Set the timings

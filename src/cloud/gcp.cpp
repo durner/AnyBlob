@@ -3,7 +3,7 @@
 #include "cloud/gcp_signer.hpp"
 #include "network/http_helper.hpp"
 #include "network/original_message.hpp"
-#include "network/resolver.hpp"
+#include "network/cache.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
 #include <chrono>

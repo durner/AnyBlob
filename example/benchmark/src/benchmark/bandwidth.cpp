@@ -1,6 +1,6 @@
 #include "benchmark/bandwidth.hpp"
 #include "cloud/aws.hpp"
-#include "cloud/aws_resolver.hpp"
+#include "cloud/aws_cache.hpp"
 #include "cloud/azure.hpp"
 #include "cloud/gcp.hpp"
 #include "network/original_message.hpp"
@@ -172,7 +172,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         auto awsProvider = static_cast<cloud::AWS*>(cloudProvider.get());
         if (!benchmarkSettings.resolver.compare("aws")) {
             for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
-                awsProvider->initResolver(*sendReceiverHandles[i].get());
+                awsProvider->initCache(*sendReceiverHandles[i].get());
             }
         }
     }

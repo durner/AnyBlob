@@ -1,9 +1,9 @@
 #pragma once
-// The `ThroughputResolver` depends on gnu stdlib associative containers that are
-// not supported by libcxx. We remove the throughput resolver in its entirety when
+// The `ThroughputCache` depends on gnu stdlib associative containers that are
+// not supported by libcxx. We remove the throughput cache in its entirety when
 // building with libcxx.
 #ifndef ANYBLOB_LIBCXX_COMPAT
-#include "network/resolver.hpp"
+#include "network/cache.hpp"
 #include <chrono>
 #include <ext/pb_ds/assoc_container.hpp>
 #include <ext/pb_ds/tree_policy.hpp>
@@ -20,8 +20,8 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace network {
 //---------------------------------------------------------------------------
-/// Implements the AWS Resolver logic
-class ThroughputResolver : public network::Resolver {
+/// Implements the throughput-based cache logic
+class ThroughputCache : public network::Cache {
     /// Order statistic tree
     typedef __gnu_pbds::tree<
         double,
@@ -43,7 +43,7 @@ class ThroughputResolver : public network::Resolver {
 
     public:
     /// The constructor
-    explicit ThroughputResolver(unsigned cacheEntries);
+    explicit ThroughputCache(unsigned cacheEntries);
     /// The address resolving
     virtual const addrinfo* resolve(std::string hostname, std::string port, bool& reuse) override;
     /// Start the timing
@@ -53,7 +53,7 @@ class ThroughputResolver : public network::Resolver {
     /// Clears the used server from the cache
     virtual void shutdownSocket(int fd) override;
     /// The destructor
-    virtual ~ThroughputResolver() noexcept = default;
+    virtual ~ThroughputCache() noexcept = default;
 };
 //---------------------------------------------------------------------------
 }; // namespace network

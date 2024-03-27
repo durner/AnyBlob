@@ -1,4 +1,4 @@
-#include "network/resolver.hpp"
+#include "network/cache.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -12,7 +12,7 @@ namespace anyblob {
 namespace network {
 namespace test {
 //---------------------------------------------------------------------------
-TEST_CASE("resolver") {
+TEST_CASE("cache") {
 }
 //---------------------------------------------------------------------------
 } // namespace test
