@@ -28,8 +28,8 @@ int main(int /*argc*/, char** /*argv*/) {
     bool https = false;
     auto provider = anyblob::cloud::Provider::makeProvider(bucketName, https, "", "", &sendReceiverHandle);
 
-    // Optionally init the specialized aws resolver
-    // provider->initResolver(sendReceiverHandle);
+    // Optionally init the specialized aws cache
+    // provider->initCache(sendReceiverHandle);
 
     // Update the concurrency according to instance settings
     auto config = provider->getConfig(sendReceiverHandle);

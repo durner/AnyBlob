@@ -20,7 +20,7 @@ namespace network {
 class IOUringSocket;
 //---------------------------------------------------------------------------
 /// The addr resolver and cacher, which is not thread safe
-class Resolver {
+class Cache {
     protected:
     /// The addr info
     std::vector<std::unique_ptr<addrinfo, decltype(&freeaddrinfo)>> _addr;
@@ -31,7 +31,7 @@ class Resolver {
 
     public:
     /// The constructor
-    explicit Resolver(unsigned entries);
+    explicit Cache(unsigned entries);
     /// The address resolving
     virtual const addrinfo* resolve(std::string hostname, std::string port, bool& oldAddress);
     /// Reset the current cache bucket
@@ -43,7 +43,7 @@ class Resolver {
     /// Shutdown of the socket should clear the same addresses
     virtual void shutdownSocket(int /*fd*/) {}
     /// The destructor
-    virtual ~Resolver() noexcept = default;
+    virtual ~Cache() noexcept = default;
 
     /// Get the tld
     static std::string_view tld(std::string_view domain);

@@ -1,5 +1,5 @@
 #include "catch2/single_include/catch2/catch.hpp"
-#include "cloud/aws_resolver.hpp"
+#include "cloud/aws_cache.hpp"
 #include "network/connection_manager.hpp"
 #include "perfevent/PerfEvent.hpp"
 //---------------------------------------------------------------------------

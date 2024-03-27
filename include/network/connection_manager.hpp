@@ -1,6 +1,7 @@
 #pragma once
-#include "network/resolver.hpp"
+#include "network/cache.hpp"
 #include <cassert>
+#include <deque>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -73,6 +74,7 @@ class ConnectionManager {
         /// The hostname
         std::string hostname;
 
+        /// The constructor
         SocketEntry(int32_t fd, std::string hostname, unsigned port, std::unique_ptr<TLSConnection> tls);
     };
 
@@ -83,14 +85,21 @@ class ConnectionManager {
     std::unordered_map<int32_t, std::unique_ptr<SocketEntry>> _fdSockets;
     /// The fd socket cache, uses hostname as key
     std::unordered_multimap<std::string, std::unique_ptr<SocketEntry>> _fdCache;
-    /// Resolver
-    std::unordered_map<std::string, std::unique_ptr<Resolver>> _resolverCache;
+    /// The queue
+    std::deque<SocketEntry*> _fdQueue;
+    /// Cache
+    std::unordered_map<std::string, std::unique_ptr<Cache>> _cache;
     /// The tls context
     std::unique_ptr<network::TLSContext> _context;
 
+    /// The counter of current connection managers
+    static std::atomic<unsigned> _activeConnectionManagers;
+    /// The maximum number of cached fds, TODO: access ulimit for this
+    constexpr static unsigned _maxCachedFds = 512;
+
     public:
     /// The constructor
-    explicit ConnectionManager(unsigned uringEntries, unsigned resolverCacheEntries);
+    explicit ConnectionManager(unsigned uringEntries, unsigned cacheEntries);
     /// The destructor
     ~ConnectionManager();
 
@@ -99,8 +108,8 @@ class ConnectionManager {
     /// Disconnects the socket
     void disconnect(int32_t fd, std::string hostname = "", uint32_t port = 0, const TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
 
-    /// Add resolver
-    void addResolver(const std::string& hostname, std::unique_ptr<Resolver> resolver);
+    /// Add domain-specific cache
+    void addCache(const std::string& hostname, std::unique_ptr<Cache> cache);
     /// Checks for a timeout
     bool checkTimeout(int fd, const TCPSettings& settings);
 

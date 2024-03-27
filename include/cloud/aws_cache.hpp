@@ -1,5 +1,5 @@
 #pragma once
-#include "network/resolver.hpp"
+#include "network/cache.hpp"
 #include <unordered_map>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -13,18 +13,18 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------
-/// Implements the AWS resolver logic
-class AWSResolver : public network::Resolver {
+/// Implements the AWS cache logic
+class AWSCache : public network::Cache {
     /// The good mtu cache
     std::unordered_map<unsigned, bool> _mtuCache;
 
     public:
     /// The constructor
-    explicit AWSResolver(unsigned cacheEntries);
+    explicit AWSCache(unsigned cacheEntries);
     /// The address resolving
     virtual const addrinfo* resolve(std::string hostname, std::string port, bool& reuse) override;
     /// The destructor
-    virtual ~AWSResolver() noexcept = default;
+    virtual ~AWSCache() noexcept = default;
 };
 //---------------------------------------------------------------------------
 }; // namespace cloud

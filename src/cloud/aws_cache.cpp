@@ -1,7 +1,8 @@
-#include "network/resolver.hpp"
+#include "cloud/aws_cache.hpp"
 #include <cstring>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <arpa/inet.h>
 #include <sys/types.h>
 //---------------------------------------------------------------------------
@@ -13,41 +14,22 @@
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
 namespace anyblob {
-namespace network {
+namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-string_view Resolver::tld(string_view domain)
-// String prefix
-{
-    auto pos = domain.find_last_of('.');
-    if (pos != string::npos) {
-        pos = domain.substr(0, pos - 1).find_last_of('.');
-        if (pos == string::npos)
-            return domain;
-        else
-            return string_view(domain).substr(pos + 1, domain.size());
-    }
-    return string_view();
-}
-//---------------------------------------------------------------------------
-Resolver::Resolver(unsigned entries)
+AWSCache::AWSCache(unsigned entries) : Cache(entries), _mtuCache()
 // Constructor
 {
-    _addr.reserve(entries);
-    for (auto i = 0u; i < entries; i++) {
-        _addr.emplace_back(nullptr, &freeaddrinfo);
-    }
-    _addrString.resize(entries, {"", 0});
-    _addrCtr = 0;
 }
 //---------------------------------------------------------------------------
-const addrinfo* Resolver::resolve(string hostname, string port, bool& oldAddress)
+const addrinfo* AWSCache::resolve(string hostname, string port, bool& oldAddress)
 // Resolve the request
 {
     auto addrPos = _addrCtr % static_cast<unsigned>(_addrString.size());
     auto curCtr = _addrString[addrPos].second--;
     auto hostString = hostname + ":" + port;
+    // Reuses old address
     oldAddress = true;
     if (_addrString[addrPos].first.compare(hostString) || curCtr == 0) {
         struct addrinfo hints = {};
@@ -57,16 +39,40 @@ const addrinfo* Resolver::resolve(string hostname, string port, bool& oldAddress
         hints.ai_protocol = IPPROTO_TCP;
 
         addrinfo* temp;
-        if (getaddrinfo(hostname.c_str(), port.c_str(), &hints, &temp) != 0) {
+        if (getaddrinfo(hostname.c_str(), port.c_str(), &hints, &temp)) {
             throw runtime_error("hostname getaddrinfo error");
         }
         _addr[addrPos].reset(temp);
-        _addrString[addrPos] = {move(hostString), 12};
+        if (!Cache::tld(hostname).compare("amazonaws.com")) {
+            struct sockaddr_in* p = reinterpret_cast<sockaddr_in*>(_addr[addrPos]->ai_addr);
+            auto ipAsInt = p->sin_addr.s_addr;
+            auto it = _mtuCache.find(ipAsInt);
+            if (it != _mtuCache.end()) {
+                if (it->second)
+                    _addrString[addrPos] = {move(hostString), numeric_limits<int>::max()};
+                else
+                    _addrString[addrPos] = {move(hostString), 12};
+            } else {
+                char ipv4[INET_ADDRSTRLEN];
+                inet_ntop(AF_INET, &p->sin_addr, ipv4, INET_ADDRSTRLEN);
+                string cmd = "timeout 0.01 ping -s 1473 -D " + string(ipv4) + " -c 1 >>/dev/null 2>>/dev/null";
+                auto res = system(cmd.c_str());
+                if (!res) {
+                    _mtuCache.emplace(ipAsInt, true);
+                    _addrString[addrPos] = {move(hostString), numeric_limits<int>::max()};
+                } else {
+                    _mtuCache.emplace(ipAsInt, false);
+                    _addrString[addrPos] = {move(hostString), 12};
+                }
+            }
+        } else {
+            _addrString[addrPos] = {move(hostString), 12};
+        }
         oldAddress = false;
     }
     return _addr[addrPos].get();
 }
 //---------------------------------------------------------------------------
-}; // namespace network
+}; // namespace cloud
 //---------------------------------------------------------------------------
 }; // namespace anyblob

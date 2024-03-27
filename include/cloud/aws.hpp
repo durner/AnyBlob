@@ -84,8 +84,8 @@ class AWS : public Provider {
     [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiver) override;
     /// Get the region of the instance
     [[nodiscard]] static std::string getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiver);
-    /// Init the resolver
-    void initResolver(network::TaskedSendReceiverHandle& sendReceiverHandle) override;
+    /// Init the Cache
+    void initCache(network::TaskedSendReceiverHandle& sendReceiverHandle) override;
 
     /// The constructor
     explicit AWS(const RemoteInfo& info) : _settings({info.bucket, info.region, info.endpoint, info.port, info.zonal}), _mutex() {

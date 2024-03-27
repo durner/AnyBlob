@@ -1,5 +1,5 @@
 #include "cloud/aws.hpp"
-#include "cloud/aws_resolver.hpp"
+#include "cloud/aws_cache.hpp"
 #include "cloud/http.hpp"
 #include "network/http_helper.hpp"
 #include "network/original_message.hpp"
@@ -304,12 +304,12 @@ void AWS::getSecret()
     }
 }
 //---------------------------------------------------------------------------
-void AWS::initResolver(network::TaskedSendReceiverHandle& sendReceiverHandle)
-// Inits the resolver
+void AWS::initCache(network::TaskedSendReceiverHandle& sendReceiverHandle)
+// Inits the cache
 {
     assert(sendReceiverHandle.get());
     if (_type == Provider::CloudService::AWS) {
-        sendReceiverHandle.get()->addResolver("amazonaws.com", unique_ptr<network::Resolver>(new cloud::AWSResolver(sendReceiverHandle.getGroup()->getConcurrentRequests())));
+        sendReceiverHandle.get()->addCache("amazonaws.com", unique_ptr<network::Cache>(new cloud::AWSCache(sendReceiverHandle.getGroup()->getConcurrentRequests())));
     }
 }
 //---------------------------------------------------------------------------

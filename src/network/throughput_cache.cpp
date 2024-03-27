@@ -1,5 +1,5 @@
 #ifndef ANYBLOB_LIBCXX_COMPAT 
-#include "network/throughput_resolver.hpp"
+#include "network/throughput_cache.hpp"
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -19,13 +19,13 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-ThroughputResolver::ThroughputResolver(unsigned entries) : Resolver(entries), _throughputTree(), _throughput(), _throughputIterator()
+ThroughputCache::ThroughputCache(unsigned entries) : Cache(entries), _throughputTree(), _throughput(), _throughputIterator()
 // Constructor
 {
     _throughput.resize(_maxHistory);
 }
 //---------------------------------------------------------------------------
-const addrinfo* ThroughputResolver::resolve(string hostname, string port, bool& reuse)
+const addrinfo* ThroughputCache::resolve(string hostname, string port, bool& reuse)
 // Resolve the request
 {
     auto addrPos = _addrCtr % _addrString.size();
@@ -50,13 +50,13 @@ const addrinfo* ThroughputResolver::resolve(string hostname, string port, bool& 
     return _addr[addrPos].get();
 }
 //---------------------------------------------------------------------------
-void ThroughputResolver::startSocket(int fd)
+void ThroughputCache::startSocket(int fd)
 // Start a socket
 {
     _fdMap.emplace(fd, make_pair(_addrCtr++ % _addrString.size(), chrono::steady_clock::now()));
 }
 //---------------------------------------------------------------------------
-void ThroughputResolver::shutdownSocket(int fd)
+void ThroughputCache::shutdownSocket(int fd)
 // Shutdown a socket and clear the dns cache
 {
     auto it = _fdMap.find(fd);
@@ -71,7 +71,7 @@ void ThroughputResolver::shutdownSocket(int fd)
     }
 }
 //---------------------------------------------------------------------------
-void ThroughputResolver::stopSocket(int fd, uint64_t bytes)
+void ThroughputCache::stopSocket(int fd, uint64_t bytes)
 // Stop a socket
 {
     auto now = chrono::steady_clock::now();
