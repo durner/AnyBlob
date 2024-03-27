@@ -39,6 +39,8 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
             try {
                 fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), true, tcpSettings);
             } catch (exception& /*e*/) {
+                if (request)
+                    request->fd = -1;
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
                 reset(connectionManager, failures++ > failuresMax);
                 return execute(connectionManager);
@@ -114,7 +116,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                         // Decide if to cache the session
                         if (tcpSettings.reuse) {
                             state = MessageState::Finished;
-                            connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
+                            connectionManager.disconnect(request->fd, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                             return state;
                         } else {
                             state = MessageState::TLSShutdown;
@@ -144,7 +146,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
             auto status = tlsLayer->shutdown(connectionManager);
             // The request was successful even if the shutdown fails
             if (status == TLSConnection::Progress::Finished || status == TLSConnection::Progress::Aborted) {
-                connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
+                connectionManager.disconnect(request->fd, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                 state = MessageState::Finished;
                 return MessageState::Finished;
             } else {

@@ -117,8 +117,7 @@ class UnorderedMap {
 
         /// The advance function of the forward iterator
         constexpr Iterator& operator++() {
-            /// TODO: durner
-            return *this;
+            throw std::runtime_error("advancing an iterator is not implemented");
         }
     };
 
