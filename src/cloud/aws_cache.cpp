@@ -18,59 +18,60 @@ namespace cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-AWSCache::AWSCache(unsigned entries) : Cache(entries), _mtuCache()
+AWSCache::AWSCache() : Cache(), _mtuCache()
 // Constructor
 {
 }
 //---------------------------------------------------------------------------
-const addrinfo* AWSCache::resolve(string hostname, string port, bool& oldAddress)
+unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(string hostname, unsigned port, bool tls)
 // Resolve the request
 {
-    auto addrPos = _addrCtr % static_cast<unsigned>(_addrString.size());
-    auto curCtr = _addrString[addrPos].second--;
-    auto hostString = hostname + ":" + port;
-    // Reuses old address
-    oldAddress = true;
-    if (_addrString[addrPos].first.compare(hostString) || curCtr == 0) {
-        struct addrinfo hints = {};
-        memset(&hints, 0, sizeof hints);
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-
-        addrinfo* temp;
-        if (getaddrinfo(hostname.c_str(), port.c_str(), &hints, &temp)) {
-            throw runtime_error("hostname getaddrinfo error");
+    for (auto it = _cache.find(hostname); it != _cache.end();) {
+        // loosely clean up the multimap cache
+        if (it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
+            auto socketEntry = move(it->second);
+            socketEntry->dns->cachePriority--;
+            _cache.erase(it);
+            return socketEntry;
         }
-        _addr[addrPos].reset(temp);
-        if (!Cache::tld(hostname).compare("amazonaws.com")) {
-            struct sockaddr_in* p = reinterpret_cast<sockaddr_in*>(_addr[addrPos]->ai_addr);
-            auto ipAsInt = p->sin_addr.s_addr;
-            auto it = _mtuCache.find(ipAsInt);
-            if (it != _mtuCache.end()) {
-                if (it->second)
-                    _addrString[addrPos] = {move(hostString), numeric_limits<int>::max()};
-                else
-                    _addrString[addrPos] = {move(hostString), 12};
-            } else {
-                char ipv4[INET_ADDRSTRLEN];
-                inet_ntop(AF_INET, &p->sin_addr, ipv4, INET_ADDRSTRLEN);
-                string cmd = "timeout 0.01 ping -s 1473 -D " + string(ipv4) + " -c 1 >>/dev/null 2>>/dev/null";
-                auto res = system(cmd.c_str());
-                if (!res) {
-                    _mtuCache.emplace(ipAsInt, true);
-                    _addrString[addrPos] = {move(hostString), numeric_limits<int>::max()};
-                } else {
-                    _mtuCache.emplace(ipAsInt, false);
-                    _addrString[addrPos] = {move(hostString), 12};
-                }
-            }
-        } else {
-            _addrString[addrPos] = {move(hostString), 12};
-        }
-        oldAddress = false;
+        it++;
     }
-    return _addr[addrPos].get();
+    struct addrinfo hints = {};
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    addrinfo* temp;
+    char port_str[16] = {};
+    sprintf(port_str, "%d", port);
+    if (getaddrinfo(hostname.c_str(), port_str, &hints, &temp) != 0) {
+        throw runtime_error("hostname getaddrinfo error");
+    }
+    auto socketEntry = make_unique<Cache::SocketEntry>(hostname, port);
+    socketEntry->dns = make_unique<DnsEntry>(unique_ptr<addrinfo, decltype(&freeaddrinfo)>(temp, &freeaddrinfo), _defaultPriority);
+
+    if (!Cache::tld(hostname).compare("amazonaws.com")) {
+        struct sockaddr_in* p = reinterpret_cast<sockaddr_in*>(socketEntry->dns->addr->ai_addr);
+        auto ipAsInt = p->sin_addr.s_addr;
+        auto it = _mtuCache.find(ipAsInt);
+        if (it != _mtuCache.end()) {
+            if (it->second)
+                socketEntry->dns->cachePriority = numeric_limits<int>::max();
+        } else {
+            char ipv4[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &p->sin_addr, ipv4, INET_ADDRSTRLEN);
+            string cmd = "timeout 0.01 ping -s 1473 -D " + string(ipv4) + " -c 1 >>/dev/null 2>>/dev/null";
+            auto res = system(cmd.c_str());
+            if (!res) {
+                _mtuCache.emplace(ipAsInt, true);
+                socketEntry->dns->cachePriority = numeric_limits<int>::max();
+            } else {
+                _mtuCache.emplace(ipAsInt, false);
+            }
+        }
+    }
+    return socketEntry;
 }
 //---------------------------------------------------------------------------
 }; // namespace cloud

@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <arpa/inet.h>
 #include <sys/types.h>
+#include <unistd.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -31,40 +32,83 @@ string_view Cache::tld(string_view domain)
     return string_view();
 }
 //---------------------------------------------------------------------------
-Cache::Cache(unsigned entries)
-// Constructor
+Cache::SocketEntry::SocketEntry(string hostname, unsigned port) : dns(nullptr), tls(nullptr), fd(-1), port(port), hostname(move(hostname))
+// The constructor
+{}
+//---------------------------------------------------------------------------
+void Cache::shutdownSocket(unique_ptr<Cache::SocketEntry> socketEntry)
+// Shutdown the socket and dns cache
 {
-    _addr.reserve(entries);
-    for (auto i = 0u; i < entries; i++) {
-        _addr.emplace_back(nullptr, &freeaddrinfo);
+    // delete all occurences of the cached ip in map
+    if (socketEntry->hostname.length() > 0) {
+        for (auto it = _cache.find(socketEntry->hostname); it != _cache.end();) {
+            if (!strncmp(socketEntry->dns->addr->ai_addr->sa_data, it->second->dns->addr->ai_addr->sa_data, 14)) {
+                it->second->dns->cachePriority = 0;
+                stopSocket(move(it->second), 0, 0, false);
+                it = _cache.erase(it);
+            } else {
+                it++;
+            }
+        }
     }
-    _addrString.resize(entries, {"", 0});
-    _addrCtr = 0;
+    stopSocket(move(socketEntry), 0, 0, false);
 }
 //---------------------------------------------------------------------------
-const addrinfo* Cache::resolve(string hostname, string port, bool& oldAddress)
+void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*bytes*/, unsigned /*cacheEntries*/, bool reuseSocket)
+// Stops the socket and either closes the connection or cashes it
+{
+    if (reuseSocket && socketEntry->hostname.length() > 0 && socketEntry->port) {
+        if (socketEntry->dns->cachePriority > 0) {
+            _cache.emplace(socketEntry->hostname, move(socketEntry));
+        } else {
+            close(socketEntry->fd);
+        }
+    } else {
+        if (socketEntry->fd >= 0) {
+            close(socketEntry->fd);
+        }
+        socketEntry->fd = -1;
+        if (socketEntry->dns->cachePriority > 0)
+            _cache.emplace(socketEntry->hostname, move(socketEntry));
+    }
+}
+//---------------------------------------------------------------------------
+unique_ptr<Cache::SocketEntry> Cache::resolve(string hostname, unsigned port, bool tls)
 // Resolve the request
 {
-    auto addrPos = _addrCtr % static_cast<unsigned>(_addrString.size());
-    auto curCtr = _addrString[addrPos].second--;
-    auto hostString = hostname + ":" + port;
-    oldAddress = true;
-    if (_addrString[addrPos].first.compare(hostString) || curCtr == 0) {
-        struct addrinfo hints = {};
-        memset(&hints, 0, sizeof hints);
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-
-        addrinfo* temp;
-        if (getaddrinfo(hostname.c_str(), port.c_str(), &hints, &temp) != 0) {
-            throw runtime_error("hostname getaddrinfo error");
+    for (auto it = _cache.find(hostname); it != _cache.end();) {
+        // loosely clean up the multimap cache
+        if (it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
+            auto socketEntry = move(it->second);
+            socketEntry->dns->cachePriority--;
+            _cache.erase(it);
+            return socketEntry;
         }
-        _addr[addrPos].reset(temp);
-        _addrString[addrPos] = {move(hostString), 12};
-        oldAddress = false;
+        it++;
     }
-    return _addr[addrPos].get();
+    struct addrinfo hints = {};
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    addrinfo* temp;
+    char port_str[16] = {};
+    sprintf(port_str, "%d", port);
+    if (getaddrinfo(hostname.c_str(), port_str, &hints, &temp) != 0) {
+        throw runtime_error("hostname getaddrinfo error");
+    }
+    auto socketEntry = make_unique<Cache::SocketEntry>(hostname, port);
+    socketEntry->dns = make_unique<DnsEntry>(unique_ptr<addrinfo, decltype(&freeaddrinfo)>(temp, &freeaddrinfo), _defaultPriority);
+    return socketEntry;
+}
+//---------------------------------------------------------------------------
+Cache::~Cache()
+// The destructor
+{
+    for (auto& f : _cache)
+        if (f.second->fd >= 0)
+            close(f.second->fd);
 }
 //---------------------------------------------------------------------------
 }; // namespace network
