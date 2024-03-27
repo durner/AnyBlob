@@ -12,6 +12,12 @@
 namespace anyblob {
 namespace utils {
 //---------------------------------------------------------------------------
+#ifndef NDEBUG
+#define verify(expression) assert(expression)
+#else
+#define verify(expression) ((void) (expression))
+#endif
+//---------------------------------------------------------------------------
 /// Encode url special characters in %HEX
 std::string encodeUrlParameters(const std::string& encode);
 /// Encode everything from binary representation to hex

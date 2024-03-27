@@ -6,6 +6,7 @@
 #include "network/cache.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
+#include "utils/utils.hpp"
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -50,8 +51,8 @@ Provider::Instance GCP::getInstanceDetails(network::TaskedSendReceiverHandle& se
     info.port = getIAMPort();
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-    assert(sendReceiverHandle.sendSync(originalMsg.get()));
-    assert(sendReceiverHandle.processSync());
+    verify(sendReceiverHandle.sendSync(originalMsg.get()));
+    verify(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
@@ -73,8 +74,8 @@ string GCP::getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiverHan
     info.port = getIAMPort();
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-    assert(sendReceiverHandle.sendSync(originalMsg.get()));
-    assert(sendReceiverHandle.processSync());
+    verify(sendReceiverHandle.sendSync(originalMsg.get()));
+    verify(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);

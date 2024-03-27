@@ -1,4 +1,5 @@
 #include "network/connection_manager.hpp"
+#include "network/cache.hpp"
 #include "network/io_uring_socket.hpp"
 #include "network/tls_connection.hpp"
 #include "network/tls_context.hpp"
@@ -9,8 +10,8 @@
 #include <cassert>
 #include <cstring>
 #include <string>
-#include <arpa/inet.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <poll.h>
 #include <stdlib.h>
 #include <sys/eventfd.h>
@@ -31,48 +32,24 @@ namespace network {
 using namespace std;
 std::atomic<unsigned> ConnectionManager::_activeConnectionManagers{0};
 //---------------------------------------------------------------------------
-ConnectionManager::SocketEntry::SocketEntry(int32_t fd, std::string hostname, unsigned port, std::unique_ptr<TLSConnection> tls) : tls(move(tls)), fd(fd), port(port), hostname(move(hostname))
-// The constructor
-{}
-//---------------------------------------------------------------------------
-ConnectionManager::ConnectionManager(unsigned uringEntries, unsigned cacheEntries) : _socketWrapper(make_unique<IOUringSocket>(uringEntries)), _cache()
+ConnectionManager::ConnectionManager(unsigned uringEntries) : _socketWrapper(make_unique<IOUringSocket>(uringEntries)), _cache()
 // The constructor
 {
     _activeConnectionManagers++;
     _context = make_unique<network::TLSContext>();
 #ifndef ANYBLOB_LIBCXX_COMPAT
     // By default, use the ThroughputCache.
-    _cache.emplace("", make_unique<ThroughputCache>(cacheEntries));
+    _cache.emplace("", make_unique<ThroughputCache>());
 #else
     // If we build in libcxx compatability mode, we need to use the default cache.
     // The ThroughputCache currently does not build with libcxx.
-    _cache.emplace("", make_unique<Cache>(cacheEntries));
+    _cache.emplace("", make_unique<Cache>());
 #endif
 }
 //---------------------------------------------------------------------------
-int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, bool useCache, int retryLimit)
+int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit)
 // Creates a new socket connection
 {
-    if (useCache) {
-        for (auto it = _fdCache.find(hostname); it != _fdCache.end();) {
-            // loosely clean up the multimap cache
-            if (it->second->fd < 0) {
-                it = _fdCache.erase(it);
-                continue;
-            }
-            if (it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
-                auto fd = it->second->fd;
-                _fdSockets.emplace(fd, move(it->second));
-                _fdCache.erase(it);
-                return fd;
-            }
-            it++;
-        }
-    }
-
-    char port_str[16] = {};
-    sprintf(port_str, "%d", port);
-
     Cache* resCache;
     auto tldName = string(Cache::tld(hostname));
     auto it = _cache.find(tldName);
@@ -83,77 +60,91 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     }
 
     // Did we use
-    bool oldAddress = false;
-    const auto* addr = resCache->resolve(hostname, port_str, oldAddress);
+    auto socketEntry = resCache->resolve(hostname, port, tls);
+
+    auto fd = socketEntry->fd;
+    if (fd >= 0) {
+        _fdSockets.emplace(socketEntry->fd, move(socketEntry));
+        return fd;
+    }
 
     // Build socket
-    auto fd = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-    if (fd == -1) {
+    socketEntry->fd = socket(socketEntry->dns->addr->ai_family, socketEntry->dns->addr->ai_socktype, socketEntry->dns->addr->ai_protocol);
+    if (socketEntry->fd == -1) {
         throw runtime_error("Socket creation error!" + string(strerror(errno)));
     }
 
     // Settings for socket
     // No blocking mode
     if (tcpSettings.nonBlocking > 0) {
-        int flags = fcntl(fd, F_GETFL, 0);
+        int flags = fcntl(socketEntry->fd, F_GETFL, 0);
         flags |= O_NONBLOCK;
-        if (fcntl(fd, F_SETFL, flags) < 0) {
+        if (fcntl(socketEntry->fd, F_SETFL, flags) < 0) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error! - non blocking error");
         }
     }
 
     // Keep Alive
     if (tcpSettings.keepAlive > 0) {
-        if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &tcpSettings.keepAlive, sizeof(tcpSettings.keepAlive))) {
+        if (setsockopt(socketEntry->fd, SOL_SOCKET, SO_KEEPALIVE, &tcpSettings.keepAlive, sizeof(tcpSettings.keepAlive))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error! - keep alive error");
         }
     }
 
     // Keep Idle
     if (tcpSettings.keepIdle > 0) {
-        if (setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &tcpSettings.keepIdle, sizeof(tcpSettings.keepIdle))) {
+        if (setsockopt(socketEntry->fd, SOL_TCP, TCP_KEEPIDLE, &tcpSettings.keepIdle, sizeof(tcpSettings.keepIdle))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error! - keep idle error");
         }
     }
 
     // Keep intvl
     if (tcpSettings.keepIntvl > 0) {
-        if (setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &tcpSettings.keepIntvl, sizeof(tcpSettings.keepIntvl))) {
+        if (setsockopt(socketEntry->fd, SOL_TCP, TCP_KEEPINTVL, &tcpSettings.keepIntvl, sizeof(tcpSettings.keepIntvl))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error! - keep intvl error");
         }
     }
 
     // Keep cnt
     if (tcpSettings.keepCnt > 0) {
-        if (setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &tcpSettings.keepCnt, sizeof(tcpSettings.keepCnt))) {
+        if (setsockopt(socketEntry->fd, SOL_TCP, TCP_KEEPCNT, &tcpSettings.keepCnt, sizeof(tcpSettings.keepCnt))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error! - keep cnt error");
         }
     }
 
     // No Delay
     if (tcpSettings.noDelay > 0) {
-        if (setsockopt(fd, SOL_TCP, TCP_NODELAY, &tcpSettings.noDelay, sizeof(tcpSettings.noDelay))) {
+        if (setsockopt(socketEntry->fd, SOL_TCP, TCP_NODELAY, &tcpSettings.noDelay, sizeof(tcpSettings.noDelay))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error! - nodelay error");
         }
     }
 
     // Reuse ports
     if (tcpSettings.reusePorts > 0) {
-        if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &tcpSettings.reusePorts, sizeof(tcpSettings.reusePorts))) {
+        if (setsockopt(socketEntry->fd, SOL_SOCKET, SO_REUSEPORT, &tcpSettings.reusePorts, sizeof(tcpSettings.reusePorts))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error! - reuse port error");
         }
     }
 
     // Recv buffer
     if (tcpSettings.recvBuffer > 0) {
-        if (setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &tcpSettings.recvBuffer, sizeof(tcpSettings.recvBuffer))) {
+        if (setsockopt(socketEntry->fd, SOL_SOCKET, SO_RCVBUF, &tcpSettings.recvBuffer, sizeof(tcpSettings.recvBuffer))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error! - recvbuf error");
         }
     }
 
     // Lingering of sockets
     if (tcpSettings.linger > 0) {
-        if (setsockopt(fd, SOL_TCP, TCP_LINGER2, &tcpSettings.linger, sizeof(tcpSettings.linger))) {
+        if (setsockopt(socketEntry->fd, SOL_TCP, TCP_LINGER2, &tcpSettings.linger, sizeof(tcpSettings.linger))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error - linger timeout error!" + string(strerror(errno)));
         }
     }
@@ -166,7 +157,8 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
             windowShift++;
         }
 
-        if (setsockopt(inSock, SOL_TCP, TCP_WINSHIFT, &windowShift, sizeof(windowShift))) {
+        if (setsockopt(socketEntry->fd, SOL_TCP, TCP_WINSHIFT, &windowShift, sizeof(windowShift))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error - win shift error!");
         }
     }
@@ -176,7 +168,8 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
 #ifdef TCP_RFC1323
     if (tcpSettings.rfc1323 && tcpSettings.recvBuffer >= (64 << 10)) {
         int on = 1;
-        if (setsockopt(fd, SOL_TCP, TCP_RFC1323, &on, sizeof(on))) {
+        if (setsockopt(socketEntry->fd, SOL_TCP, TCP_RFC1323, &on, sizeof(on))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error - rfc 1323 error!");
         }
     }
@@ -185,57 +178,60 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // Max segment size
 #ifdef TCP_MAXSEG
     if (tcpSettings.mss > 0) {
-        if (setsockopt(fd, SOL_TCP, TCP_MAXSEG, &tcpSettings.mss, sizeof(tcpSettings.mss))) {
+        if (setsockopt(socketEntry->fd, SOL_TCP, TCP_MAXSEG, &tcpSettings.mss, sizeof(tcpSettings.mss))) {
+            resCache->shutdownSocket(move(socketEntry));
             throw runtime_error("Socket creation error - max segment error!");
         }
     }
 #endif
 
-    auto setTimeOut = [](int fd, const TCPSettings& tcpSettings) {
+    auto setTimeOut = [&resCache, &socketEntry](int fd, const TCPSettings& tcpSettings) {
         // Set timeout
         if (tcpSettings.timeout > 0) {
             struct timeval tv;
             tv.tv_sec = tcpSettings.timeout / (1000 * 1000);
             tv.tv_usec = tcpSettings.timeout % (1000 * 1000);
             if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof tv)) {
+                resCache->shutdownSocket(move(socketEntry));
                 throw runtime_error("Socket creation error - recv timeout error!");
             }
             if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&tv), sizeof tv)) {
+                resCache->shutdownSocket(move(socketEntry));
                 throw runtime_error("Socket creation error - send timeout error!");
             }
             int timeoutInMs = tcpSettings.timeout / 1000;
             if (setsockopt(fd, SOL_TCP, TCP_USER_TIMEOUT, &timeoutInMs, sizeof(timeoutInMs))) {
+                resCache->shutdownSocket(move(socketEntry));
                 throw runtime_error("Socket creation error - tcp timeout error!" + string(strerror(errno)));
             }
         }
     };
 
     // Connect to remote
-    auto connectRes = ::connect(fd, addr->ai_addr, addr->ai_addrlen);
+    auto connectRes = ::connect(socketEntry->fd, socketEntry->dns->addr->ai_addr, socketEntry->dns->addr->ai_addrlen);
     if (connectRes < 0 && errno != EINPROGRESS) {
-        close(fd);
-        if (oldAddress && retryLimit > 0) {
-            // Retry with a new address
-            resCache->resetBucket();
-            return connect(hostname, port, tls, tcpSettings, useCache, retryLimit - 1);
+        resCache->shutdownSocket(move(socketEntry));
+        if (retryLimit > 0) {
+            return connect(hostname, port, tls, tcpSettings, retryLimit - 1);
         } else {
             throw runtime_error("Socket creation error! " + string(strerror(errno)));
         }
     }
 
-    resCache->startSocket(fd);
+    resCache->startSocket(socketEntry->fd);
 
-    auto emplaceSocket = [this, &hostname, port, tls](int32_t fd) {
+    auto emplaceSocket = [this, &socketEntry, tls]() {
+        auto fd = socketEntry->fd;
         if (tls)
-            _fdSockets.emplace(fd, make_unique<SocketEntry>(fd, hostname, port, make_unique<TLSConnection>(*_context)));
-        else
-            _fdSockets.emplace(fd, make_unique<SocketEntry>(fd, hostname, port, nullptr));
+            socketEntry->tls = make_unique<TLSConnection>(*_context);
+        _fdSockets.emplace(fd, move(socketEntry));
+        return fd;
     };
 
     if (connectRes < 0 && errno == EINPROGRESS) {
         // connection check
         struct pollfd pollEvent;
-        pollEvent.fd = fd;
+        pollEvent.fd = socketEntry->fd;
         pollEvent.events = POLLIN | POLLOUT;
 
         // connection check
@@ -243,67 +239,52 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
         if (t == 1) {
             int socketError;
             socklen_t socketErrorLen = sizeof(socketError);
-            if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &socketError, &socketErrorLen)) {
+            if (getsockopt(socketEntry->fd, SOL_SOCKET, SO_ERROR, &socketError, &socketErrorLen)) {
+                resCache->shutdownSocket(move(socketEntry));
                 throw runtime_error("Socket creation error! Could not retrieve socket options!");
             }
 
             if (!socketError) {
                 // sucessful
-                setTimeOut(fd, tcpSettings);
-                emplaceSocket(fd);
-                return fd;
+                setTimeOut(socketEntry->fd, tcpSettings);
+                return emplaceSocket();
             } else {
-                close(fd);
+                resCache->shutdownSocket(move(socketEntry));
                 throw runtime_error("Socket creation error! " + string(strerror(socketError)));
             }
         } else {
             // Reached timeout
-            close(fd);
+            resCache->shutdownSocket(move(socketEntry));
             if (retryLimit > 0) {
-                return connect(hostname, port, tls, tcpSettings, useCache, retryLimit - 1);
+                return connect(hostname, port, tls, tcpSettings, retryLimit - 1);
             } else {
                 throw runtime_error("Socket creation error! Timeout reached");
             }
         }
     }
-    setTimeOut(fd, tcpSettings);
-    emplaceSocket(fd);
-    return fd;
+    setTimeOut(socketEntry->fd, tcpSettings);
+    return emplaceSocket();
 }
 //---------------------------------------------------------------------------
-void ConnectionManager::disconnect(int32_t fd, string hostname, uint32_t port, const TCPSettings* tcpSettings, uint64_t bytes, bool forceShutdown)
+void ConnectionManager::disconnect(int32_t fd, const TCPSettings* tcpSettings, uint64_t bytes, bool forceShutdown)
 // Disconnects the socket
 {
+    auto socketIt = _fdSockets.find(fd);
+    assert(socketIt != _fdSockets.end());
     Cache* resCache;
-    auto tldName = string(Cache::tld(hostname));
+    auto tldName = string(Cache::tld(socketIt->second->hostname));
     auto it = _cache.find(tldName);
     if (it != _cache.end()) {
         resCache = it->second.get();
     } else {
         resCache = _cache.find("")->second.get();
     }
-    resCache->stopSocket(fd, bytes);
     if (forceShutdown) {
-        shutdown(fd, SHUT_RDWR);
-        resCache->shutdownSocket(fd);
-        _fdSockets.erase(fd);
-    } else if (tcpSettings && tcpSettings->reuse > 0 && hostname.length() > 0 && port) {
-        auto it = _fdSockets.find(fd);
-        assert(it != _fdSockets.end());
-        auto* socketEntry = it->second.get();
-        _fdQueue.push_back(socketEntry);
-        auto cacheEntries = (_maxCachedFds / _activeConnectionManagers) + 1;
-        while (_fdQueue.size() > cacheEntries) {
-            socketEntry = _fdQueue.front();
-            close(socketEntry->fd);
-            socketEntry->fd = -1;
-            _fdQueue.pop_front();
-        }
-        _fdCache.emplace(hostname, move(it->second));
-        _fdSockets.erase(it);
+        resCache->shutdownSocket(move(socketIt->second));
+        _fdSockets.erase(socketIt);
     } else {
-        _fdSockets.erase(fd);
-        close(fd);
+        resCache->stopSocket(move(socketIt->second), bytes, (_maxCachedFds / _activeConnectionManagers) + 1, tcpSettings ? tcpSettings->reuse : false);
+        _fdSockets.erase(socketIt);
     }
 }
 //---------------------------------------------------------------------------
@@ -338,9 +319,7 @@ ConnectionManager::~ConnectionManager()
 {
     for (auto& f : _fdSockets)
         close(f.first);
-    for (auto& f : _fdCache)
-        if (f.second->fd >= 0)
-            close(f.second->fd);
+
     _activeConnectionManagers--;
 }
 //---------------------------------------------------------------------------
