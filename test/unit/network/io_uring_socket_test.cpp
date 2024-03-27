@@ -16,7 +16,7 @@ namespace test {
 //---------------------------------------------------------------------------
 TEST_CASE("io_uring_socket") {
     PerfEventBlock e;
-    ConnectionManager io (10, 10);
+    ConnectionManager io (10);
     ConnectionManager::TCPSettings tcpSettings;
     REQUIRE(io.connect("db.in.tum.de", 80, false, tcpSettings) > 0);
 }

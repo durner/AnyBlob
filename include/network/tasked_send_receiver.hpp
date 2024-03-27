@@ -57,8 +57,6 @@ class TaskedSendReceiverGroup {
     uint64_t _chunkSize;
     /// The queue maximum for each TaskedSendReceiver
     unsigned _concurrentRequests;
-    /// The maximum dns cache size
-    unsigned _cacheEntries = 32;
     /// The TCP settings
     std::unique_ptr<ConnectionManager::TCPSettings> _tcpSettings;
 

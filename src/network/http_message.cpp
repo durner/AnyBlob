@@ -34,6 +34,8 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
             try {
                 fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), false, tcpSettings);
             } catch (exception& /*e*/) {
+                if (request)
+                    request->fd = -1;
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
                 reset(connectionManager, failures++ > failuresMax);
                 return execute(connectionManager);
@@ -97,7 +99,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                     try {
                         // check whether finished http
                         if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
-                            connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
+                            connectionManager.disconnect(request->fd, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                             originalMessage->result.response = move(info);
                             if (HttpResponse::checkSuccess(originalMessage->result.response->response.code)) {
                                 state = MessageState::Finished;
@@ -158,8 +160,8 @@ void HTTPMessage::reset(ConnectionManager& connectionManager, bool aborted)
     if ((originalMessage->result.failureCode & static_cast<uint16_t>(MessageFailureCode::HTTP)) && originalMessage->provider.supportsResigning()) {
         originalMessage->message = originalMessage->provider.resignRequest(*originalMessage->message, originalMessage->putData, originalMessage->putLength);
     }
-    if (request)
-        connectionManager.disconnect(request->fd, originalMessage->provider.getAddress(), originalMessage->provider.getPort(), &tcpSettings, 0, true);
+    if (request && request->fd >= 0)
+        connectionManager.disconnect(request->fd, &tcpSettings, 0, true);
 }
 //---------------------------------------------------------------------------
 } // namespace network

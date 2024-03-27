@@ -35,7 +35,7 @@ class ThroughputCache : public network::Cache {
     /// The seconds vector as stable ring buffer
     std::vector<double> _throughput;
     /// The map between fd and start time
-    std::unordered_map<int, std::pair<unsigned, std::chrono::steady_clock::time_point>> _fdMap;
+    std::unordered_map<int, std::chrono::steady_clock::time_point> _fdMap;
     /// The seconds vector iterator
     uint64_t _throughputIterator;
     /// The maximum history
@@ -43,17 +43,13 @@ class ThroughputCache : public network::Cache {
 
     public:
     /// The constructor
-    explicit ThroughputCache(unsigned cacheEntries);
-    /// The address resolving
-    virtual const addrinfo* resolve(std::string hostname, std::string port, bool& reuse) override;
-    /// Start the timing
+    explicit ThroughputCache();
+    /// Start the timing and advance to the next cache bucket
     virtual void startSocket(int fd) override;
-    /// Stop the timing
-    virtual void stopSocket(int fd, uint64_t bytes) override;
-    /// Clears the used server from the cache
-    virtual void shutdownSocket(int fd) override;
+    /// Stops the socket and either closes the connection or cashes it
+    virtual void stopSocket(std::unique_ptr<SocketEntry> socketEntry, uint64_t bytes, unsigned cachedEntries, bool reuseSocket) override;
     /// The destructor
-    virtual ~ThroughputCache() noexcept = default;
+    virtual ~ThroughputCache() = default;
 };
 //---------------------------------------------------------------------------
 }; // namespace network

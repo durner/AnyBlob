@@ -20,11 +20,11 @@ class AWSCache : public network::Cache {
 
     public:
     /// The constructor
-    explicit AWSCache(unsigned cacheEntries);
+    AWSCache();
     /// The address resolving
-    virtual const addrinfo* resolve(std::string hostname, std::string port, bool& reuse) override;
+    virtual std::unique_ptr<network::Cache::SocketEntry> resolve(std::string hostname, unsigned port, bool tls) override;
     /// The destructor
-    virtual ~AWSCache() noexcept = default;
+    virtual ~AWSCache() = default;
 };
 //---------------------------------------------------------------------------
 }; // namespace cloud

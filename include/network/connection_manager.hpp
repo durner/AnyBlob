@@ -1,7 +1,6 @@
 #pragma once
 #include "network/cache.hpp"
 #include <cassert>
-#include <deque>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -20,6 +19,7 @@ namespace network {
 //---------------------------------------------------------------------------
 class TLSConnection;
 class TLSContext;
+struct DnsEntry;
 //---------------------------------------------------------------------------
 // This class acts as the connection enabler, closer, and main
 // cache for sockets and their optional tls connection.
@@ -63,30 +63,11 @@ class ConnectionManager {
         }
     };
 
-    /// The fd socket entry
-    struct SocketEntry {
-        /// The optional tls connection
-        std::unique_ptr<TLSConnection> tls;
-        /// The fd
-        int32_t fd;
-        /// The port
-        unsigned port;
-        /// The hostname
-        std::string hostname;
-
-        /// The constructor
-        SocketEntry(int32_t fd, std::string hostname, unsigned port, std::unique_ptr<TLSConnection> tls);
-    };
-
     private:
     /// The socket wrapper
     std::unique_ptr<IOUringSocket> _socketWrapper;
     /// The active sockets
-    std::unordered_map<int32_t, std::unique_ptr<SocketEntry>> _fdSockets;
-    /// The fd socket cache, uses hostname as key
-    std::unordered_multimap<std::string, std::unique_ptr<SocketEntry>> _fdCache;
-    /// The queue
-    std::deque<SocketEntry*> _fdQueue;
+    std::unordered_map<int32_t, std::unique_ptr<Cache::SocketEntry>> _fdSockets;
     /// Cache
     std::unordered_map<std::string, std::unique_ptr<Cache>> _cache;
     /// The tls context
@@ -99,14 +80,14 @@ class ConnectionManager {
 
     public:
     /// The constructor
-    explicit ConnectionManager(unsigned uringEntries, unsigned cacheEntries);
+    explicit ConnectionManager(unsigned uringEntries);
     /// The destructor
     ~ConnectionManager();
 
     /// Creates a new socket connection
-    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, bool useCache = true, int retryLimit = 16);
+    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit = 16);
     /// Disconnects the socket
-    void disconnect(int32_t fd, std::string hostname = "", uint32_t port = 0, const TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
+    void disconnect(int32_t fd, const TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
 
     /// Add domain-specific cache
     void addCache(const std::string& hostname, std::unique_ptr<Cache> cache);

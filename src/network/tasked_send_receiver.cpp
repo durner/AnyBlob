@@ -6,6 +6,7 @@
 #include "network/tls_context.hpp"
 #include "utils/data_vector.hpp"
 #include "utils/timer.hpp"
+#include "utils/utils.hpp"
 #include <algorithm>
 #include <cassert>
 #include <cstring>
@@ -17,12 +18,6 @@
 // This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
-//---------------------------------------------------------------------------
-#ifndef NDEBUG
-#define verify(expression) assert(expression)
-#else
-#define verify(expression) ((void) (expression))
-#endif
 //---------------------------------------------------------------------------
 namespace anyblob {
 namespace network {
@@ -138,7 +133,7 @@ bool TaskedSendReceiverHandle::sendReceive(bool local, bool oneQueueInvocation)
     return true;
 }
 //---------------------------------------------------------------------------
-TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _submissions(), _next(nullptr), _connectionManager(make_unique<ConnectionManager>(group._concurrentRequests << 2, group._cacheEntries)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
+TaskedSendReceiver::TaskedSendReceiver(TaskedSendReceiverGroup& group) : _group(group), _submissions(), _next(nullptr), _connectionManager(make_unique<ConnectionManager>(group._concurrentRequests << 2)), _messageTasks(), _timings(nullptr), _stopDeamon(false)
 // The constructor
 {
 }

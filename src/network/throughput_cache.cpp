@@ -1,4 +1,4 @@
-#ifndef ANYBLOB_LIBCXX_COMPAT 
+#ifndef ANYBLOB_LIBCXX_COMPAT
 #include "network/throughput_cache.hpp"
 #include <cstring>
 #include <limits>
@@ -19,65 +19,26 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-ThroughputCache::ThroughputCache(unsigned entries) : Cache(entries), _throughputTree(), _throughput(), _throughputIterator()
+ThroughputCache::ThroughputCache() : Cache(), _throughputTree(), _throughput(), _throughputIterator()
 // Constructor
 {
+    _defaultPriority = 2;
     _throughput.resize(_maxHistory);
-}
-//---------------------------------------------------------------------------
-const addrinfo* ThroughputCache::resolve(string hostname, string port, bool& reuse)
-// Resolve the request
-{
-    auto addrPos = _addrCtr % _addrString.size();
-    auto curCtr = _addrString[addrPos].second--;
-    auto hostString = hostname + ":" + port;
-    if (_addrString[addrPos].first.compare(hostString) || curCtr == 0) {
-        struct addrinfo hints = {};
-        memset(&hints, 0, sizeof hints);
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_protocol = IPPROTO_TCP;
-
-        addrinfo* temp;
-        if (getaddrinfo(hostname.c_str(), port.c_str(), &hints, &temp)) {
-            throw runtime_error("hostname getaddrinfo error");
-        }
-        _addr[addrPos].reset(temp);
-        _addrString[addrPos] = {hostString, 2};
-        reuse = false;
-    }
-    reuse = true;
-    return _addr[addrPos].get();
 }
 //---------------------------------------------------------------------------
 void ThroughputCache::startSocket(int fd)
 // Start a socket
 {
-    _fdMap.emplace(fd, make_pair(_addrCtr++ % _addrString.size(), chrono::steady_clock::now()));
+    _fdMap.emplace(fd, chrono::steady_clock::now());
 }
 //---------------------------------------------------------------------------
-void ThroughputCache::shutdownSocket(int fd)
-// Shutdown a socket and clear the dns cache
-{
-    auto it = _fdMap.find(fd);
-    if (it != _fdMap.end()) {
-        auto pos = it->second.first;
-        auto& ip = _addr[pos];
-        for (auto compPos = 0u; compPos < _addr.size(); compPos++) {
-            if (_addr[compPos] && !strncmp(ip->ai_addr->sa_data, _addr[compPos]->ai_addr->sa_data, 14)) {
-                _addrString[compPos].second = 0;
-            }
-        }
-    }
-}
-//---------------------------------------------------------------------------
-void ThroughputCache::stopSocket(int fd, uint64_t bytes)
+void ThroughputCache::stopSocket(std::unique_ptr<SocketEntry> socketEntry, uint64_t bytes, unsigned cachedEntries, bool reuseSocket)
 // Stop a socket
 {
     auto now = chrono::steady_clock::now();
-    auto it = _fdMap.find(fd);
+    auto it = _fdMap.find(socketEntry->fd);
     if (it != _fdMap.end()) {
-        auto timeNs = chrono::duration_cast<chrono::nanoseconds>(now - it->second.second).count();
+        auto timeNs = chrono::duration_cast<chrono::nanoseconds>(now - it->second).count();
         auto throughput = static_cast<double>(bytes) / chrono::duration<double>(timeNs).count();
         auto curThroughput = _throughputIterator++;
         auto del = _throughput[curThroughput % _maxHistory];
@@ -89,16 +50,17 @@ void ThroughputCache::stopSocket(int fd, uint64_t bytes)
         if (maxElem > 3) {
             auto percentile = _throughputTree.find_by_order(maxElem / 3);
             if (percentile.m_p_nd->m_value <= throughput)
-                _addrString[it->second.first].second += 1;
+                socketEntry->dns->cachePriority += 1;
             else
                 possible = false;
         }
         if (possible && maxElem > 6) {
             auto percentile = _throughputTree.find_by_order(maxElem / 6);
             if (percentile.m_p_nd->m_value <= throughput)
-                _addrString[it->second.first].second += 2;
+                socketEntry->dns->cachePriority += 2;
         }
     }
+    Cache::stopSocket(move(socketEntry), bytes, cachedEntries, reuseSocket);
 }
 //---------------------------------------------------------------------------
 }; // namespace network

@@ -5,6 +5,7 @@
 #include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
+#include "utils/utils.hpp"
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -63,8 +64,8 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiverHandle& se
         info.port = getIAMPort();
         HTTP http(info);
         auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-        assert(sendReceiverHandle.sendSync(originalMsg.get()));
-        assert(sendReceiverHandle.processSync());
+        verify(sendReceiverHandle.sendSync(originalMsg.get()));
+        verify(sendReceiverHandle.processSync());
         auto& content = originalMsg->result.getDataVector();
         unique_ptr<network::HttpHelper::Info> infoPtr;
         auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
@@ -87,8 +88,8 @@ string AWS::getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiverHan
     info.port = getIAMPort();
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-    assert(sendReceiverHandle.sendSync(originalMsg.get()));
-    assert(sendReceiverHandle.processSync());
+    verify(sendReceiverHandle.sendSync(originalMsg.get()));
+    verify(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
@@ -243,16 +244,16 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
                 info.port = getIAMPort();
                 HTTP http(info);
                 auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                assert(sendReceiverHandle.sendSync(originalMsg.get()));
-                assert(sendReceiverHandle.processSync());
+                verify(sendReceiverHandle.sendSync(originalMsg.get()));
+                verify(sendReceiverHandle.processSync());
                 auto& content = originalMsg->result.getDataVector();
                 unique_ptr<network::HttpHelper::Info> infoPtr;
                 auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
                 string iamUser;
                 message = downloadSecret(s, iamUser);
                 originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                assert(sendReceiverHandle.sendSync(originalMsg.get()));
-                assert(sendReceiverHandle.processSync());
+                verify(sendReceiverHandle.sendSync(originalMsg.get()));
+                verify(sendReceiverHandle.processSync());
                 auto& secretContent = originalMsg->result.getDataVector();
                 infoPtr.reset();
                 s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
@@ -277,8 +278,8 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
                 info.port = getPort();
                 HTTP http(info);
                 auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                assert(sendReceiverHandle.sendSync(originalMsg.get()));
-                assert(sendReceiverHandle.processSync());
+                verify(sendReceiverHandle.sendSync(originalMsg.get()));
+                verify(sendReceiverHandle.processSync());
                 auto& secretContent = originalMsg->result.getDataVector();
                 unique_ptr<network::HttpHelper::Info> infoPtr;
                 auto s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
@@ -309,7 +310,7 @@ void AWS::initCache(network::TaskedSendReceiverHandle& sendReceiverHandle)
 {
     assert(sendReceiverHandle.get());
     if (_type == Provider::CloudService::AWS) {
-        sendReceiverHandle.get()->addCache("amazonaws.com", unique_ptr<network::Cache>(new cloud::AWSCache(sendReceiverHandle.getGroup()->getConcurrentRequests())));
+        sendReceiverHandle.get()->addCache("amazonaws.com", unique_ptr<network::Cache>(new cloud::AWSCache()));
     }
 }
 //---------------------------------------------------------------------------
