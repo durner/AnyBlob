@@ -42,6 +42,8 @@ class Cache {
         std::unique_ptr<DnsEntry> dns;
         /// The optional tls connection
         std::unique_ptr<TLSConnection> tls;
+        /// The timestamp
+        size_t timestamp;
         /// The fd
         int32_t fd;
         /// The port
@@ -57,6 +59,10 @@ class Cache {
     protected:
     /// The cache, uses hostname as key, multimap traversals same keys in the insertion order
     std::multimap<std::string, std::unique_ptr<SocketEntry>> _cache;
+    /// The fifo deletion of sockets to help reduce open fds (ulimit -n issue)
+    std::map<size_t, SocketEntry*> _fifo;
+    /// The timestamp counter for deletion
+    size_t _timestamp = 0;
     /// The default priority
     int _defaultPriority = 8;
 
@@ -68,7 +74,7 @@ class Cache {
     /// Stops the socket and either closes the connection or cashes it
     virtual void stopSocket(std::unique_ptr<SocketEntry> socketEntry, uint64_t bytes, unsigned cachedEntries, bool reuseSocket);
     /// Shutdown of the socket and clears the same addresses
-    virtual void shutdownSocket(std::unique_ptr<SocketEntry> socketEntry);
+    virtual void shutdownSocket(std::unique_ptr<SocketEntry> socketEntry, unsigned cachedEntries);
     /// The destructor
     virtual ~Cache();
 
