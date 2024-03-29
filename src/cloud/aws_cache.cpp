@@ -28,9 +28,15 @@ unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(string hostname, unsig
 {
     for (auto it = _cache.find(hostname); it != _cache.end();) {
         // loosely clean up the multimap cache
+        if (!it->second->dns) {
+            _fifo.erase(it->second->timestamp);
+            it = _cache.erase(it);
+            continue;
+        }
         if (it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
             auto socketEntry = move(it->second);
             socketEntry->dns->cachePriority--;
+            _fifo.erase(socketEntry->timestamp);
             _cache.erase(it);
             return socketEntry;
         }

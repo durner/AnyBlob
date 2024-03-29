@@ -36,29 +36,39 @@ Cache::SocketEntry::SocketEntry(string hostname, unsigned port) : dns(nullptr), 
 // The constructor
 {}
 //---------------------------------------------------------------------------
-void Cache::shutdownSocket(unique_ptr<Cache::SocketEntry> socketEntry)
+void Cache::shutdownSocket(unique_ptr<Cache::SocketEntry> socketEntry, unsigned cacheEntries)
 // Shutdown the socket and dns cache
 {
-    // delete all occurences of the cached ip in map
+    // delete all occurences of the cached ips in the cache map
     if (socketEntry->hostname.length() > 0) {
         for (auto it = _cache.find(socketEntry->hostname); it != _cache.end();) {
             if (!strncmp(socketEntry->dns->addr->ai_addr->sa_data, it->second->dns->addr->ai_addr->sa_data, 14)) {
                 it->second->dns->cachePriority = 0;
-                stopSocket(move(it->second), 0, 0, false);
+                _fifo.erase(it->second->timestamp);
+                stopSocket(move(it->second), 0, cacheEntries, false);
                 it = _cache.erase(it);
             } else {
                 it++;
             }
         }
     }
-    stopSocket(move(socketEntry), 0, 0, false);
+    stopSocket(move(socketEntry), 0, cacheEntries, false);
 }
 //---------------------------------------------------------------------------
-void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*bytes*/, unsigned /*cacheEntries*/, bool reuseSocket)
+void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*bytes*/, unsigned cacheEntries, bool reuseSocket)
 // Stops the socket and either closes the connection or cashes it
 {
     if (reuseSocket && socketEntry->hostname.length() > 0 && socketEntry->port) {
         if (socketEntry->dns->cachePriority > 0) {
+            socketEntry->timestamp = _timestamp++;
+            for (auto it = _fifo.begin(); _fifo.size() >= cacheEntries;) {
+                if (it->second->fd >= 0)
+                    close(it->second->fd);
+                it->second->fd = -1;
+                it->second->dns = nullptr;
+                it = _fifo.erase(it);
+            }
+            _fifo.emplace(socketEntry->timestamp, socketEntry.get());
             _cache.emplace(socketEntry->hostname, move(socketEntry));
         } else {
             close(socketEntry->fd);
@@ -78,9 +88,15 @@ unique_ptr<Cache::SocketEntry> Cache::resolve(string hostname, unsigned port, bo
 {
     for (auto it = _cache.find(hostname); it != _cache.end();) {
         // loosely clean up the multimap cache
+        if (!it->second->dns) {
+            _fifo.erase(it->second->timestamp);
+            it = _cache.erase(it);
+            continue;
+        }
         if (it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
             auto socketEntry = move(it->second);
             socketEntry->dns->cachePriority--;
+            _fifo.erase(socketEntry->timestamp);
             _cache.erase(it);
             return socketEntry;
         }

@@ -14,19 +14,20 @@ fi
 aws s3api create-bucket --bucket $CONTAINER --region $REGION --create-bucket-configuration LocationConstraint=$REGION
 #------------------------------------------------------
 mkdir data
+mkdir data/enc
 cd data
 for size in ${SIZES[@]}
 do
     for n in {1..8192}
     do
         openssl rand -out ${n}.bin $size
-        openssl enc -aes-256-cbc -K "3031323334353637383930313233343536373839303132333435363738393031" -iv "30313233343536373839303132333435" -in ${n}.bin -out ${n}.enc.bin
+        openssl enc -aes-256-cbc -K "3031323334353637383930313233343536373839303132333435363738393031" -iv "30313233343536373839303132333435" -in ${n}.bin -out enc/${n}.bin
     done
     aws s3 sync ./ s3://${CONTAINER}/${size}/
     for n in {1..8192}
     do
         rm ${n}.bin
-        rm ${n}.enc.bin
+        rm enc/${n}.bin
     done
 done
 #------------------------------------------------------

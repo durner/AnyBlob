@@ -74,13 +74,14 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
         throw runtime_error("Socket creation error!" + string(strerror(errno)));
     }
 
+    auto maxCacheEntries = (_maxCachedFds / _activeConnectionManagers) + 1;
     // Settings for socket
     // No blocking mode
     if (tcpSettings.nonBlocking > 0) {
         int flags = fcntl(socketEntry->fd, F_GETFL, 0);
         flags |= O_NONBLOCK;
         if (fcntl(socketEntry->fd, F_SETFL, flags) < 0) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error! - non blocking error");
         }
     }
@@ -88,7 +89,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // Keep Alive
     if (tcpSettings.keepAlive > 0) {
         if (setsockopt(socketEntry->fd, SOL_SOCKET, SO_KEEPALIVE, &tcpSettings.keepAlive, sizeof(tcpSettings.keepAlive))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error! - keep alive error");
         }
     }
@@ -96,7 +97,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // Keep Idle
     if (tcpSettings.keepIdle > 0) {
         if (setsockopt(socketEntry->fd, SOL_TCP, TCP_KEEPIDLE, &tcpSettings.keepIdle, sizeof(tcpSettings.keepIdle))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error! - keep idle error");
         }
     }
@@ -104,7 +105,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // Keep intvl
     if (tcpSettings.keepIntvl > 0) {
         if (setsockopt(socketEntry->fd, SOL_TCP, TCP_KEEPINTVL, &tcpSettings.keepIntvl, sizeof(tcpSettings.keepIntvl))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error! - keep intvl error");
         }
     }
@@ -112,7 +113,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // Keep cnt
     if (tcpSettings.keepCnt > 0) {
         if (setsockopt(socketEntry->fd, SOL_TCP, TCP_KEEPCNT, &tcpSettings.keepCnt, sizeof(tcpSettings.keepCnt))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error! - keep cnt error");
         }
     }
@@ -120,7 +121,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // No Delay
     if (tcpSettings.noDelay > 0) {
         if (setsockopt(socketEntry->fd, SOL_TCP, TCP_NODELAY, &tcpSettings.noDelay, sizeof(tcpSettings.noDelay))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error! - nodelay error");
         }
     }
@@ -128,7 +129,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // Reuse ports
     if (tcpSettings.reusePorts > 0) {
         if (setsockopt(socketEntry->fd, SOL_SOCKET, SO_REUSEPORT, &tcpSettings.reusePorts, sizeof(tcpSettings.reusePorts))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error! - reuse port error");
         }
     }
@@ -136,7 +137,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // Recv buffer
     if (tcpSettings.recvBuffer > 0) {
         if (setsockopt(socketEntry->fd, SOL_SOCKET, SO_RCVBUF, &tcpSettings.recvBuffer, sizeof(tcpSettings.recvBuffer))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error! - recvbuf error");
         }
     }
@@ -144,7 +145,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // Lingering of sockets
     if (tcpSettings.linger > 0) {
         if (setsockopt(socketEntry->fd, SOL_TCP, TCP_LINGER2, &tcpSettings.linger, sizeof(tcpSettings.linger))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error - linger timeout error!" + string(strerror(errno)));
         }
     }
@@ -158,7 +159,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
         }
 
         if (setsockopt(socketEntry->fd, SOL_TCP, TCP_WINSHIFT, &windowShift, sizeof(windowShift))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error - win shift error!");
         }
     }
@@ -169,7 +170,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     if (tcpSettings.rfc1323 && tcpSettings.recvBuffer >= (64 << 10)) {
         int on = 1;
         if (setsockopt(socketEntry->fd, SOL_TCP, TCP_RFC1323, &on, sizeof(on))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error - rfc 1323 error!");
         }
     }
@@ -179,29 +180,29 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
 #ifdef TCP_MAXSEG
     if (tcpSettings.mss > 0) {
         if (setsockopt(socketEntry->fd, SOL_TCP, TCP_MAXSEG, &tcpSettings.mss, sizeof(tcpSettings.mss))) {
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             throw runtime_error("Socket creation error - max segment error!");
         }
     }
 #endif
 
-    auto setTimeOut = [&resCache, &socketEntry](int fd, const TCPSettings& tcpSettings) {
+    auto setTimeOut = [&resCache, &socketEntry, maxCacheEntries](int fd, const TCPSettings& tcpSettings) {
         // Set timeout
         if (tcpSettings.timeout > 0) {
             struct timeval tv;
             tv.tv_sec = tcpSettings.timeout / (1000 * 1000);
             tv.tv_usec = tcpSettings.timeout % (1000 * 1000);
             if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof tv)) {
-                resCache->shutdownSocket(move(socketEntry));
+                resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
                 throw runtime_error("Socket creation error - recv timeout error!");
             }
             if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&tv), sizeof tv)) {
-                resCache->shutdownSocket(move(socketEntry));
+                resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
                 throw runtime_error("Socket creation error - send timeout error!");
             }
             int timeoutInMs = tcpSettings.timeout / 1000;
             if (setsockopt(fd, SOL_TCP, TCP_USER_TIMEOUT, &timeoutInMs, sizeof(timeoutInMs))) {
-                resCache->shutdownSocket(move(socketEntry));
+                resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
                 throw runtime_error("Socket creation error - tcp timeout error!" + string(strerror(errno)));
             }
         }
@@ -210,7 +211,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
     // Connect to remote
     auto connectRes = ::connect(socketEntry->fd, socketEntry->dns->addr->ai_addr, socketEntry->dns->addr->ai_addrlen);
     if (connectRes < 0 && errno != EINPROGRESS) {
-        resCache->shutdownSocket(move(socketEntry));
+        resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
         if (retryLimit > 0) {
             return connect(hostname, port, tls, tcpSettings, retryLimit - 1);
         } else {
@@ -240,7 +241,7 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
             int socketError;
             socklen_t socketErrorLen = sizeof(socketError);
             if (getsockopt(socketEntry->fd, SOL_SOCKET, SO_ERROR, &socketError, &socketErrorLen)) {
-                resCache->shutdownSocket(move(socketEntry));
+                resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
                 throw runtime_error("Socket creation error! Could not retrieve socket options!");
             }
 
@@ -249,12 +250,12 @@ int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, con
                 setTimeOut(socketEntry->fd, tcpSettings);
                 return emplaceSocket();
             } else {
-                resCache->shutdownSocket(move(socketEntry));
+                resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
                 throw runtime_error("Socket creation error! " + string(strerror(socketError)));
             }
         } else {
             // Reached timeout
-            resCache->shutdownSocket(move(socketEntry));
+            resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             if (retryLimit > 0) {
                 return connect(hostname, port, tls, tcpSettings, retryLimit - 1);
             } else {
@@ -279,11 +280,12 @@ void ConnectionManager::disconnect(int32_t fd, const TCPSettings* tcpSettings, u
     } else {
         resCache = _cache.find("")->second.get();
     }
+    auto maxCacheEntries = (_maxCachedFds / _activeConnectionManagers) + 1;
     if (forceShutdown) {
-        resCache->shutdownSocket(move(socketIt->second));
+        resCache->shutdownSocket(move(socketIt->second), maxCacheEntries);
         _fdSockets.erase(socketIt);
     } else {
-        resCache->stopSocket(move(socketIt->second), bytes, (_maxCachedFds / _activeConnectionManagers) + 1, tcpSettings ? tcpSettings->reuse : false);
+        resCache->stopSocket(move(socketIt->second), bytes, maxCacheEntries, tcpSettings ? tcpSettings->reuse : false);
         _fdSockets.erase(socketIt);
     }
 }
