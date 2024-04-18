@@ -141,7 +141,7 @@ unique_ptr<utils::DataVector<uint8_t>> HttpRequest::serialize(const HttpRequest&
     string httpHeader = getRequestMethod(request.method);
     httpHeader += " " + request.path;
     if (request.queries.size())
-         httpHeader += "?";
+        httpHeader += "?";
     auto it = request.queries.begin();
     while (it != request.queries.end()) {
         httpHeader += utils::encodeUrlParameters(it->first) + "=" + utils::encodeUrlParameters(it->second);

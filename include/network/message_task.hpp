@@ -1,8 +1,8 @@
 #pragma once
 #include "cloud/provider.hpp"
+#include "network/connection_manager.hpp"
 #include "network/http_helper.hpp"
 #include "network/io_uring_socket.hpp"
-#include "network/connection_manager.hpp"
 #include "network/original_message.hpp"
 #include "utils/data_vector.hpp"
 #include <memory>

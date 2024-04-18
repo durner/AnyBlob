@@ -34,7 +34,6 @@ class HTTP : public Provider {
     Settings _settings;
 
     public:
-
     /// The constructor
     HTTP(const RemoteInfo& info) : _settings({info.endpoint, info.port}) {
         assert(info.provider == Provider::CloudService::HTTP || info.provider == Provider::CloudService::HTTPS);

@@ -108,12 +108,14 @@ bool TaskedSendReceiverHandle::sendSync(OriginalMessage* msg)
     return true;
 }
 //---------------------------------------------------------------------------
-void TaskedSendReceiverHandle::stop()
+void TaskedSendReceiverHandle::stop(bool freeSendReceiver)
 // Stops the deamon
 {
     if (!_sendReceiver)
         return;
     _sendReceiver->stop();
+    if (!freeSendReceiver)
+        return;
     auto ptr = _sendReceiver;
     for (auto head = _group->_head.load();;) {
         ptr->_next = head;
@@ -122,6 +124,7 @@ void TaskedSendReceiverHandle::stop()
         }
         head = _group->_head;
     }
+    _sendReceiver = nullptr;
 }
 //---------------------------------------------------------------------------
 bool TaskedSendReceiverHandle::sendReceive(bool local, bool oneQueueInvocation)

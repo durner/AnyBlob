@@ -1,4 +1,5 @@
 #include "network/cache.hpp"
+#include <cassert>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -58,6 +59,7 @@ void Cache::shutdownSocket(unique_ptr<Cache::SocketEntry> socketEntry, unsigned 
 void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*bytes*/, unsigned cacheEntries, bool reuseSocket)
 // Stops the socket and either closes the connection or cashes it
 {
+    assert(socketEntry);
     if (reuseSocket && socketEntry->hostname.length() > 0 && socketEntry->port) {
         if (socketEntry->dns->cachePriority > 0) {
             socketEntry->timestamp = _timestamp++;
@@ -74,9 +76,10 @@ void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*by
             close(socketEntry->fd);
         }
     } else {
-        if (socketEntry->fd >= 0) {
+        if (socketEntry->fd >= 0)
             close(socketEntry->fd);
-        }
+        else
+            return;
         socketEntry->fd = -1;
         if (socketEntry->dns->cachePriority > 0)
             _cache.emplace(socketEntry->hostname, move(socketEntry));

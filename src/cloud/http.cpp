@@ -1,8 +1,8 @@
 #include "cloud/http.hpp"
 #include "network/http_request.hpp"
 #include "utils/data_vector.hpp"
-#include <string>
 #include <sstream>
+#include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2024

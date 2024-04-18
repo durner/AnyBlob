@@ -107,8 +107,8 @@ class LoadTracker {
     /// Get the active cpu times
     static constexpr size_t getActiveTime(const CPUData& e) {
         return e.times[static_cast<uint8_t>(CPUStates::S_USER)] + e.times[static_cast<uint8_t>(CPUStates::S_NICE)] +
-               e.times[static_cast<uint8_t>(CPUStates::S_SYSTEM)] + e.times[static_cast<uint8_t>(CPUStates::S_IRQ)] +
-               e.times[static_cast<uint8_t>(CPUStates::S_SOFTIRQ)] + e.times[static_cast<uint8_t>(CPUStates::S_STEAL)];
+            e.times[static_cast<uint8_t>(CPUStates::S_SYSTEM)] + e.times[static_cast<uint8_t>(CPUStates::S_IRQ)] +
+            e.times[static_cast<uint8_t>(CPUStates::S_SOFTIRQ)] + e.times[static_cast<uint8_t>(CPUStates::S_STEAL)];
     }
 
     /// Write stats as csv

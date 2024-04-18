@@ -160,8 +160,10 @@ void HTTPMessage::reset(ConnectionManager& connectionManager, bool aborted)
     if ((originalMessage->result.failureCode & static_cast<uint16_t>(MessageFailureCode::HTTP)) && originalMessage->provider.supportsResigning()) {
         originalMessage->message = originalMessage->provider.resignRequest(*originalMessage->message, originalMessage->putData, originalMessage->putLength);
     }
-    if (request && request->fd >= 0)
+    if (request && request->fd >= 0) {
         connectionManager.disconnect(request->fd, &tcpSettings, 0, true);
+        request->fd = -1;
+    }
 }
 //---------------------------------------------------------------------------
 } // namespace network

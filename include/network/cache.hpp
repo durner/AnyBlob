@@ -55,7 +55,6 @@ class Cache {
         SocketEntry(std::string hostname, unsigned port);
     };
 
-
     protected:
     /// The cache, uses hostname as key, multimap traversals same keys in the insertion order
     std::multimap<std::string, std::unique_ptr<SocketEntry>> _cache;

@@ -26,6 +26,7 @@ using namespace std;
 //---------------------------------------------------------------------------
 thread_local shared_ptr<AWS::Secret> AWS::_secret = nullptr;
 thread_local shared_ptr<AWS::Secret> AWS::_sessionSecret = nullptr;
+thread_local AWS* AWS::_validInstance = nullptr;
 //---------------------------------------------------------------------------
 static string buildAMZTimestamp()
 // Creates the AWS timestamp
@@ -161,6 +162,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
     secret->iamUser = iamUser;
     _globalSecret = secret;
     _secret = secret;
+    _validInstance = this;
     return true;
 }
 //---------------------------------------------------------------------------
@@ -214,7 +216,7 @@ bool AWS::updateSessionToken(string_view content)
 bool AWS::validKeys(uint32_t offset) const
 // Checks whether keys need to be refresehd
 {
-    if (!_secret || ((!_secret->token.empty() && _secret->expiration - offset < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _secret->secret.empty()))
+    if (!_secret || _validInstance != this || ((!_secret->token.empty() && _secret->expiration - offset < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _secret->secret.empty()))
         return false;
     return true;
 }
@@ -222,7 +224,7 @@ bool AWS::validKeys(uint32_t offset) const
 bool AWS::validSession(uint32_t offset) const
 // Checks whether the session token needs to be refresehd
 {
-    if (!_sessionSecret || ((!_sessionSecret->token.empty() && _sessionSecret->expiration - offset < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _sessionSecret->secret.empty()))
+    if (!_sessionSecret || _validInstance != this || ((!_sessionSecret->token.empty() && _sessionSecret->expiration - offset < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _sessionSecret->secret.empty()))
         return false;
     return true;
 }
@@ -234,6 +236,7 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
         while (true) {
             if (_mutex.try_lock()) {
                 _secret = _globalSecret;
+                _validInstance = this;
                 if (validKeys(180)) {
                     _mutex.unlock();
                     return;
@@ -268,6 +271,7 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
         while (true) {
             if (_mutex.try_lock()) {
                 _sessionSecret = _globalSessionSecret;
+                _validInstance = this;
                 if (validKeys(180)) {
                     _mutex.unlock();
                     return;
@@ -295,13 +299,15 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
 void AWS::getSecret()
 // Updates the local secret
 {
-    if (!_secret) {
+    if (!_secret || _validInstance != this) {
         unique_lock lock(_mutex);
         _secret = _globalSecret;
+        _validInstance = this;
     }
-    if (_type == Provider::CloudService::AWS && _settings.zonal && !_sessionSecret) {
+    if (_type == Provider::CloudService::AWS && _settings.zonal && (!_sessionSecret || _validInstance != this)) {
         unique_lock lock(_mutex);
         _sessionSecret = _globalSessionSecret;
+        _validInstance = this;
     }
 }
 //---------------------------------------------------------------------------

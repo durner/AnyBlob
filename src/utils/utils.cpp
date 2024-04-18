@@ -225,7 +225,7 @@ uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uin
     if (EVP_DecryptFinal(ctx.get(), plainData + len, &len) <= 0)
         throw runtime_error("OpenSSL Decrypt Final Error!");
     assert(in_range<unsigned>(len));
-    plainLength += static_cast<unsigned>(len);;
+    plainLength += static_cast<unsigned>(len);
 
     return plainLength;
 }
