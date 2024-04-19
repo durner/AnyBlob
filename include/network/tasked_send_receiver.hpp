@@ -184,6 +184,8 @@ class TaskedSendReceiverHandle {
     TaskedSendReceiverHandle(TaskedSendReceiverHandle&& other);
     /// Move assignment
     TaskedSendReceiverHandle& operator=(TaskedSendReceiverHandle&& other);
+    /// Destructor
+    ~TaskedSendReceiverHandle();
 
     /// Process group submissions (should be used for async requests)
     inline bool process(bool oneQueueInvocation = true) { return sendReceive(false, oneQueueInvocation); }
@@ -192,7 +194,7 @@ class TaskedSendReceiverHandle {
     /// Adds a message to the submission queue
     bool sendSync(OriginalMessage* msg);
     /// Stops the handle thread if deamon
-    void stop(bool freeSendReceiver = true);
+    void stop();
     /// Returns the underlying TaskedSendReceiver
     TaskedSendReceiver* get() { return _sendReceiver; }
     /// Returns the underlying TaskedSendReceiverGroup

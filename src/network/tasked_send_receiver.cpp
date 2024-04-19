@@ -99,22 +99,10 @@ TaskedSendReceiverHandle& TaskedSendReceiverHandle::operator=(TaskedSendReceiver
     return *this;
 }
 //---------------------------------------------------------------------------
-bool TaskedSendReceiverHandle::sendSync(OriginalMessage* msg)
-// Adds a message to the submission queue
+TaskedSendReceiverHandle::~TaskedSendReceiverHandle()
+// The destructor
 {
     if (!_sendReceiver)
-        return false;
-    _sendReceiver->sendSync(msg);
-    return true;
-}
-//---------------------------------------------------------------------------
-void TaskedSendReceiverHandle::stop(bool freeSendReceiver)
-// Stops the deamon
-{
-    if (!_sendReceiver)
-        return;
-    _sendReceiver->stop();
-    if (!freeSendReceiver)
         return;
     auto ptr = _sendReceiver;
     for (auto head = _group->_head.load();;) {
@@ -125,6 +113,23 @@ void TaskedSendReceiverHandle::stop(bool freeSendReceiver)
         head = _group->_head;
     }
     _sendReceiver = nullptr;
+}
+//---------------------------------------------------------------------------
+bool TaskedSendReceiverHandle::sendSync(OriginalMessage* msg)
+// Adds a message to the submission queue
+{
+    if (!_sendReceiver)
+        return false;
+    _sendReceiver->sendSync(msg);
+    return true;
+}
+//---------------------------------------------------------------------------
+void TaskedSendReceiverHandle::stop()
+// Stops the deamon
+{
+    if (!_sendReceiver)
+        return;
+    _sendReceiver->stop();
 }
 //---------------------------------------------------------------------------
 bool TaskedSendReceiverHandle::sendReceive(bool local, bool oneQueueInvocation)
