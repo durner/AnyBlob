@@ -24,7 +24,7 @@ namespace network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _head(nullptr), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _tcpSettings(make_unique<ConnectionManager::TCPSettings>()), _cv(), _mutex()
+TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _sendReceiverCache(submissions), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _tcpSettings(make_unique<ConnectionManager::TCPSettings>()), _cv(), _mutex()
 // Initializes the global submissions and completions
 {
     TLSContext::initOpenSSL();
@@ -54,13 +54,11 @@ bool TaskedSendReceiverGroup::send(span<OriginalMessage*> msgs)
 TaskedSendReceiverHandle TaskedSendReceiverGroup::getHandle()
 // Runs a new tasked send receiver deamon
 {
-    for (auto head = _head.load(); head;) {
-        if (_head.compare_exchange_weak(head, head->_next)) {
-            TaskedSendReceiverHandle handle(this);
-            handle._sendReceiver = head;
-            return handle;
-        }
-        head = _head;
+    auto result = _sendReceiverCache.consume();
+    if (result.has_value()) {
+        TaskedSendReceiverHandle handle(this);
+        handle._sendReceiver = result.value();
+        return handle;
     }
     lock_guard<mutex> lg(_resizeMutex);
     auto& ref = _sendReceivers.emplace_back(unique_ptr<TaskedSendReceiver>(new TaskedSendReceiver(*this)));
@@ -105,12 +103,9 @@ TaskedSendReceiverHandle::~TaskedSendReceiverHandle()
     if (!_sendReceiver)
         return;
     auto ptr = _sendReceiver;
-    for (auto head = _group->_head.load();;) {
-        ptr->_next = head;
-        if (_group->_head.compare_exchange_weak(head, ptr)) {
-            return;
-        }
-        head = _group->_head;
+    if (_group->_sendReceiverCache.insert(ptr) == ~0ull) {
+        lock_guard<mutex> lg(_group->_resizeMutex);
+        _group->_sendReceivers.erase(std::remove_if(_group->_sendReceivers.begin(), _group->_sendReceivers.end(), [this](auto& val) { return val.get() == _sendReceiver; }));
     }
     _sendReceiver = nullptr;
 }
@@ -176,6 +171,10 @@ void TaskedSendReceiver::addCache(const std::string& hostname, std::unique_ptr<C
 void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
 // Creates a sending message chaining IOSQE_IO_LINK, creates a receiving message, and waits for result
 {
+#ifndef NDEBUG
+    assert(countThreads == 0);
+    countThreads++;
+#endif
     // Reset the stop
     _stopDeamon = false;
 
@@ -293,9 +292,9 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             local ? emplaceLocalRequest() : emplaceNewRequest();
         }
         auto cnt = _connectionManager->getSocketConnection().submit();
-        if (cnt < 0)
+        if (cnt < 0) {
             throw runtime_error("io_uring_submit error: " + to_string(-cnt));
-        else
+        } else
             count += static_cast<unsigned>(cnt);
 
         auto empty = local ? _submissions.empty() : _group._submissions.empty();
@@ -306,6 +305,9 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
     }
     if (oneQueueInvocation)
         _stopDeamon = false;
+#ifndef NDEBUG
+    countThreads--;
+#endif
 }
 //---------------------------------------------------------------------------
 int32_t TaskedSendReceiver::submitRequests()

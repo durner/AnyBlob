@@ -49,7 +49,7 @@ class TaskedSendReceiverGroup {
     std::mutex _resizeMutex;
 
     /// Implicitly handle the unused send receivers
-    std::atomic<TaskedSendReceiver*> _head;
+    utils::RingBuffer<TaskedSendReceiver*> _sendReceiverCache;
 
     /// The number of submissions in queue (per thread)
     static constexpr uint64_t submissionPerCore = 1 << 10;
@@ -119,6 +119,10 @@ class TaskedSendReceiver {
     std::vector<utils::TimingHelper>* _timings;
     /// Stops the daemon
     std::atomic<bool> _stopDeamon;
+#ifndef NDEBUG
+    /// Count the threads
+    std::atomic<uint64_t> countThreads = 0;
+#endif
 
     public:
     /// Get the group
