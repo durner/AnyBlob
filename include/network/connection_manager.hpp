@@ -85,7 +85,7 @@ class ConnectionManager {
     ~ConnectionManager();
 
     /// Creates a new socket connection
-    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit = 16);
+    [[nodiscard]] int32_t connect(std::string hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit = 0);
     /// Disconnects the socket
     void disconnect(int32_t fd, const TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
 
