@@ -63,6 +63,7 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiverHandle& se
         RemoteInfo info;
         info.endpoint = getIAMAddress();
         info.port = getIAMPort();
+        info.provider = Provider::CloudService::HTTPS;
         HTTP http(info);
         auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
         verify(sendReceiverHandle.sendSync(originalMsg.get()));
@@ -87,6 +88,7 @@ string AWS::getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiverHan
     RemoteInfo info;
     info.endpoint = getIAMAddress();
     info.port = getIAMPort();
+    info.provider = Provider::CloudService::HTTPS;
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     verify(sendReceiverHandle.sendSync(originalMsg.get()));
@@ -245,6 +247,7 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
                 RemoteInfo info;
                 info.endpoint = getIAMAddress();
                 info.port = getIAMPort();
+                info.provider = Provider::CloudService::HTTPS;
                 HTTP http(info);
                 auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
                 verify(sendReceiverHandle.sendSync(originalMsg.get()));
@@ -280,6 +283,7 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
                 RemoteInfo info;
                 info.endpoint = _settings.bucket + ".s3.amazonaws.com";
                 info.port = getPort();
+                info.provider = Provider::CloudService::HTTPS;
                 HTTP http(info);
                 auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
                 verify(sendReceiverHandle.sendSync(originalMsg.get()));
