@@ -33,14 +33,14 @@ class Provider {
     /// The remote prefixes count
     static constexpr unsigned remoteFileCount = 8;
     /// The remote prefixes
-    static constexpr std::string_view remoteFile[] = {"http://", "https://", "s3://", "azure://", "gcp://", "oci://", "ibm://", "minio://"};
+    static constexpr std::string_view remoteFile[] = {"https://", "http://", "s3://", "azure://", "gcp://", "oci://", "ibm://", "minio://"};
     /// Are we currently testing the provdiers
     static bool testEnviornment;
 
     /// The cloud service enum
     enum class CloudService : uint8_t {
-        HTTP = 0,
-        HTTPS = 1,
+        HTTPS = 0,
+        HTTP = 1,
         AWS = 2,
         Azure = 3,
         GCP = 4,
@@ -53,7 +53,7 @@ class Provider {
     /// RemoteInfo struct
     struct RemoteInfo {
         /// The provider
-        CloudService provider;
+        CloudService provider = Provider::CloudService::HTTPS;
         /// The bucket name
         std::string bucket = "";
         /// The region name
