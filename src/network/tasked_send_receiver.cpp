@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
-#include <unistd.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -100,12 +99,13 @@ TaskedSendReceiverHandle& TaskedSendReceiverHandle::operator=(TaskedSendReceiver
 TaskedSendReceiverHandle::~TaskedSendReceiverHandle()
 // The destructor
 {
-    if (!_sendReceiver)
+    if (!_sendReceiver || !_sendReceiver->_connectionManager.get())
         return;
+    _sendReceiver->reset();
     auto ptr = _sendReceiver;
     if (_group->_sendReceiverCache.insert(ptr) == ~0ull) {
         lock_guard<mutex> lg(_group->_resizeMutex);
-        _group->_sendReceivers.erase(std::remove_if(_group->_sendReceivers.begin(), _group->_sendReceivers.end(), [this](auto& val) { return val.get() == _sendReceiver; }));
+        _group->_sendReceivers.erase(remove_if(_group->_sendReceivers.begin(), _group->_sendReceivers.end(), [this](auto& val) { return val.get() == _sendReceiver; }));
     }
     _sendReceiver = nullptr;
 }
@@ -158,11 +158,11 @@ unique_ptr<utils::DataVector<uint8_t>> TaskedSendReceiver::getReused()
 {
     auto mem = _group._reuse.consume();
     if (mem.has_value())
-        return std::unique_ptr<utils::DataVector<uint8_t>>(mem.value());
+        return unique_ptr<utils::DataVector<uint8_t>>(mem.value());
     return nullptr;
 }
 //--------------------------------------------------------------------------
-void TaskedSendReceiver::addCache(const std::string& hostname, std::unique_ptr<Cache> cache)
+void TaskedSendReceiver::addCache(const string& hostname, unique_ptr<Cache> cache)
 // Adds a hostname-specific cache
 {
     _connectionManager->addCache(hostname, move(cache));
@@ -177,6 +177,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
 #endif
     // Reset the stop
     _stopDeamon = false;
+    exception_ptr firstException = nullptr;
 
     // Current requests in flight
     auto count = 0u;
@@ -202,10 +203,16 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 (*_timings)[original->traceId].start = chrono::steady_clock::now();
 
             // Start the message process
-            if (messageTask->execute(*_connectionManager) == MessageState::Aborted) {
-                if (messageTask->originalMessage->requiresFinish())
-                    messageTask->originalMessage->finish();
-                continue;
+            try {
+                if (messageTask->execute(*_connectionManager) == MessageState::Aborted) {
+                    if (messageTask->originalMessage->requiresFinish())
+                        messageTask->originalMessage->finish();
+                    continue;
+                }
+            } catch (...) {
+                if (!firstException)
+                    firstException = current_exception();
+                return;
             }
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
@@ -233,10 +240,16 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 (*_timings)[original->traceId].start = chrono::steady_clock::now();
 
             // Start the message process
-            if (messageTask->execute(*_connectionManager) == MessageState::Aborted) {
-                if (messageTask->originalMessage->requiresFinish())
-                    messageTask->originalMessage->finish();
-                continue;
+            try {
+                if (messageTask->execute(*_connectionManager) == MessageState::Aborted) {
+                    if (messageTask->originalMessage->requiresFinish())
+                        messageTask->originalMessage->finish();
+                    continue;
+                }
+            } catch (...) {
+                if (!firstException)
+                    firstException = current_exception();
+                return;
             }
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
@@ -250,7 +263,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
     while (!_stopDeamon || count) {
         if (count > 0) {
             // get cqe
-            IOUringSocket::Request* req;
+            IOUringSocket::Request* req = nullptr;
             try {
                 req = _connectionManager->getSocketConnection().complete();
             } catch (const exception& e) {
@@ -260,60 +273,81 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             count--;
 
             // nullptr in user_data if IORING_OP_LINK_TIMEOUT, skip this one
-            if (!req)
+            if (!req || !req->messageTask)
                 continue;
 
             // get the task
             auto task = reinterpret_cast<MessageTask*>(req->messageTask);
-            // execute next task
-            auto status = task->execute(*_connectionManager);
-            // check if finished
-            if (status == MessageState::Finished || status == MessageState::Aborted) {
-                for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
-                    if (it->get() == task) {
-                        // Remove the second param with the real data
-                        if (_timings) {
-                            (*_timings)[task->originalMessage->traceId].size = status == MessageState::Aborted ? 0 : task->originalMessage->result.getSize();
-                            (*_timings)[task->originalMessage->traceId].finish = chrono::steady_clock::now();
-                        }
+            // execute next task, handle if the tasks throws (e.g., the task callback)
 
-                        if (task->originalMessage->requiresFinish())
-                            task->originalMessage->finish();
-                        _messageTasks.erase(it);
-                        _group._cv.notify_all();
-                        break;
+            try {
+                auto status = task->execute(*_connectionManager);
+                // check if finished
+                if (status == MessageState::Finished || status == MessageState::Aborted) {
+                    for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
+                        if (it->get() == task) {
+                            // Remove the second param with the real data
+                            if (_timings) {
+                                (*_timings)[task->originalMessage->traceId].size = status == MessageState::Aborted ? 0 : task->originalMessage->result.getSize();
+                                (*_timings)[task->originalMessage->traceId].finish = chrono::steady_clock::now();
+                            }
+
+                            if (task->originalMessage->requiresFinish())
+                                task->originalMessage->finish();
+                            _messageTasks.erase(it);
+                            _group._cv.notify_all();
+                            break;
+                        }
                     }
+                } else if (_timings && status == MessageState::Receiving && !task->receiveBufferOffset) {
+                    (*_timings)[task->originalMessage->traceId].recieve = chrono::steady_clock::now();
                 }
-            } else if (_timings && status == MessageState::Receiving && !task->receiveBufferOffset) {
-                (*_timings)[task->originalMessage->traceId].recieve = chrono::steady_clock::now();
+            } catch (...) {
+                if (!firstException)
+                    firstException = current_exception();
             }
         }
-        if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests) {
+        if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests && !firstException) {
             local ? emplaceLocalRequest() : emplaceNewRequest();
         }
         auto cnt = _connectionManager->getSocketConnection().submit();
-        if (cnt < 0) {
+        if (cnt < 0)
             throw runtime_error("io_uring_submit error: " + to_string(-cnt));
-        } else
-            count += static_cast<unsigned>(cnt);
+        count += static_cast<unsigned>(cnt);
 
         auto empty = local ? _submissions.empty() : _group._submissions.empty();
-        if (oneQueueInvocation && empty && !count) {
+        if (oneQueueInvocation && (empty || firstException) && !count) {
             _stopDeamon = true;
-            continue;
         }
     }
     if (oneQueueInvocation)
         _stopDeamon = false;
+
 #ifndef NDEBUG
     countThreads--;
 #endif
+
+    // Rethrow the first caught exception (if any)
+    if (firstException) {
+        _connectionManager.reset();
+        rethrow_exception(firstException);
+    }
 }
 //---------------------------------------------------------------------------
 int32_t TaskedSendReceiver::submitRequests()
 // Submits the queue
 {
     return _connectionManager->getSocketConnection().submit();
+}
+//---------------------------------------------------------------------------
+void TaskedSendReceiver::reset()
+// Reset the receiver
+{
+    while (!_submissions.empty())
+        _submissions.pop();
+    _messageTasks.clear();
+    if (_timings)
+        _timings->clear();
 }
 //---------------------------------------------------------------------------
 } // namespace network

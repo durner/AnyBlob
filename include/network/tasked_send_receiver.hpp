@@ -158,6 +158,8 @@ class TaskedSendReceiver {
     void sendReceive(bool local = false, bool oneQueueInvocation = true);
     /// Submits the queue
     [[nodiscard]] int32_t submitRequests();
+    /// Reset the receiver
+    void reset();
 
     friend TaskedSendReceiverGroup;
     friend TaskedSendReceiverHandle;
