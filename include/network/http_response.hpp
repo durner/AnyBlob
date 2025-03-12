@@ -74,6 +74,28 @@ struct HttpResponse {
             default: return "UNKNOWN";
         }
     }
+
+    /// Get the request method number
+    static constexpr uint64_t getResponseCodeNumber(const Code& code) noexcept {
+        switch (code) {
+            case Code::OK_200: return 200;
+            case Code::CREATED_201: return 201;
+            case Code::NO_CONTENT_204: return 204;
+            case Code::PARTIAL_CONTENT_206: return 206;
+            case Code::BAD_REQUEST_400: return 400;
+            case Code::UNAUTHORIZED_401: return 401;
+            case Code::FORBIDDEN_403: return 403;
+            case Code::NOT_FOUND_404: return 404;
+            case Code::CONFLICT_409: return 409;
+            case Code::LENGTH_REQUIRED_411: return 411;
+            case Code::RANGE_NOT_SATISFIABLE_416: return 416;
+            case Code::TOO_MANY_REQUESTS_429: return 429;
+            case Code::INTERNAL_SERVER_ERROR_500: return 500;
+            case Code::SERVICE_UNAVAILABLE_503: return 503;
+            case Code::SLOW_DOWN_503: return 503;
+            default: return 0;
+        }
+    }
     /// Get the request type
     static constexpr std::string_view getResponseType(const Type& type) noexcept {
         switch (type) {

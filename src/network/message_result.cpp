@@ -92,22 +92,32 @@ uint16_t MessageResult::getFailureCode() const
 }
 //---------------------------------------------------------------------------
 std::string_view MessageResult::getResponseCode() const
-// Get the failure code
+// Get the response code
 {
     if (originError)
         return originError->getResponseCode();
     else
         return HttpResponse::getResponseCode(response->response.code);
 }
-
+//---------------------------------------------------------------------------
+uint64_t MessageResult::getResponseCodeNumber() const
+// Get the response code number
+{
+    if (originError)
+        return originError->getResponseCodeNumber();
+    else if (response)
+        return HttpResponse::getResponseCodeNumber(response->response.code);
+    return 0;
+}
 //---------------------------------------------------------------------------
 std::string_view MessageResult::getErrorResponse() const
 // Get the error header
 {
     if (originError)
         return originError->getErrorResponse();
-    else
+    else if (response)
         return string_view(reinterpret_cast<char*>(dataVector->data()), dataVector->size());
+    return ""sv;
 }
 //---------------------------------------------------------------------------
 bool MessageResult::owned() const
