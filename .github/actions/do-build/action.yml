@@ -19,13 +19,12 @@ runs:
       # CMake configuration option 2 - Clang toolchain
       - name: Configure CMake
         if: ${{ inputs.clang-toolchain == 'true' }}
-        # Explicitly use clang-15. The runner comes with clang-13, 14, and 15.
-        # However, only clang-15 and up support `-Wno-unqualified-std-cast-call`.
-        run: | 
-          sudo apt install libc++-15-dev libc++abi-15-dev
+        # Explicitly use clang-18. The runner comes with clang-18.
+        run: |
+          sudo apt install libc++-18-dev libc++abi-18-dev
           cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-                -DCMAKE_C_COMPILER=clang-15  \
-                -DCMAKE_CXX_COMPILER=clang++-15 \
+                -DCMAKE_C_COMPILER=clang-18  \
+                -DCMAKE_CXX_COMPILER=clang++-18 \
                 -DANYBLOB_LIBCXX_COMPAT=1
         shell: bash
 
