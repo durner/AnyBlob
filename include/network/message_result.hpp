@@ -103,6 +103,8 @@ class MessageResult {
     [[nodiscard]] std::string_view getErrorResponse() const;
     /// Get the error response code
     [[nodiscard]] std::string_view getResponseCode() const;
+    /// Get the error response code number
+    [[nodiscard]] uint64_t getResponseCodeNumber() const;
     /// Is the data owned by this object
     [[nodiscard]] bool owned() const;
     /// Was the request successful
