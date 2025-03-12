@@ -50,12 +50,17 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                 if (request->length > 0) {
                     sendBufferOffset += request->length;
                 } else if (request->length != -EINPROGRESS && request->length != -EAGAIN) {
-                    if (request->length == -ECANCELED || request->length == -EINTR)
+                    if (request->length == -ECANCELED || request->length == -EINTR) {
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
-                    else
+                        reset(connectionManager, failures++ > failuresMax);
+                        return execute(connectionManager);
+                    } else {
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
-                    reset(connectionManager, failures++ > failuresMax);
-                    return execute(connectionManager);
+                        state = MessageState::InitReceiving;
+                        receiveBufferOffset = 0;
+                        originalMessage->result.getDataVector().clear();
+                        return execute(connectionManager);
+                    }
                 }
 
                 if (sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size() + originalMessage->putLength)) {
