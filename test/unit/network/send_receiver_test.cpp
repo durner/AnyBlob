@@ -34,8 +34,8 @@ TEST_CASE("send_receiver") {
     TaskedSendReceiverGroup group;
     group.setConcurrentRequests(concurrency);
 
-    auto provider = cloud::Provider::makeProvider("http://db.cs.tum.edu");
-    auto tlsProvider = cloud::Provider::makeProvider("https://db.cs.tum.edu");
+    auto provider = cloud::Provider::makeProvider("http://detectportal.firefox.com/success.txt");
+    auto tlsProvider = cloud::Provider::makeProvider("https://detectportal.firefox.com/success.txt");
 
     vector<unique_ptr<OriginalMessage>> msgs;
     for (auto i = 0u; i < requests; i++) {
@@ -51,7 +51,7 @@ TEST_CASE("send_receiver") {
     group.process(true);
 
     unique_ptr<uint8_t[]> currentMessage;
-    size_t size;
+    size_t skip;
     for (auto i = 0u; i < msgs.size();) {
         auto& original = msgs[i];
         switch (original->result.getState()) {
@@ -59,12 +59,10 @@ TEST_CASE("send_receiver") {
                 auto& message = original->result;
                 if (i > 0) {
                     // skip header
-                    size_t skip = 1024;
-                    REQUIRE(size > skip);
-                    REQUIRE(!strncmp(reinterpret_cast<char*>(currentMessage.get()) + skip, reinterpret_cast<char*>(message.getData()) + skip, size - skip));
+                    REQUIRE(!strncmp(reinterpret_cast<char*>(currentMessage.get()) + skip, reinterpret_cast<char*>(message.getData()) + message.getOffset(), message.getSize()));
                 }
                 currentMessage = message.moveData();
-                size = message.getOffset() + message.getSize();
+                skip = message.getOffset();
                 ++i;
                 break;
             }
