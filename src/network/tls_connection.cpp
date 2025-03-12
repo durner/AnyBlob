@@ -186,12 +186,14 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     if (_message->request->length > 0) {
                         _state.socketWrite += static_cast<uint64_t>(_message->request->length);
                     } else if (_message->request->length != -EINPROGRESS && _message->request->length != -EAGAIN) {
-                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR)
+                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR) {
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
-                        else
+                            _state.progress = Progress::Aborted;
+                            return _state.progress;
+                        } else {
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
-                        _state.progress = Progress::Aborted;
-                        return _state.progress;
+                            _state.progress = Progress::ReceivingInit;
+                        }
                     }
                 }
                 if (_state.networkBioRead >= 0 && static_cast<size_t>(_state.networkBioRead) != _state.socketWrite) {

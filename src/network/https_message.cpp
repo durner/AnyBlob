@@ -112,6 +112,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                         } else {
                             originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
                             reset(connectionManager, true);
+                            return execute(connectionManager);
                         }
                         // Decide if to cache the session
                         if (tcpSettings.reuse) {
