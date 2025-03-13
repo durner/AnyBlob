@@ -104,9 +104,10 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                     try {
                         // check whether finished http
                         if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
-                            connectionManager.disconnect(request->fd, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset));
                             originalMessage->result.response = move(info);
-                            if (HttpResponse::checkSuccess(originalMessage->result.response->response.code)) {
+                            auto success = HttpResponse::checkSuccess(originalMessage->result.response->response.code);
+                            connectionManager.disconnect(request->fd, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset), !success);
+                            if (success) {
                                 state = MessageState::Finished;
                             } else {
                                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
