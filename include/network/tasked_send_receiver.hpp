@@ -99,7 +99,7 @@ class TaskedSendReceiverGroup {
     friend TaskedSendReceiverHandle;
 };
 //---------------------------------------------------------------------------
-/// Implements a send recieve roundtrip with the help of IOUringSockets
+/// Implements a send recieve roundtrip with the help of Sockets
 /// TaskedSendReceiver uses one socket and can contain mutliple requests
 class TaskedSendReceiver {
     private:

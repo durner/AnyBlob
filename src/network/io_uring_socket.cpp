@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cstring>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <sys/eventfd.h>
 //---------------------------------------------------------------------------
@@ -12,8 +13,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -177,12 +177,11 @@ void IOUringSocket::wait()
         throw runtime_error("Wait error!");
 }
 //---------------------------------------------------------------------------
-IOUringSocket::~IOUringSocket()
+IOUringSocket::~IOUringSocket() noexcept
 // The destructor
 {
     io_uring_queue_exit(&_uring);
     close(_eventId);
 }
 //---------------------------------------------------------------------------
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network

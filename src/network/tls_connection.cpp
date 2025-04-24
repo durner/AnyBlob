@@ -2,6 +2,7 @@
 #include "network/https_message.hpp"
 #include "network/tls_context.hpp"
 #include <cassert>
+#include <memory>
 #include <utility>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
@@ -201,11 +202,11 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     _state.progress = Progress::Sending;
                     auto writeSize = static_cast<size_t>(_state.networkBioRead) - _state.socketWrite;
                     const uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketWrite;
-                    _message->request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, static_cast<int64_t>(writeSize), _message->fd, IOUringSocket::EventType::write, _message});
+                    _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = static_cast<int64_t>(writeSize), .fd = _message->fd, .event = Socket::EventType::write, .messageTask = _message});
                     if (writeSize <= _message->chunkSize)
-                        connectionManager.getSocketConnection().send_prep_to(_message->request.get(), &_message->tcpSettings.kernelTimeout);
+                        connectionManager.getSocketConnection().send_to(_message->request.get(), &_message->tcpSettings.kernelTimeout);
                     else
-                        connectionManager.getSocketConnection().send_prep(_message->request.get());
+                        connectionManager.getSocketConnection().send(_message->request.get());
                     return _state.progress;
                 } else {
                     _state.progress = Progress::ReceivingInit;
@@ -246,8 +247,8 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     uint64_t readSize = _message->chunkSize > (_state.internalBioRead - _state.socketRead) ? _state.internalBioRead - _state.socketRead : _message->chunkSize;
                     uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketRead;
                     assert(in_range<int64_t>(readSize));
-                    _message->request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = ptr}, static_cast<int64_t>(readSize), _message->fd, IOUringSocket::EventType::read, _message});
-                    connectionManager.getSocketConnection().recv_prep_to(_message->request.get(), &_message->tcpSettings.kernelTimeout, _message->tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+                    _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.data = ptr}, .length = static_cast<int64_t>(readSize), .fd = _message->fd, .event = Socket::EventType::read, .messageTask = _message});
+                    connectionManager.getSocketConnection().recv_to(_message->request.get(), &_message->tcpSettings.kernelTimeout, _message->tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
                     return _state.progress;
                 } else {
                     _state.progress = Progress::Finished;
