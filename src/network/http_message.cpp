@@ -79,11 +79,11 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                     ptr = originalMessage->putData + sendBufferOffset - originalMessage->message->size();
                     length = static_cast<int64_t>(originalMessage->putLength + originalMessage->message->size()) - sendBufferOffset;
                 }
-                request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.cdata = ptr}, length, fd, IOUringSocket::EventType::write, this});
+                request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = length, .fd = fd, .event = Socket::EventType::write, .messageTask = this});
                 if (length <= static_cast<int64_t>(chunkSize))
-                    connectionManager.getSocketConnection().send_prep_to(request.get(), &tcpSettings.kernelTimeout);
+                    connectionManager.getSocketConnection().send_to(request.get(), &tcpSettings.kernelTimeout);
                 else
-                    connectionManager.getSocketConnection().send_prep(request.get());
+                    connectionManager.getSocketConnection().send(request.get());
             }
             break;
         }
@@ -136,15 +136,11 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                 }
             }
             receive.resize(receive.size() + chunkSize);
-            request = unique_ptr<IOUringSocket::Request>(new IOUringSocket::Request{{.data = receive.data() + receiveBufferOffset}, static_cast<int64_t>(chunkSize), request->fd, IOUringSocket::EventType::read, this});
-            connectionManager.getSocketConnection().recv_prep_to(request.get(), &tcpSettings.kernelTimeout, tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+            request = std::make_unique<Socket::Request>(Socket::Request{.data = {.data = receive.data() + receiveBufferOffset}, .length = static_cast<int64_t>(chunkSize), .fd = request->fd, .event = Socket::EventType::read, .messageTask = this});
+            connectionManager.getSocketConnection().recv_to(request.get(), &tcpSettings.kernelTimeout, tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
             state = MessageState::Receiving;
             break;
         }
-        case MessageState::Finished:
-            break;
-        case MessageState::Aborted:
-            break;
         default:
             break;
     }
