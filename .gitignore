@@ -1,4 +1,5 @@
 compile_commands.json
+.cache/
 .ccls-cache/
 .ccls_cache/
 build/

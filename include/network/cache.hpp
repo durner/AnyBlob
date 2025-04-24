@@ -20,8 +20,6 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace network {
 //---------------------------------------------------------------------------
-class IOUringSocket;
-//---------------------------------------------------------------------------
 /// The addr resolver and cacher, which is not thread safe
 class Cache {
     public:
@@ -67,7 +65,7 @@ class Cache {
 
     public:
     /// The address resolving
-    virtual std::unique_ptr<SocketEntry> resolve(std::string hostname, unsigned port, bool tls);
+    virtual std::unique_ptr<SocketEntry> resolve(const std::string& hostname, unsigned port, bool tls);
     /// Start the timing and advance to the next cache bucket
     virtual void startSocket(int /*fd*/) {}
     /// Stops the socket and either closes the connection or cashes it
@@ -79,8 +77,6 @@ class Cache {
 
     /// Get the tld
     static std::string_view tld(std::string_view domain);
-
-    friend IOUringSocket;
 };
 //---------------------------------------------------------------------------
 }; // namespace network

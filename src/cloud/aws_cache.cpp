@@ -1,4 +1,5 @@
 #include "cloud/aws_cache.hpp"
+#include <array>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -23,7 +24,7 @@ AWSCache::AWSCache() : Cache(), _mtuCache()
 {
 }
 //---------------------------------------------------------------------------
-unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(string hostname, unsigned port, bool tls)
+unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(const string& hostname, unsigned port, bool tls)
 // Resolve the request
 {
     for (auto it = _cache.find(hostname); it != _cache.end();) {
@@ -49,25 +50,27 @@ unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(string hostname, unsig
     hints.ai_protocol = IPPROTO_TCP;
 
     addrinfo* temp;
-    char port_str[16] = {};
-    sprintf(port_str, "%d", port);
-    if (getaddrinfo(hostname.c_str(), port_str, &hints, &temp) != 0) {
+    std::array<char, 16> port_str{};
+    sprintf(port_str.data(), "%d", port);
+    if (getaddrinfo(hostname.c_str(), port_str.data(), &hints, &temp) != 0) {
         throw runtime_error("hostname getaddrinfo error");
     }
     auto socketEntry = make_unique<Cache::SocketEntry>(hostname, port);
     socketEntry->dns = make_unique<DnsEntry>(unique_ptr<addrinfo, decltype(&freeaddrinfo)>(temp, &freeaddrinfo), _defaultPriority);
 
     if (!Cache::tld(hostname).compare("amazonaws.com")) {
-        struct sockaddr_in* p = reinterpret_cast<sockaddr_in*>(socketEntry->dns->addr->ai_addr);
+        auto* p = reinterpret_cast<sockaddr_in*>(socketEntry->dns->addr->ai_addr);
         auto ipAsInt = p->sin_addr.s_addr;
         auto it = _mtuCache.find(ipAsInt);
         if (it != _mtuCache.end()) {
             if (it->second)
                 socketEntry->dns->cachePriority = numeric_limits<int>::max();
         } else {
-            char ipv4[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &p->sin_addr, ipv4, INET_ADDRSTRLEN);
-            string cmd = "timeout 0.01 ping -s 1473 -D " + string(ipv4) + " -c 1 >>/dev/null 2>>/dev/null";
+            std::array<char, INET_ADDRSTRLEN> ipv4{};
+            inet_ntop(AF_INET, &p->sin_addr, ipv4.data(), INET_ADDRSTRLEN);
+            string cmd = "timeout 0.01 ping -s 1473 -D ";
+            cmd += string_view(ipv4.data(), ipv4.size());
+            cmd += " -c 1 >>/dev/null 2>>/dev/null";
             auto res = system(cmd.c_str());
             if (!res) {
                 _mtuCache.emplace(ipAsInt, true);

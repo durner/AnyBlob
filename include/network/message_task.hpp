@@ -2,8 +2,8 @@
 #include "cloud/provider.hpp"
 #include "network/connection_manager.hpp"
 #include "network/http_helper.hpp"
-#include "network/io_uring_socket.hpp"
 #include "network/original_message.hpp"
+#include "network/socket.hpp"
 #include "utils/data_vector.hpp"
 #include <memory>
 #include <string>
@@ -40,7 +40,7 @@ struct MessageTask {
     /// The TCP Settings
     ConnectionManager::TCPSettings& tcpSettings;
     /// Send message
-    std::unique_ptr<IOUringSocket::Request> request;
+    std::unique_ptr<Socket::Request> request;
     /// The reduced offset in the send buffers
     int64_t sendBufferOffset;
     /// The reduced offset in the receive buffers
@@ -58,7 +58,7 @@ struct MessageTask {
     /// The pure virtual  callback
     virtual MessageState execute(ConnectionManager& connectionManager) = 0;
     /// The pure virtual destuctor
-    virtual ~MessageTask(){};
+    virtual ~MessageTask() {};
 
     /// Builds the message task according to the sending message
     template <typename... Args>

@@ -4,7 +4,6 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <liburing.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -18,6 +17,7 @@ namespace anyblob {
 namespace network {
 //---------------------------------------------------------------------------
 class TLSConnection;
+class Socket;
 class TLSContext;
 struct DnsEntry;
 //---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ class ConnectionManager {
 
     private:
     /// The socket wrapper
-    std::unique_ptr<IOUringSocket> _socketWrapper;
+    std::unique_ptr<Socket> _socketWrapper;
     /// The active sockets
     std::unordered_map<int32_t, std::unique_ptr<Cache::SocketEntry>> _fdSockets;
     /// Cache
@@ -95,7 +95,7 @@ class ConnectionManager {
     bool checkTimeout(int fd, const TCPSettings& settings);
 
     /// Get the socket
-    IOUringSocket& getSocketConnection() {
+    Socket& getSocketConnection() {
         assert(_socketWrapper);
         return *_socketWrapper.get();
     }

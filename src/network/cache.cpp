@@ -1,7 +1,7 @@
 #include "network/cache.hpp"
+#include <array>
 #include <cassert>
 #include <cstring>
-#include <limits>
 #include <stdexcept>
 #include <arpa/inet.h>
 #include <sys/types.h>
@@ -30,7 +30,7 @@ string_view Cache::tld(string_view domain)
         else
             return string_view(domain).substr(pos + 1, domain.size());
     }
-    return string_view();
+    return {};
 }
 //---------------------------------------------------------------------------
 Cache::SocketEntry::SocketEntry(string hostname, unsigned port) : dns(nullptr), tls(nullptr), fd(-1), port(port), hostname(move(hostname))
@@ -86,7 +86,7 @@ void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*by
     }
 }
 //---------------------------------------------------------------------------
-unique_ptr<Cache::SocketEntry> Cache::resolve(string hostname, unsigned port, bool tls)
+unique_ptr<Cache::SocketEntry> Cache::resolve(const string& hostname, unsigned port, bool tls)
 // Resolve the request
 {
     for (auto it = _cache.find(hostname); it != _cache.end();) {
@@ -112,9 +112,9 @@ unique_ptr<Cache::SocketEntry> Cache::resolve(string hostname, unsigned port, bo
     hints.ai_protocol = IPPROTO_TCP;
 
     addrinfo* temp;
-    char port_str[16] = {};
-    sprintf(port_str, "%d", port);
-    if (getaddrinfo(hostname.c_str(), port_str, &hints, &temp) != 0) {
+    std::array<char, 16> port_str{};
+    sprintf(port_str.data(), "%d", port);
+    if (getaddrinfo(hostname.c_str(), port_str.data(), &hints, &temp) != 0) {
         throw runtime_error("hostname getaddrinfo error");
     }
     auto socketEntry = make_unique<Cache::SocketEntry>(hostname, port);

@@ -263,7 +263,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
     while (!_stopDeamon || count) {
         if (count > 0) {
             // get cqe
-            IOUringSocket::Request* req = nullptr;
+            Socket::Request* req = nullptr;
             try {
                 req = _connectionManager->getSocketConnection().complete();
             } catch (const exception& e) {

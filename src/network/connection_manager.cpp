@@ -1,6 +1,7 @@
 #include "network/connection_manager.hpp"
 #include "network/cache.hpp"
 #include "network/io_uring_socket.hpp"
+#include "network/poll_socket.hpp"
 #include "network/tls_connection.hpp"
 #include "network/tls_context.hpp"
 #ifndef ANYBLOB_LIBCXX_COMPAT
@@ -32,7 +33,7 @@ namespace network {
 using namespace std;
 std::atomic<unsigned> ConnectionManager::_activeConnectionManagers{0};
 //---------------------------------------------------------------------------
-ConnectionManager::ConnectionManager(unsigned uringEntries) : _socketWrapper(make_unique<IOUringSocket>(uringEntries)), _cache()
+ConnectionManager::ConnectionManager([[maybe_unused]] unsigned uringEntries) : _socketWrapper(make_unique<PollSocket>()), _cache()
 // The constructor
 {
     _activeConnectionManagers++;
