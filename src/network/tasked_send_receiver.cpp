@@ -312,7 +312,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
         }
         auto cnt = _connectionManager->getSocketConnection().submit();
         if (cnt < 0)
-            throw runtime_error("io_uring_submit error: " + to_string(-cnt));
+            throw runtime_error("socket submit error: " + to_string(-cnt));
         count += static_cast<unsigned>(cnt);
 
         auto empty = local ? _submissions.empty() : _group._submissions.empty();

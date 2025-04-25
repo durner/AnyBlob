@@ -1,4 +1,5 @@
 #pragma once
+#ifdef ANYBLOB_HAS_IO_URING
 #include "network/socket.hpp"
 #include <vector>
 #include <liburing.h>
@@ -73,3 +74,4 @@ class IOUringSocket : public Socket {
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::network
+#endif
