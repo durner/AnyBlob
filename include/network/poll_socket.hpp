@@ -16,7 +16,7 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 /// This class opens a TCP connection to a server and exchanges messages
 /// with the old poll interface acting as a fallback.
-/// We implement it to fully match the IOUringSockets behavior.
+/// We implement it to fully match the IOUringSockets behavior as a fallback on old machines.
 class PollSocket : public Socket {
     private:
     /// The request infos with timeout and message flags
@@ -25,7 +25,7 @@ class PollSocket : public Socket {
         Request* request;
         /// The timeout in ms
         std::chrono::time_point<std::chrono::steady_clock> timeout;
-        /// The flags
+        /// The flags for the syscall (e.g., MSG_DONTWAIT for recv)
         int32_t flags;
     };
     /// The ready request vector

@@ -1,6 +1,8 @@
 #include "network/connection_manager.hpp"
 #include "network/cache.hpp"
+#ifdef ANYBLOB_HAS_IO_URING
 #include "network/io_uring_socket.hpp"
+#endif
 #include "network/poll_socket.hpp"
 #include "network/tls_connection.hpp"
 #include "network/tls_context.hpp"
@@ -9,13 +11,12 @@
 #endif
 #include <atomic>
 #include <cassert>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <fcntl.h>
 #include <netdb.h>
 #include <poll.h>
-#include <stdlib.h>
-#include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -27,15 +28,25 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 std::atomic<unsigned> ConnectionManager::_activeConnectionManagers{0};
 //---------------------------------------------------------------------------
-ConnectionManager::ConnectionManager([[maybe_unused]] unsigned uringEntries) : _socketWrapper(make_unique<PollSocket>()), _cache()
+ConnectionManager::ConnectionManager([[maybe_unused]] unsigned uringEntries) : _cache()
 // The constructor
 {
+#ifdef ANYBLOB_HAS_IO_URING
+    // Init can fail on runtime instances with kernel < 5.6 as we do not have the uring syscall or specific feature is not available
+    try {
+        _socketWrapper = make_unique<IOUringSocket>(uringEntries);
+    } catch (std::runtime_error& /*error*/) {
+        // Fall back to poll socket
+        _socketWrapper = make_unique<PollSocket>();
+    }
+#else
+    _socketWrapper = make_unique<PollSocket>();
+#endif
     _activeConnectionManagers++;
     _context = make_unique<network::TLSContext>();
 #ifndef ANYBLOB_LIBCXX_COMPAT
@@ -48,7 +59,7 @@ ConnectionManager::ConnectionManager([[maybe_unused]] unsigned uringEntries) : _
 #endif
 }
 //---------------------------------------------------------------------------
-int32_t ConnectionManager::connect(string hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit)
+int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit)
 // Creates a new socket connection
 {
     Cache* resCache;
@@ -326,5 +337,4 @@ ConnectionManager::~ConnectionManager()
     _activeConnectionManagers--;
 }
 //---------------------------------------------------------------------------
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network

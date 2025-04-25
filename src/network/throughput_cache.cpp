@@ -1,4 +1,6 @@
-#ifndef ANYBLOB_LIBCXX_COMPAT
+#ifdef ANYBLOB_LIBCXX_COMPAT
+#error "You must not include throughput_cache.cpp when building with libc++"
+#endif
 #include "network/throughput_cache.hpp"
 #include <cstring>
 #include <limits>
@@ -66,4 +68,3 @@ void ThroughputCache::stopSocket(std::unique_ptr<SocketEntry> socketEntry, uint6
 }; // namespace network
 //---------------------------------------------------------------------------
 }; // namespace anyblob
-#endif // ANYBLOB_LIBCXX_COMPAT

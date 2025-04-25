@@ -1,8 +1,10 @@
-#pragma once
+#ifdef ANYBLOB_LIBCXX_COMPAT
 // The `ThroughputCache` depends on gnu stdlib associative containers that are
 // not supported by libcxx. We remove the throughput cache in its entirety when
 // building with libcxx.
-#ifndef ANYBLOB_LIBCXX_COMPAT
+#error "You must not include throughput_cache.hpp when building with libc++"
+#endif
+#pragma once
 #include "network/cache.hpp"
 #include <chrono>
 #include <ext/pb_ds/assoc_container.hpp>
@@ -55,4 +57,3 @@ class ThroughputCache : public network::Cache {
 }; // namespace network
 //---------------------------------------------------------------------------
 }; // namespace anyblob
-#endif // ANYBLOB_LIBCXX_COMPAT

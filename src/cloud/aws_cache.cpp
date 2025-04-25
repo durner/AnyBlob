@@ -1,5 +1,6 @@
 #include "cloud/aws_cache.hpp"
 #include <array>
+#include <charconv>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -50,8 +51,8 @@ unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(const string& hostname
     hints.ai_protocol = IPPROTO_TCP;
 
     addrinfo* temp;
-    std::array<char, 16> port_str{};
-    sprintf(port_str.data(), "%d", port);
+    array<char, 16> port_str{};
+    to_chars(port_str.data(), port_str.data() + port_str.size(), port);
     if (getaddrinfo(hostname.c_str(), port_str.data(), &hints, &temp) != 0) {
         throw runtime_error("hostname getaddrinfo error");
     }
@@ -69,7 +70,7 @@ unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(const string& hostname
             std::array<char, INET_ADDRSTRLEN> ipv4{};
             inet_ntop(AF_INET, &p->sin_addr, ipv4.data(), INET_ADDRSTRLEN);
             string cmd = "timeout 0.01 ping -s 1473 -D ";
-            cmd += string_view(ipv4.data(), ipv4.size());
+            cmd += string_view(ipv4.data(), strnlen(ipv4.data(), ipv4.size()));
             cmd += " -c 1 >>/dev/null 2>>/dev/null";
             auto res = system(cmd.c_str());
             if (!res) {

@@ -1,3 +1,6 @@
+#ifndef ANYBLOB_HAS_IO_URING
+#error "You must not include io_uring_socket.cpp when building without uring support"
+#endif
 #include "network/io_uring_socket.hpp"
 #include <cassert>
 #include <cstring>

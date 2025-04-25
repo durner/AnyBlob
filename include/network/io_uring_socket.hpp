@@ -1,4 +1,7 @@
 #pragma once
+#ifndef ANYBLOB_HAS_IO_URING
+#error "You must not include io_uring_socket.hpp when building without uring support"
+#endif
 #include "network/socket.hpp"
 #include <vector>
 #include <liburing.h>
@@ -39,19 +42,19 @@ class IOUringSocket : public Socket {
     io_uring_sqe* recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0, uint8_t flags = 0);
 
     /// Prepare a submission send
-    [[gnu::always_inline]] bool send(const Request* req, int32_t msg_flags = 0) override {
+    bool send(const Request* req, int32_t msg_flags = 0) override {
         return send_prep(req, msg_flags);
     }
     /// Prepare a submission recv
-    [[gnu::always_inline]] bool recv(Request* req, int32_t msg_flags = 0) override {
+    bool recv(Request* req, int32_t msg_flags = 0) override {
         return recv_prep(req, msg_flags);
     }
     /// Prepare a submission send with timeout
-    [[gnu::always_inline]] bool send_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0) override {
+    bool send_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0) override {
         return send_prep_to(req, timeout, msg_flags);
     }
     /// Prepare a submission recv with timeout
-    [[gnu::always_inline]] bool recv_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0) override {
+    bool recv_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0) override {
         return recv_prep_to(req, timeout, msg_flags);
     }
 

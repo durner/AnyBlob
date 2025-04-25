@@ -1,6 +1,7 @@
 #include "network/cache.hpp"
 #include <array>
 #include <cassert>
+#include <charconv>
 #include <cstring>
 #include <stdexcept>
 #include <arpa/inet.h>
@@ -112,8 +113,8 @@ unique_ptr<Cache::SocketEntry> Cache::resolve(const string& hostname, unsigned p
     hints.ai_protocol = IPPROTO_TCP;
 
     addrinfo* temp;
-    std::array<char, 16> port_str{};
-    sprintf(port_str.data(), "%d", port);
+    array<char, 16> port_str{};
+    to_chars(port_str.data(), port_str.data() + port_str.size(), port);
     if (getaddrinfo(hostname.c_str(), port_str.data(), &hints, &temp) != 0) {
         throw runtime_error("hostname getaddrinfo error");
     }
