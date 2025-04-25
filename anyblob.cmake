@@ -47,10 +47,6 @@ include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS(
         LIBURING
         REQUIRED_VARS LIBURING_LIBRARY LIBURING_INCLUDE_DIR)
-if(LIBURING_FOUND)
-  set(LIBURING_LIBRARIES ${LIBURING_LIBRARY})
-  set(LIBURING_INCLUDE_DIRS ${LIBURING_INCLUDE_DIR})
-endif()
 
 # ---------------------------------------------------------------------------
 # Build Library with dependencies
@@ -60,5 +56,12 @@ add_library(AnyBlob STATIC IMPORTED)
 set_property(TARGET AnyBlob PROPERTY IMPORTED_LOCATION ${BINARY_DIR}/libAnyBlob.a)
 set_property(TARGET AnyBlob APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${ANYBLOB_INCLUDE_DIR})
 add_dependencies(AnyBlob anyblob)
-target_link_libraries(AnyBlob INTERFACE OpenSSL::SSL Threads::Threads ${LIBURING_LIBRARY} jemalloc)
+target_link_libraries(AnyBlob INTERFACE OpenSSL::SSL Threads::Threads jemalloc)
+if (ANYBLOB_LIBCXX_COMPAT)
+    target_compile_definitions(AnyBlob PRIVATE ANYBLOB_LIBCXX_COMPAT)
+endif()
+if(LIBURING_FOUND)
+    target_compile_definitions(AnyBlob PRIVATE ANYBLOB_HAS_IO_URING)
+    target_link_libraries(AnyBlob INTERFACE ${LIBURING_LIBRARY})
+endif()
 

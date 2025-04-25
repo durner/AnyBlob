@@ -16,7 +16,7 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 /// This class opens a TCP connection to a server and exchanges messages
 /// with the old poll interface acting as a fallback.
-/// We implement it to fully match the IOUringSockets behavior.
+/// We implement it to fully match the IOUringSockets behavior as a fallback on old machines.
 class PollSocket : public Socket {
     private:
     /// The request infos with timeout and message flags

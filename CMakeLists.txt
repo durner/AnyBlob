@@ -92,11 +92,6 @@ FIND_PACKAGE_HANDLE_STANDARD_ARGS(
         LIBURING
         REQUIRED_VARS LIBURING_LIBRARY LIBURING_INCLUDE_DIR)
 
-if(LIBURING_FOUND)
-  set(LIBURING_LIBRARIES ${LIBURING_LIBRARY})
-  set(LIBURING_INCLUDE_DIRS ${LIBURING_INCLUDE_DIR})
-endif()
-
 # ---------------------------------------------------------------------------
 # Includes
 # ---------------------------------------------------------------------------
@@ -122,10 +117,14 @@ include("${PROJECT_SOURCE_DIR}/test/integration/local.cmake")
 # ---------------------------------------------------------------------------
 
 add_library(AnyBlob STATIC ${SRC_CPP} ${INCLUDE_HPP})
-target_link_libraries(AnyBlob PUBLIC OpenSSL::SSL Threads::Threads ${LIBURING_LIBRARY} jemalloc)
+target_link_libraries(AnyBlob PUBLIC OpenSSL::SSL Threads::Threads jemalloc)
 target_include_directories(AnyBlob PUBLIC ${PROJECT_SOURCE_DIR}/include)
 if (ANYBLOB_LIBCXX_COMPAT)
     target_compile_definitions(AnyBlob PRIVATE ANYBLOB_LIBCXX_COMPAT)
+endif()
+if(LIBURING_FOUND)
+    target_link_libraries(AnyBlob PUBLIC ${LIBURING_LIBRARY})
+    target_compile_definitions(AnyBlob PRIVATE ANYBLOB_HAS_IO_URING)
 endif()
 
 # ---------------------------------------------------------------------------

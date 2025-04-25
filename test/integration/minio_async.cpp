@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <unistd.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022

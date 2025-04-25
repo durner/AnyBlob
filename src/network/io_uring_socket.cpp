@@ -1,3 +1,4 @@
+#ifdef ANYBLOB_HAS_IO_URING
 #include "network/io_uring_socket.hpp"
 #include <cassert>
 #include <cstring>
@@ -185,3 +186,4 @@ IOUringSocket::~IOUringSocket() noexcept
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::network
+#endif
