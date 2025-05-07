@@ -7,24 +7,24 @@ on:
       - dev
   pull_request:
     branches:
-      - master
-      - dev
+      - "*"
 
 env:
   BUILD_TYPE: Debug
-  # False ASAN positives for alloc_dealloc_mismatch when running with clang 
+  # False ASAN positives for alloc_dealloc_mismatch when running with clang
   # https://github.com/llvm/llvm-project/issues/59432
-  ASAN_OPTIONS: alloc_dealloc_mismatch=0 
+  ASAN_OPTIONS: alloc_dealloc_mismatch=0
 
 jobs:
   integration-test:
-    name: Integration Tests (Clang ${{ matrix.clang-toolchain }})
+    name: Integration Tests (Clang ${{ matrix.clang-toolchain }}) (Uring Compat ${{ matrix.uring-compat }})
     # Run on ubuntu
     runs-on: ubuntu-latest
     # Use both the GCC and Clang Toolchain
     strategy:
         matrix:
             clang-toolchain: [true, false]
+            uring-compat: [0, 1]
 
     # Define the steps
     steps:
@@ -47,15 +47,16 @@ jobs:
         with:
           submodules: true
 
-      # Use action to install dependencies 
-      - name: Install Dependencies 
+      # Use action to install dependencies
+      - name: Install Dependencies
         uses: ./.github/actions/install-deps
 
-      # Use action to build 
+      # Use action to build
       - name: Build AnyBlob
         uses: ./.github/actions/do-build
         with:
             clang-toolchain: ${{ matrix.clang-toolchain }}
+            uring-compat: ${{ matrix.uring-compat }}
 
       # Run the integration test
       - name: Integration Test

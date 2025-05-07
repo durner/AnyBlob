@@ -53,10 +53,13 @@ PollSocket::Request* PollSocket::complete()
 // Get a completion event and mark it as seen; return the Request
 {
     while (ready.empty()) {
-        // Poll wait up to 1ms
-        int ret = ::poll(pollfds.data(), pollfds.size(), 1);
-        // No events ready
-        if (ret <= 0) continue;
+        // Activly poll here as well to match io_uring because we have to check for new arrivals
+        if (readyFds <= 0) {
+            // Poll wait up to 1ms
+            readyFds = ::poll(pollfds.data(), pollfds.size(), 1);
+            // No events ready
+            if (readyFds <= 0) continue;
+        }
 
         // Check for completed events
         auto currentTime = chrono::steady_clock::now();
@@ -110,6 +113,8 @@ int32_t PollSocket::submit()
 {
     auto sub = submitted;
     submitted = 0;
+    // Do the poll here, but don't wait or work on the results
+    readyFds = ::poll(pollfds.data(), pollfds.size(), 0);
     return sub;
 }
 //---------------------------------------------------------------------------

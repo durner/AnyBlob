@@ -34,6 +34,8 @@ class PollSocket : public Socket {
     std::unordered_map<int, RequestInfo> fdToRequest;
     /// The pollfd vector
     std::vector<pollfd> pollfds;
+    /// The ready pollfds
+    int32_t readyFds = 0;
     /// The submitted requests since last invocation
     int32_t submitted = 0;
 
