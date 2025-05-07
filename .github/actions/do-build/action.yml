@@ -5,6 +5,10 @@ inputs:
         required: false
         description: "Build with clang and use libcxx as the standard library"
         default: false
+    uring-compat:
+        required: false
+        description: "Build without uring"
+        default: 0
 
 runs:
     using: "composite"
@@ -13,7 +17,7 @@ runs:
       - name: Configure CMake
         if: ${{ inputs.clang-toolchain == 'false' }}
         run: |
-          cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DANYBLOB_URING_COMPAT=${{ inputs.uring-compat }}
         shell: bash
 
       # CMake configuration option 2 - Clang toolchain
@@ -25,7 +29,8 @@ runs:
           cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
                 -DCMAKE_C_COMPILER=clang-18  \
                 -DCMAKE_CXX_COMPILER=clang++-18 \
-                -DANYBLOB_LIBCXX_COMPAT=1
+                -DANYBLOB_LIBCXX_COMPAT=1 \
+                -DANYBLOB_URING_COMPAT=${{ inputs.uring-compat }}
         shell: bash
 
       # Build library and test binaries
