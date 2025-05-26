@@ -52,8 +52,10 @@ struct MessageTask {
     /// The message task class
     Type type;
 
-    /// The failure limit
+    /// The failure limit during recv and send
     static constexpr uint16_t failuresMax = 32;
+    /// The limit of failures to connect
+    static constexpr uint16_t connectionFailuresMax = 4;
 
     /// The pure virtual  callback
     virtual MessageState execute(ConnectionManager& connectionManager) = 0;
