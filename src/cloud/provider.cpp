@@ -206,6 +206,9 @@ unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, 
             if (sendReceiverHandle && info.region.empty())
                 info.region = anyblob::cloud::AWS::getInstanceRegion(*sendReceiverHandle);
 
+            if (info.region.empty())
+                throw runtime_error("IMDSv1 required for retrieving instance region.");
+
             if (keyId.empty()) {
                 auto aws = make_unique<anyblob::cloud::AWS>(info);
                 aws->initSecret(*sendReceiverHandle);

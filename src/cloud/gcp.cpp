@@ -49,6 +49,7 @@ Provider::Instance GCP::getInstanceDetails(network::TaskedSendReceiverHandle& se
     RemoteInfo info;
     info.endpoint = getIAMAddress();
     info.port = getIAMPort();
+    info.provider = CloudService::HTTP;
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     verify(sendReceiverHandle.sendSync(originalMsg.get()));
@@ -72,6 +73,7 @@ string GCP::getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiverHan
     RemoteInfo info;
     info.endpoint = getIAMAddress();
     info.port = getIAMPort();
+    info.provider = CloudService::HTTP;
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     verify(sendReceiverHandle.sendSync(originalMsg.get()));

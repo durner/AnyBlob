@@ -56,6 +56,7 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiverHandle& 
     RemoteInfo info;
     info.endpoint = getIAMAddress();
     info.port = getIAMPort();
+    info.provider = CloudService::HTTP;
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     verify(sendReceiverHandle.sendSync(originalMsg.get()));
@@ -85,6 +86,7 @@ string Azure::getRegion(network::TaskedSendReceiverHandle& sendReceiverHandle)
     RemoteInfo info;
     info.endpoint = getIAMAddress();
     info.port = getIAMPort();
+    info.provider = CloudService::HTTP;
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
     verify(sendReceiverHandle.sendSync(originalMsg.get()));
