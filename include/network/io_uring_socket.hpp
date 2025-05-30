@@ -33,28 +33,28 @@ class IOUringSocket : public Socket {
     ~IOUringSocket() noexcept override;
 
     /// Prepare a submission (sqe) send
-    io_uring_sqe* send_prep(const Request* req, int32_t msg_flags = 0, uint8_t flags = 0);
+    io_uring_sqe* send_prep(const Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
     /// Prepare a submission (sqe) recv
-    io_uring_sqe* recv_prep(Request* req, int32_t msg_flags = 0, uint8_t flags = 0);
+    io_uring_sqe* recv_prep(Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
     /// Prepare a submission (sqe) send with timeout
-    io_uring_sqe* send_prep_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0, uint8_t flags = 0);
+    io_uring_sqe* send_prep_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0, uint8_t flags = 0);
     /// Prepare a submission (sqe) recv with timeout
-    io_uring_sqe* recv_prep_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0, uint8_t flags = 0);
+    io_uring_sqe* recv_prep_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0, uint8_t flags = 0);
 
     /// Prepare a submission send
-    bool send(const Request* req, int32_t msg_flags = 0) override {
+    bool send(const Request& req, int32_t msg_flags = 0) override {
         return send_prep(req, msg_flags);
     }
     /// Prepare a submission recv
-    bool recv(Request* req, int32_t msg_flags = 0) override {
+    bool recv(Request& req, int32_t msg_flags = 0) override {
         return recv_prep(req, msg_flags);
     }
     /// Prepare a submission send with timeout
-    bool send_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0) override {
+    bool send_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) override {
         return send_prep_to(req, timeout, msg_flags);
     }
     /// Prepare a submission recv with timeout
-    bool recv_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0) override {
+    bool recv_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) override {
         return recv_prep_to(req, timeout, msg_flags);
     }
 

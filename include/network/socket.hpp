@@ -48,13 +48,13 @@ class Socket {
     /// The destructor
     virtual ~Socket() noexcept = default;
     /// Prepare a submission send
-    virtual bool send(const Request* req, int32_t msg_flags = 0) = 0;
+    virtual bool send(const Request& req, int32_t msg_flags = 0) = 0;
     /// Prepare a submission recv
-    virtual bool recv(Request* req, int32_t msg_flags = 0) = 0;
+    virtual bool recv(Request& req, int32_t msg_flags = 0) = 0;
     /// Prepare a submission send with timeout
-    virtual bool send_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0) = 0;
+    virtual bool send_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) = 0;
     /// Prepare a submission recv with timeout
-    virtual bool recv_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags = 0) = 0;
+    virtual bool recv_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) = 0;
 
     /// Get a completion event and mark it as seen; return the Request
     [[nodiscard]] virtual Request* complete() = 0;

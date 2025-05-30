@@ -15,37 +15,37 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-bool PollSocket::send(const Request* req, int32_t msg_flags)
+bool PollSocket::send(const Request& req, int32_t msg_flags)
 // Prepare a submission send
 {
-    if (!req || req->event != EventType::write) return false;
-    enqueue(req->fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(req), .timeout = chrono::time_point<chrono::steady_clock>::max(), .flags = msg_flags});
+    if (req.event != EventType::write) return false;
+    enqueue(req.fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(&req), .timeout = chrono::time_point<chrono::steady_clock>::max(), .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------
-bool PollSocket::recv(Request* req, int32_t msg_flags)
+bool PollSocket::recv(Request& req, int32_t msg_flags)
 // Prepare a submission recv
 {
-    if (!req || req->event != EventType::read) return false;
-    enqueue(req->fd, POLLIN, RequestInfo{.request = req, .timeout = chrono::time_point<chrono::steady_clock>::max(), .flags = msg_flags});
+    if (req.event != EventType::read) return false;
+    enqueue(req.fd, POLLIN, RequestInfo{.request = &req, .timeout = chrono::time_point<chrono::steady_clock>::max(), .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------
-bool PollSocket::send_to(const Request* req, __kernel_timespec* timeout, int32_t msg_flags)
+bool PollSocket::send_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags)
 // Prepare a submission send with timeout
 {
-    if (!req || req->event != EventType::write) return false;
-    auto duration = chrono::seconds(timeout->tv_sec) + chrono::nanoseconds(timeout->tv_nsec);
-    enqueue(req->fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(req), .timeout = chrono::steady_clock::now() + duration, .flags = msg_flags});
+    if (req.event != EventType::write) return false;
+    auto duration = chrono::seconds(timeout.tv_sec) + chrono::nanoseconds(timeout.tv_nsec);
+    enqueue(req.fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(&req), .timeout = chrono::steady_clock::now() + duration, .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------
-bool PollSocket::recv_to(Request* req, __kernel_timespec* timeout, int32_t msg_flags)
+bool PollSocket::recv_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags)
 // Prepare a submission recv with timeout
 {
-    if (!req || req->event != EventType::read) return false;
-    auto duration = chrono::seconds(timeout->tv_sec) + chrono::nanoseconds(timeout->tv_nsec);
-    enqueue(req->fd, POLLIN, RequestInfo{.request = req, .timeout = chrono::steady_clock::now() + duration, .flags = msg_flags});
+    if (req.event != EventType::read) return false;
+    auto duration = chrono::seconds(timeout.tv_sec) + chrono::nanoseconds(timeout.tv_nsec);
+    enqueue(req.fd, POLLIN, RequestInfo{.request = &req, .timeout = chrono::steady_clock::now() + duration, .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------
@@ -69,15 +69,27 @@ PollSocket::Request* PollSocket::complete()
                 if (pit->revents & (POLLIN | POLLOUT)) {
                     // Active pollfd
                     if (req.request->event == EventType::read) {
-                        req.request->length = ::recv(it->first, req.request->data.data, static_cast<size_t>(req.request->length), req.flags);
+                        req.request->length = ::recv(it->first, req.request->data.data, static_cast<size_t>(req.request->length), req.flags | MSG_DONTWAIT);
                     } else if (req.request->event == EventType::write) {
-                        req.request->length = ::send(it->first, req.request->data.cdata, static_cast<size_t>(req.request->length), req.flags);
+                        req.request->length = ::send(it->first, req.request->data.cdata, static_cast<size_t>(req.request->length), req.flags | MSG_DONTWAIT);
                     }
 
                     // Simulate io uring by returning -errno
                     if (req.request->length == -1)
                         req.request->length = -errno;
 
+                    ready.push_back(req.request);
+                    fdToRequest.erase(it->first);
+                    pit = pollfds.erase(pit);
+                } else if (pit->revents & (POLLERR | POLLHUP | POLLNVAL)) {
+                    // Simulate io uring by returning -error
+                    int err = 0;
+                    socklen_t len = sizeof(err);
+                    if (::getsockopt(it->first, SOL_SOCKET, SO_ERROR, &err, &len) == 0) {
+                        req.request->length = -err;
+                    } else {
+                        req.request->length = -EIO;
+                    }
                     ready.push_back(req.request);
                     fdToRequest.erase(it->first);
                     pit = pollfds.erase(pit);

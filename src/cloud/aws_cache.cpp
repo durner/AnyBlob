@@ -66,7 +66,7 @@ unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(const string& hostname
             if (it->second)
                 socketEntry->dns->cachePriority = numeric_limits<int>::max();
         } else {
-            std::array<char, INET_ADDRSTRLEN> ipv4{};
+            array<char, INET_ADDRSTRLEN> ipv4{};
             inet_ntop(AF_INET, &p->sin_addr, ipv4.data(), INET_ADDRSTRLEN);
             string cmd = "timeout 0.01 ping -s 1473 -D ";
             cmd += string_view(ipv4.data(), strnlen(ipv4.data(), ipv4.size()));
