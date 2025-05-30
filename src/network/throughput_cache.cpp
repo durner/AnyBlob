@@ -1,5 +1,5 @@
 #ifdef ANYBLOB_LIBCXX_COMPAT
-#error "You must not include throughput_cache.cpp when building with libc++"
+#error "Cannot build throughput_cache.cpp when compiling with libc++"
 #endif
 #include "network/throughput_cache.hpp"
 #include <cstring>
