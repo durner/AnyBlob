@@ -1,7 +1,6 @@
 #include "cloud/azure.hpp"
 #include "cloud/azure_signer.hpp"
 #include "cloud/http.hpp"
-#include "network/cache.hpp"
 #include "network/http_helper.hpp"
 #include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
@@ -20,8 +19,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace cloud {
+namespace anyblob::cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -200,5 +198,4 @@ string Azure::getAddress() const
     return _secret->accountName + ".blob.core.windows.net";
 }
 //---------------------------------------------------------------------------
-} // namespace cloud
-} // namespace anyblob
+} // namespace anyblob::cloud

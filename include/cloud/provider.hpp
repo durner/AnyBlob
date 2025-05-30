@@ -19,11 +19,11 @@ class TaskedSendReceiverHandle;
 class Transaction;
 struct Config;
 struct OriginalMessage;
-}; // namespace network
+} // namespace network
 namespace utils {
 template <typename T>
 class DataVector;
-}; // namespace utils
+} // namespace utils
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------

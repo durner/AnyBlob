@@ -1,8 +1,6 @@
 #include "cloud/gcp_signer.hpp"
 #include "utils/utils.hpp"
 #include <algorithm>
-#include <chrono>
-#include <iomanip>
 #include <map>
 #include <sstream>
 //---------------------------------------------------------------------------
@@ -13,8 +11,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace cloud {
+namespace anyblob::cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -118,5 +115,4 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
     return signedUrl;
 }
 //---------------------------------------------------------------------------
-}; // namespace cloud
-}; // namespace anyblob
+} // namespace anyblob::cloud

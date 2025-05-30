@@ -33,8 +33,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 /// Implements a send recieve roundtrip with the help of AWS S3 Library
 /// S3SendReceiver contains mutliple requests
@@ -330,5 +329,4 @@ class S3SendReceiver {
 typedef S3SendReceiver<Aws::S3::S3Client, Aws::S3::Model::GetObjectRequest, Aws::S3::GetObjectResponseReceivedHandler, Aws::S3::Model::GetObjectOutcome, Aws::Client::ClientConfiguration> S3CurlSendReceiver;
 typedef S3SendReceiver<Aws::S3Crt::S3CrtClient, Aws::S3Crt::Model::GetObjectRequest, Aws::S3Crt::GetObjectResponseReceivedHandler, Aws::S3Crt::Model::GetObjectOutcome, Aws::S3Crt::ClientConfiguration> S3CrtSendReceiver;
 //---------------------------------------------------------------------------
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network

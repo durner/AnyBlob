@@ -8,8 +8,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -144,5 +143,4 @@ unique_ptr<utils::DataVector<uint8_t>> MessageResult::moveDataVector()
     return move(dataVector);
 }
 //---------------------------------------------------------------------------
-}; // namespace network
-}; // namespace anyblob
+} // namespace anyblob::network

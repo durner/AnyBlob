@@ -5,8 +5,6 @@
 #include "network/transaction.hpp"
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
-#include <fstream>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -15,8 +13,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace test {
+namespace anyblob::test {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -177,5 +174,4 @@ TEST_CASE("MinIO Sync Integration") {
     }
 }
 //---------------------------------------------------------------------------
-} // namespace test
-} // namespace anyblob
+} // namespace anyblob::test

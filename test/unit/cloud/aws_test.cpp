@@ -14,9 +14,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace cloud {
-namespace test {
+namespace anyblob::cloud::test {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -87,6 +85,4 @@ TEST_CASE("aws") {
     tester.test();
 }
 //---------------------------------------------------------------------------
-} // namespace test
-} // namespace cloud
-} // namespace anyblob
+} // namespace anyblob::cloud::test

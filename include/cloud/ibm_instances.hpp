@@ -1,6 +1,5 @@
 #pragma once
 #include "cloud/provider.hpp"
-#include <string>
 #include <vector>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -10,8 +9,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace cloud {
+namespace anyblob::cloud {
 //---------------------------------------------------------------------------
 /// Implements the IBM instances
 struct IBMInstance : public Provider::Instance {
@@ -19,5 +17,4 @@ struct IBMInstance : public Provider::Instance {
     [[nodiscard]] static std::vector<IBMInstance> getInstanceDetails();
 };
 //---------------------------------------------------------------------------
-}; // namespace cloud
-}; // namespace anyblob
+} // namespace anyblob::cloud

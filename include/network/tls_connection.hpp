@@ -1,6 +1,5 @@
 #pragma once
 #include <memory>
-#include <mutex>
 #include <openssl/types.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -10,8 +9,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 struct HTTPSMessage;
 class TLSContext;
@@ -125,5 +123,4 @@ class TLSConnection {
     Progress process(ConnectionManager& connectionManager);
 };
 //---------------------------------------------------------------------------
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network

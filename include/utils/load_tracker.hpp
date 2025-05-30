@@ -32,8 +32,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace utils {
+namespace anyblob::utils {
 class LoadTracker {
     public:
     /// Load values for each CPU
@@ -107,8 +106,8 @@ class LoadTracker {
     /// Get the active cpu times
     static constexpr size_t getActiveTime(const CPUData& e) {
         return e.times[static_cast<uint8_t>(CPUStates::S_USER)] + e.times[static_cast<uint8_t>(CPUStates::S_NICE)] +
-            e.times[static_cast<uint8_t>(CPUStates::S_SYSTEM)] + e.times[static_cast<uint8_t>(CPUStates::S_IRQ)] +
-            e.times[static_cast<uint8_t>(CPUStates::S_SOFTIRQ)] + e.times[static_cast<uint8_t>(CPUStates::S_STEAL)];
+               e.times[static_cast<uint8_t>(CPUStates::S_SYSTEM)] + e.times[static_cast<uint8_t>(CPUStates::S_IRQ)] +
+               e.times[static_cast<uint8_t>(CPUStates::S_SOFTIRQ)] + e.times[static_cast<uint8_t>(CPUStates::S_STEAL)];
     }
 
     /// Write stats as csv
@@ -183,5 +182,4 @@ class LoadTracker {
     }
 };
 //---------------------------------------------------------------------------
-}; // namespace utils
-}; // namespace anyblob
+} // namespace anyblob::utils

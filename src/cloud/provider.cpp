@@ -10,7 +10,6 @@
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
 #include <fstream>
-#include <istream>
 #include <string>
 #include <assert.h>
 //---------------------------------------------------------------------------
@@ -21,8 +20,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace cloud {
+namespace anyblob::cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -253,5 +251,4 @@ unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, 
     }
 }
 //---------------------------------------------------------------------------
-} // namespace cloud
-} // namespace anyblob
+} // namespace anyblob::cloud

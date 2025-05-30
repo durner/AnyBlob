@@ -62,4 +62,4 @@ class Socket {
     virtual int32_t submit() = 0;
 };
 //---------------------------------------------------------------------------
-}; // namespace anyblob::network
+} // namespace anyblob::network

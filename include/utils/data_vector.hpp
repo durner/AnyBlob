@@ -12,8 +12,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace utils {
+namespace anyblob::utils {
 //---------------------------------------------------------------------------
 /// Minimal version of a vector that only allwos to store raw data
 template <typename T>
@@ -114,5 +113,4 @@ class DataVector {
     }
 };
 //---------------------------------------------------------------------------
-}; // namespace utils
-}; // namespace anyblob
+} // namespace anyblob::utils

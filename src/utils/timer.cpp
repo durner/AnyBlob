@@ -8,8 +8,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace utils {
+namespace anyblob::utils {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -79,5 +78,4 @@ void Timer::setInfo(string headerInfo, string contentInfo)
     this->_contentInfo = contentInfo;
 }
 //---------------------------------------------------------------------------
-}; // namespace utils
-}; // namespace anyblob
+} // namespace anyblob::utils

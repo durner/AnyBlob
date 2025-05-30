@@ -15,13 +15,13 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace network {
 class TaskedSendReceiver;
-}; // namespace network
+} // namespace network
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------
 namespace test {
 class AzureTester;
-}; // namespace test
+} // namespace test
 //---------------------------------------------------------------------------
 /// Implements the Azure logic
 class Azure : public Provider {

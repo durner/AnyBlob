@@ -73,8 +73,7 @@ def write_header(vendor, output_file):
         f.write("// If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.\n")
         f.write("// SPDX-License-Identifier: MPL-2.0\n")
         f.write("//---------------------------------------------------------------------------\n")
-        f.write("namespace anyblob {\n")
-        f.write("namespace cloud {\n")
+        f.write("namespace anyblob::cloud {\n")
         f.write("//---------------------------------------------------------------------------\n")
         f.write("using namespace std;\n")
         f.write("//---------------------------------------------------------------------------\n")
@@ -88,8 +87,7 @@ def write_footer(output_file):
         f.write("return instances;\n")
         f.write("}\n")
         f.write("//---------------------------------------------------------------------------\n")
-        f.write("}; // namespace cloud\n")
-        f.write("}; // namespace anyblob\n")
+        f.write("} // namespace anyblob::cloud\n")
 
 def main():
     vendors = ["AWS", "Azure", "GCP"]

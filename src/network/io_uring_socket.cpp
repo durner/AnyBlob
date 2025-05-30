@@ -4,9 +4,7 @@
 #include "network/io_uring_socket.hpp"
 #include <cassert>
 #include <cstring>
-#include <limits>
 #include <stdexcept>
-#include <string>
 #include <sys/eventfd.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library

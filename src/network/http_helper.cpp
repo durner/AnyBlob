@@ -13,8 +13,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -92,5 +91,4 @@ bool HttpHelper::finished(const uint8_t* data, uint64_t length, unique_ptr<Info>
     }
 }
 //---------------------------------------------------------------------------
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network

@@ -22,8 +22,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace benchmark {
+namespace anyblob::benchmark {
 //---------------------------------------------------------------------------
 using namespace std;
 using namespace anyblob;
@@ -358,5 +357,4 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
     }
 }
 //---------------------------------------------------------------------------
-}; // namespace benchmark
-}; // namespace anyblob
+} // namespace anyblob::benchmark

@@ -24,8 +24,7 @@
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace utils {
+namespace anyblob::utils {
 //---------------------------------------------------------------------------
 string base64Encode(const uint8_t* input, uint64_t length)
 // Encodes a string as a base64 string
@@ -257,5 +256,4 @@ uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uin
     return encLength;
 }
 //---------------------------------------------------------------------------
-}; // namespace utils
-}; // namespace anyblob
+} // namespace anyblob::utils

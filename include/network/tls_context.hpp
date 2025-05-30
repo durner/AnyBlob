@@ -1,7 +1,5 @@
 #pragma once
 #include <array>
-#include <memory>
-#include <unordered_map>
 #include <openssl/ssl.h>
 #include <openssl/types.h>
 //---------------------------------------------------------------------------
@@ -12,8 +10,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 class TLSConnection;
 //---------------------------------------------------------------------------
@@ -49,5 +46,4 @@ class TLSContext {
     friend TLSConnection;
 };
 //---------------------------------------------------------------------------
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network

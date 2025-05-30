@@ -1,6 +1,6 @@
 #include "network/http_request.hpp"
-#include "utils/data_vector.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
+#include "utils/data_vector.hpp"
 #include <iostream>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -10,9 +10,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
-namespace test {
+namespace anyblob::network::test {
 //---------------------------------------------------------------------------
 TEST_CASE("http_request") {
     network::HttpRequest request;
@@ -36,6 +34,4 @@ TEST_CASE("http_request") {
     REQUIRE(serializeView == serializeAgainView);
 }
 //---------------------------------------------------------------------------
-} // namespace test
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network::test

@@ -11,8 +11,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 /// Implements an helper to resolve http requests
 class HttpHelper {
@@ -46,5 +45,4 @@ class HttpHelper {
     [[nodiscard]] static bool finished(const uint8_t* data, uint64_t length, std::unique_ptr<Info>& info);
 };
 //---------------------------------------------------------------------------
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network

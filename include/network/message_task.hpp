@@ -1,12 +1,10 @@
 #pragma once
 #include "cloud/provider.hpp"
 #include "network/connection_manager.hpp"
-#include "network/http_helper.hpp"
 #include "network/original_message.hpp"
 #include "network/socket.hpp"
 #include "utils/data_vector.hpp"
 #include <memory>
-#include <string>
 #include <string_view>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -20,7 +18,7 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace utils {
 class Timer;
-}; // namespace utils
+} // namespace utils
 //---------------------------------------------------------------------------
 namespace network {
 class TLSContext;

@@ -19,13 +19,13 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace network {
 class TaskedSendReceiver;
-}; // namespace network
+} // namespace network
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------
 namespace test {
 class AWSTester;
-}; // namespace test
+} // namespace test
 //---------------------------------------------------------------------------
 /// Implements the AWS S3 logic
 class AWS : public Provider {

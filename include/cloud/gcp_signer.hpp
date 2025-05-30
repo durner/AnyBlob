@@ -1,7 +1,5 @@
 #pragma once
 #include "network/http_request.hpp"
-#include <map>
-#include <memory>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -11,8 +9,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace cloud {
+namespace anyblob::cloud {
 //---------------------------------------------------------------------------
 /// Implements the GCP Signing Logic
 /// It follows the v4 docu: https://cloud.google.com/storage/docs/access-control/signing-urls-manually
@@ -31,5 +28,4 @@ class GCPSigner {
     [[nodiscard]] static std::string createSignedRequest(const std::string& serviceAccountEmail, const std::string& privateRSA, network::HttpRequest& request, StringToSign& stringToSign);
 };
 //---------------------------------------------------------------------------
-}; // namespace cloud
-}; // namespace anyblob
+} // namespace anyblob::cloud

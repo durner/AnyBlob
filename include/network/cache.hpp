@@ -1,11 +1,9 @@
 #pragma once
 #include "network/tls_connection.hpp"
-#include <deque>
 #include <map>
 #include <memory>
 #include <string>
 #include <string_view>
-#include <vector>
 #include <netdb.h>
 #include <netinet/tcp.h>
 //---------------------------------------------------------------------------
@@ -16,9 +14,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-//---------------------------------------------------------------------------
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 /// The addr resolver and cacher, which is not thread safe
 class Cache {
@@ -79,6 +75,5 @@ class Cache {
     static std::string_view tld(std::string_view domain);
 };
 //---------------------------------------------------------------------------
-}; // namespace network
+} // namespace anyblob::network
 //---------------------------------------------------------------------------
-}; // namespace anyblob

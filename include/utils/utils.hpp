@@ -9,8 +9,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace utils {
+namespace anyblob::utils {
 //---------------------------------------------------------------------------
 #ifndef NDEBUG
 #define verify(expression) assert(expression)
@@ -39,5 +38,4 @@ uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uin
 /// Encrypt with AES-256-CBC
 uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* plainData, uint64_t plainLength, uint8_t* encData);
 //---------------------------------------------------------------------------
-}; // namespace utils
-}; // namespace anyblob
+} // namespace anyblob::utils

@@ -1,9 +1,7 @@
 #pragma once
 #include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
-#include <atomic>
 #include <memory>
-#include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -16,11 +14,11 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace utils {
 class Timer;
-}; // namespace utils
+} // namespace utils
 //---------------------------------------------------------------------------
 namespace cloud {
 class Provider;
-}; // namespace cloud
+} // namespace cloud
 //---------------------------------------------------------------------------
 namespace network {
 //---------------------------------------------------------------------------

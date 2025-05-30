@@ -3,9 +3,6 @@
 #endif
 #include "network/throughput_cache.hpp"
 #include <cstring>
-#include <limits>
-#include <stdexcept>
-#include <string>
 #include <arpa/inet.h>
 #include <sys/types.h>
 //---------------------------------------------------------------------------
@@ -16,8 +13,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -65,6 +61,5 @@ void ThroughputCache::stopSocket(std::unique_ptr<SocketEntry> socketEntry, uint6
     Cache::stopSocket(move(socketEntry), bytes, cachedEntries, reuseSocket);
 }
 //---------------------------------------------------------------------------
-}; // namespace network
+} // namespace anyblob::network
 //---------------------------------------------------------------------------
-}; // namespace anyblob

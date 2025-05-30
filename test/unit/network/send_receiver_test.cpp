@@ -20,9 +20,7 @@
 #define verify(expression) ((void) (expression))
 #endif
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
-namespace test {
+namespace anyblob::network::test {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -72,6 +70,4 @@ TEST_CASE("send_receiver") {
     }
 }
 //---------------------------------------------------------------------------
-} // namespace test
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network::test

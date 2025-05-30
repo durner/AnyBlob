@@ -16,13 +16,13 @@ namespace anyblob {
 //---------------------------------------------------------------------------
 namespace network {
 class TaskedSendReceiver;
-}; // namespace network
+} // namespace network
 //---------------------------------------------------------------------------
 namespace cloud {
 //---------------------------------------------------------------------------
 namespace test {
 class GCPTester;
-}; // namespace test
+} // namespace test
 //---------------------------------------------------------------------------
 /// Implements the GCP logic
 class GCP : public Provider {

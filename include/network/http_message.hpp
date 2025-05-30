@@ -9,8 +9,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 /// Implements a http message roundtrip
 struct HTTPMessage : public MessageTask {
@@ -27,5 +26,4 @@ struct HTTPMessage : public MessageTask {
     void reset(ConnectionManager& connectionManager, bool aborted);
 };
 //---------------------------------------------------------------------------
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network

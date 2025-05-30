@@ -3,7 +3,6 @@
 #include "network/http_response.hpp"
 #include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
-#include "utils/timer.hpp"
 #include <cassert>
 #include <memory>
 #include <utility>
@@ -19,8 +18,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -170,5 +168,4 @@ void HTTPSMessage::reset(ConnectionManager& connectionManager, bool aborted)
     HTTPMessage::reset(connectionManager, aborted);
 }
 //---------------------------------------------------------------------------
-} // namespace network
-} // namespace anyblob
+} // namespace anyblob::network

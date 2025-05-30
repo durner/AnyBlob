@@ -1,6 +1,5 @@
 #include "utils/utils.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
-#include <iostream>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -9,9 +8,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace utils {
-namespace test {
+namespace anyblob::utils::test {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
@@ -27,6 +24,4 @@ TEST_CASE("utils") {
     REQUIRE(!plain.compare(res));
 }
 //---------------------------------------------------------------------------
-} // namespace test
-} // namespace utils
-} // namespace anyblob
+} // namespace anyblob::utils::test

@@ -18,9 +18,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-//---------------------------------------------------------------------------
-namespace network {
+namespace anyblob::network {
 //---------------------------------------------------------------------------
 /// Implements the throughput-based cache logic
 class ThroughputCache : public network::Cache {
@@ -54,6 +52,5 @@ class ThroughputCache : public network::Cache {
     virtual ~ThroughputCache() = default;
 };
 //---------------------------------------------------------------------------
-}; // namespace network
+} // namespace anyblob::network
 //---------------------------------------------------------------------------
-}; // namespace anyblob

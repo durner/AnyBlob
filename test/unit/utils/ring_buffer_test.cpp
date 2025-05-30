@@ -9,9 +9,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-namespace utils {
-namespace test {
+namespace anyblob::utils::test {
 //---------------------------------------------------------------------------
 TEST_CASE("ring_buffer") {
     RingBuffer<uint64_t> rb(2);
@@ -94,6 +92,4 @@ TEST_CASE("multi_threaded_ring_buffer_multi_threaded_consume") {
     REQUIRE(!rb.consume().has_value());
 }
 //---------------------------------------------------------------------------
-} // namespace test
-} // namespace utils
-} // namespace anyblob
+} // namespace anyblob::utils::test

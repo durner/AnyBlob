@@ -9,9 +9,7 @@
 // If a copy of the MPL was not distributed with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 // SPDX-License-Identifier: MPL-2.0
 //---------------------------------------------------------------------------
-namespace anyblob {
-//---------------------------------------------------------------------------
-namespace cloud {
+namespace anyblob::cloud {
 //---------------------------------------------------------------------------
 /// Implements the AWS cache logic
 class AWSCache : public network::Cache {
@@ -27,6 +25,5 @@ class AWSCache : public network::Cache {
     virtual ~AWSCache() = default;
 };
 //---------------------------------------------------------------------------
-}; // namespace cloud
+} // namespace anyblob::cloud
 //---------------------------------------------------------------------------
-}; // namespace anyblob
