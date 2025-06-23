@@ -3,6 +3,7 @@
 #error "You must not include io_uring_socket.hpp when building without uring support"
 #endif
 #include "network/socket.hpp"
+#include <chrono>
 #include <vector>
 #include <liburing.h>
 //---------------------------------------------------------------------------
@@ -37,9 +38,9 @@ class IOUringSocket : public Socket {
     /// Prepare a submission (sqe) recv
     io_uring_sqe* recv_prep(Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
     /// Prepare a submission (sqe) send with timeout
-    io_uring_sqe* send_prep_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0, uint8_t flags = 0);
+    io_uring_sqe* send_prep_to(const Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
     /// Prepare a submission (sqe) recv with timeout
-    io_uring_sqe* recv_prep_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0, uint8_t flags = 0);
+    io_uring_sqe* recv_prep_to(Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
 
     /// Prepare a submission send
     bool send(const Request& req, int32_t msg_flags = 0) override {
@@ -50,12 +51,14 @@ class IOUringSocket : public Socket {
         return recv_prep(req, msg_flags);
     }
     /// Prepare a submission send with timeout
-    bool send_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) override {
-        return send_prep_to(req, timeout, msg_flags);
+    bool send_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override {
+        req.kernelTimeout = __kernel_timespec(0, std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count());
+        return send_prep_to(req, msg_flags);
     }
     /// Prepare a submission recv with timeout
-    bool recv_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) override {
-        return recv_prep_to(req, timeout, msg_flags);
+    bool recv_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override {
+        req.kernelTimeout = __kernel_timespec(0, std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count());
+        return recv_prep_to(req, msg_flags);
     }
 
     /// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests

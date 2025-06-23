@@ -1,10 +1,10 @@
 #pragma once
 #include "network/cache.hpp"
 #include <cassert>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include <linux/time_types.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2024
@@ -49,17 +49,10 @@ class ConnectionManager {
         int reusePorts = 0;
         /// Lingering of tcp packets
         int linger = 1;
-        /// The timeout in usec
-        int timeout = 500 * 1000;
+        /// The timeout
+        std::chrono::milliseconds timeout = std::chrono::milliseconds(500);
         /// Reuse sockets
         int reuse = 1;
-        /// The kernel timeout parameter
-        __kernel_timespec kernelTimeout;
-
-        TCPSettings() {
-            kernelTimeout.tv_sec = 0;
-            kernelTimeout.tv_nsec = timeout * 1000;
-        }
     };
 
     private:
