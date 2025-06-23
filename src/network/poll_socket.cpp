@@ -31,21 +31,19 @@ bool PollSocket::recv(Request& req, int32_t msg_flags)
     return true;
 }
 //---------------------------------------------------------------------------
-bool PollSocket::send_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags)
+bool PollSocket::send_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags)
 // Prepare a submission send with timeout
 {
     if (req.event != EventType::write) return false;
-    auto duration = chrono::seconds(timeout.tv_sec) + chrono::nanoseconds(timeout.tv_nsec);
-    enqueue(req.fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(&req), .timeout = chrono::steady_clock::now() + duration, .flags = msg_flags});
+    enqueue(req.fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(&req), .timeout = chrono::steady_clock::now() + timeout, .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------
-bool PollSocket::recv_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags)
+bool PollSocket::recv_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags)
 // Prepare a submission recv with timeout
 {
     if (req.event != EventType::read) return false;
-    auto duration = chrono::seconds(timeout.tv_sec) + chrono::nanoseconds(timeout.tv_nsec);
-    enqueue(req.fd, POLLIN, RequestInfo{.request = &req, .timeout = chrono::steady_clock::now() + duration, .flags = msg_flags});
+    enqueue(req.fd, POLLIN, RequestInfo{.request = &req, .timeout = chrono::steady_clock::now() + timeout, .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------

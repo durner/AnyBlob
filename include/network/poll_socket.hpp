@@ -48,9 +48,9 @@ class PollSocket : public Socket {
     /// Prepare a submission recv
     bool recv(Request& req, int32_t msg_flags = 0) override;
     /// Prepare a submission send with timeout
-    bool send_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) override;
+    bool send_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override;
     /// Prepare a submission recv with timeout
-    bool recv_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) override;
+    bool recv_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override;
 
     /// Get a completion event and mark it as seen; return the Request
     Request* complete() override;

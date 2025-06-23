@@ -79,7 +79,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                 }
                 request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = length, .fd = fd, .event = Socket::EventType::write, .messageTask = this});
                 if (length <= static_cast<int64_t>(chunkSize))
-                    connectionManager.getSocketConnection().send_to(*request, tcpSettings.kernelTimeout);
+                    connectionManager.getSocketConnection().send_to(*request, tcpSettings.timeout);
                 else
                     connectionManager.getSocketConnection().send(*request);
             }
@@ -135,7 +135,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
             }
             receive.resize(receive.size() + chunkSize);
             request = std::make_unique<Socket::Request>(Socket::Request{.data = {.data = receive.data() + receiveBufferOffset}, .length = static_cast<int64_t>(chunkSize), .fd = request->fd, .event = Socket::EventType::read, .messageTask = this});
-            connectionManager.getSocketConnection().recv_to(*request, tcpSettings.kernelTimeout, tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+            connectionManager.getSocketConnection().recv_to(*request, tcpSettings.timeout, tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
             state = MessageState::Receiving;
             break;
         }

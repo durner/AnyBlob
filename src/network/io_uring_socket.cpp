@@ -61,7 +61,7 @@ io_uring_sqe* IOUringSocket::recv_prep(Request& req, int32_t msg_flags, uint8_t 
     return sqe;
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::send_prep_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags, uint8_t flags)
+io_uring_sqe* IOUringSocket::send_prep_to(const Request& req, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) send with relative timeout
 {
     assert(req.length > 0);
@@ -70,12 +70,12 @@ io_uring_sqe* IOUringSocket::send_prep_to(const Request& req, const __kernel_tim
     sqe->flags |= flags | IOSQE_IO_LINK;
     sqe->user_data = reinterpret_cast<uintptr_t>(&req);
     auto timeoutSqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_link_timeout(timeoutSqe, const_cast<__kernel_timespec*>(&timeout), 0);
+    io_uring_prep_link_timeout(timeoutSqe, const_cast<__kernel_timespec*>(&req.kernelTimeout), 0);
     timeoutSqe->user_data = reinterpret_cast<uintptr_t>(nullptr);
     return sqe;
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::recv_prep_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags, uint8_t flags)
+io_uring_sqe* IOUringSocket::recv_prep_to(Request& req, int32_t msg_flags, uint8_t flags)
 // Prepare a submission (sqe) recv with relative timeout
 {
     assert(req.length > 0);
@@ -84,7 +84,7 @@ io_uring_sqe* IOUringSocket::recv_prep_to(Request& req, const __kernel_timespec&
     sqe->flags |= flags | IOSQE_IO_LINK;
     sqe->user_data = reinterpret_cast<uintptr_t>(&req);
     auto timeoutSqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_link_timeout(timeoutSqe, const_cast<__kernel_timespec*>(&timeout), 0);
+    io_uring_prep_link_timeout(timeoutSqe, const_cast<__kernel_timespec*>(&req.kernelTimeout), 0);
     timeoutSqe->user_data = reinterpret_cast<uintptr_t>(nullptr);
     return sqe;
 }
