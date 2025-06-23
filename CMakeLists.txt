@@ -132,6 +132,7 @@ endif()
 # ---------------------------------------------------------------------------
 
 add_executable(tester test/unit/test.cpp ${TEST_CPP})
+target_compile_definitions(tester PRIVATE ANYBLOB_HAS_IO_URING)
 target_link_libraries(tester AnyBlob)
 
 # ---------------------------------------------------------------------------
@@ -139,4 +140,5 @@ target_link_libraries(tester AnyBlob)
 # ---------------------------------------------------------------------------
 
 add_executable(integration test/integration/test.cpp ${INTEGRATION_CPP})
+target_compile_definitions(integration PRIVATE ANYBLOB_HAS_IO_URING)
 target_link_libraries(integration AnyBlob)

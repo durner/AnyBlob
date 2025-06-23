@@ -200,10 +200,10 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
 
     auto setTimeOut = [&resCache, &socketEntry, maxCacheEntries](int fd, const TCPSettings& tcpSettings) {
         // Set timeout
-        if (tcpSettings.timeout > 0) {
+        if (tcpSettings.timeoutValue > 0) {
             struct timeval tv;
-            tv.tv_sec = tcpSettings.timeout / (1000 * 1000);
-            tv.tv_usec = tcpSettings.timeout % (1000 * 1000);
+            tv.tv_sec = tcpSettings.timeoutValue / (1000 * 1000);
+            tv.tv_usec = tcpSettings.timeoutValue % (1000 * 1000);
             if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof tv)) {
                 resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
                 throw runtime_error("Socket creation error - recv timeout error!");
@@ -212,7 +212,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
                 resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
                 throw runtime_error("Socket creation error - send timeout error!");
             }
-            int timeoutInMs = tcpSettings.timeout / 1000;
+            int timeoutInMs = tcpSettings.timeoutValue / 1000;
             if (setsockopt(fd, SOL_TCP, TCP_USER_TIMEOUT, &timeoutInMs, sizeof(timeoutInMs))) {
                 resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
                 throw runtime_error("Socket creation error - tcp timeout error!" + string(strerror(errno)));
@@ -248,7 +248,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
         pollEvent.events = POLLIN | POLLOUT;
 
         // connection check
-        auto t = poll(&pollEvent, 1, tcpSettings.timeout / 1000);
+        auto t = poll(&pollEvent, 1, tcpSettings.timeoutValue / 1000);
         if (t == 1) {
             int socketError;
             socklen_t socketErrorLen = sizeof(socketError);
@@ -312,7 +312,7 @@ bool ConnectionManager::checkTimeout(int fd, const TCPSettings& tcpSettings)
 // Check for a timeout
 {
     pollfd p = {fd, POLLIN, 0};
-    int r = poll(&p, 1, tcpSettings.timeout / 1000);
+    int r = poll(&p, 1, tcpSettings.timeoutValue / 1000);
     if (r == 0) {
         shutdown(fd, SHUT_RDWR);
         return true;

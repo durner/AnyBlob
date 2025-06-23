@@ -36,10 +36,6 @@ class IOUringSocket : public Socket {
     io_uring_sqe* send_prep(const Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
     /// Prepare a submission (sqe) recv
     io_uring_sqe* recv_prep(Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
-    /// Prepare a submission (sqe) send with timeout
-    io_uring_sqe* send_prep_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0, uint8_t flags = 0);
-    /// Prepare a submission (sqe) recv with timeout
-    io_uring_sqe* recv_prep_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0, uint8_t flags = 0);
 
     /// Prepare a submission send
     bool send(const Request& req, int32_t msg_flags = 0) override {
@@ -48,14 +44,6 @@ class IOUringSocket : public Socket {
     /// Prepare a submission recv
     bool recv(Request& req, int32_t msg_flags = 0) override {
         return recv_prep(req, msg_flags);
-    }
-    /// Prepare a submission send with timeout
-    bool send_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) override {
-        return send_prep_to(req, timeout, msg_flags);
-    }
-    /// Prepare a submission recv with timeout
-    bool recv_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) override {
-        return recv_prep_to(req, timeout, msg_flags);
     }
 
     /// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests

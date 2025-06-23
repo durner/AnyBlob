@@ -201,11 +201,10 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     _state.progress = Progress::Sending;
                     auto writeSize = static_cast<size_t>(_state.networkBioRead) - _state.socketWrite;
                     const uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketWrite;
-                    _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = static_cast<int64_t>(writeSize), .fd = _message->fd, .event = Socket::EventType::write, .messageTask = _message});
+                    _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = static_cast<int64_t>(writeSize), .fd = _message->fd, .event = Socket::EventType::write, .messageTask = _message, .timeout = nullopt});
                     if (writeSize <= _message->chunkSize)
-                        connectionManager.getSocketConnection().send_to(*_message->request, _message->tcpSettings.kernelTimeout);
-                    else
-                        connectionManager.getSocketConnection().send(*_message->request);
+                        _message->request->timeout = _message->tcpSettings.timeout;
+                    connectionManager.getSocketConnection().send(*_message->request);
                     return _state.progress;
                 } else {
                     _state.progress = Progress::ReceivingInit;
@@ -246,8 +245,8 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     uint64_t readSize = _message->chunkSize > (_state.internalBioRead - _state.socketRead) ? _state.internalBioRead - _state.socketRead : _message->chunkSize;
                     uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketRead;
                     assert(in_range<int64_t>(readSize));
-                    _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.data = ptr}, .length = static_cast<int64_t>(readSize), .fd = _message->fd, .event = Socket::EventType::read, .messageTask = _message});
-                    connectionManager.getSocketConnection().recv_to(*_message->request, _message->tcpSettings.kernelTimeout, _message->tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+                    _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.data = ptr}, .length = static_cast<int64_t>(readSize), .fd = _message->fd, .event = Socket::EventType::read, .messageTask = _message, .timeout = _message->tcpSettings.timeout});
+                    connectionManager.getSocketConnection().recv(*_message->request, _message->tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
                     return _state.progress;
                 } else {
                     _state.progress = Progress::Finished;

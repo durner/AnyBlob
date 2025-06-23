@@ -1,6 +1,11 @@
 #pragma once
 #include <cstdint>
+#include <optional>
+#ifdef ANYBLOB_HAS_IO_URING
 #include <linux/time_types.h>
+#else
+#include <chrono>
+#endif
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // CedarDB (Dominik Durner), 2025
@@ -42,6 +47,11 @@ class Socket {
         EventType event;
         /// The associated message task
         MessageTask* messageTask;
+#ifdef ANYBLOB_HAS_IO_URING
+        std::optional<__kernel_timespec> timeout;
+#else
+        std::optional<std::chrono::milliseconds> timeout;
+#endif
     };
 
     public:
@@ -51,10 +61,6 @@ class Socket {
     virtual bool send(const Request& req, int32_t msg_flags = 0) = 0;
     /// Prepare a submission recv
     virtual bool recv(Request& req, int32_t msg_flags = 0) = 0;
-    /// Prepare a submission send with timeout
-    virtual bool send_to(const Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) = 0;
-    /// Prepare a submission recv with timeout
-    virtual bool recv_to(Request& req, const __kernel_timespec& timeout, int32_t msg_flags = 0) = 0;
 
     /// Get a completion event and mark it as seen; return the Request
     [[nodiscard]] virtual Request* complete() = 0;

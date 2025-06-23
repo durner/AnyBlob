@@ -4,7 +4,11 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#ifdef ANYBLOB_HAS_IO_URING
 #include <linux/time_types.h>
+#else
+#include <chrono>
+#endif
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2024
@@ -50,15 +54,23 @@ class ConnectionManager {
         /// Lingering of tcp packets
         int linger = 1;
         /// The timeout in usec
-        int timeout = 500 * 1000;
+        int timeoutValue = 500 * 1000;
         /// Reuse sockets
         int reuse = 1;
-        /// The kernel timeout parameter
-        __kernel_timespec kernelTimeout;
+        /// The timeout parameter
+#ifdef ANYBLOB_HAS_IO_URING
+        __kernel_timespec timeout;
+#else
+        std::chrono::milliseconds timeout;
+#endif
 
         TCPSettings() {
-            kernelTimeout.tv_sec = 0;
-            kernelTimeout.tv_nsec = timeout * 1000;
+#ifdef ANYBLOB_HAS_IO_URING
+            timeout.tv_sec = 0;
+            timeout.tv_nsec = static_cast<int64_t>(timeoutValue) * 1000;
+#else
+            timeout = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::microseconds(timeoutValue));
+#endif
         }
     };
 
