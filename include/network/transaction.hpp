@@ -300,7 +300,7 @@ class Transaction {
         message_vector_type::iterator it;
 
         /// Constructor with iterator
-        explicit constexpr Iterator(const message_vector_type::iterator& it) { this->it = it; };
+        explicit constexpr Iterator(const message_vector_type::iterator& it) { this->it = it; }
         /// Copy constructor
         constexpr Iterator(const Iterator& it) { this->it = it.it; }
         /// Delete default constructor

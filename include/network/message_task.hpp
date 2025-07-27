@@ -58,7 +58,7 @@ struct MessageTask {
     /// The pure virtual  callback
     virtual MessageState execute(ConnectionManager& connectionManager) = 0;
     /// The pure virtual destuctor
-    virtual ~MessageTask() {};
+    virtual ~MessageTask() {}
 
     /// Builds the message task according to the sending message
     template <typename... Args>
