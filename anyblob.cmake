@@ -58,10 +58,10 @@ set_property(TARGET AnyBlob APPEND PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${ANYB
 add_dependencies(AnyBlob anyblob)
 target_link_libraries(AnyBlob INTERFACE OpenSSL::SSL Threads::Threads jemalloc)
 if (ANYBLOB_LIBCXX_COMPAT)
-    target_compile_definitions(AnyBlob PRIVATE ANYBLOB_LIBCXX_COMPAT)
+    target_compile_definitions(AnyBlob INTERFACE ANYBLOB_LIBCXX_COMPAT)
 endif()
 if(LIBURING_FOUND AND NOT ANYBLOB_URING_COMPAT)
-    target_compile_definitions(AnyBlob PRIVATE ANYBLOB_HAS_IO_URING)
+    target_compile_definitions(AnyBlob INTERFACE ANYBLOB_HAS_IO_URING)
     target_link_libraries(AnyBlob INTERFACE ${LIBURING_LIBRARY})
 endif()
 
