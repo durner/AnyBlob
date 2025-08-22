@@ -88,7 +88,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
         }
 
         // Upload the request asynchronously
-        putTxn.processAsync(group);
+        REQUIRE(putTxn.processAsync(group));
 
         // Wait for the upload
         while (finishedMessages != 2)
@@ -116,7 +116,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
 
         while (finishedMessages != 2) {
             // Upload the new request asynchronously
-            putTxn.processAsync(group);
+            REQUIRE(putTxn.processAsync(group));
             // Wait for the upload
             usleep(100);
         }
@@ -142,7 +142,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
 
         while (finishedMessages != 1) {
             // Upload the new request asynchronously
-            putTxn.processAsync(group);
+            REQUIRE(putTxn.processAsync(group));
             // Wait for the upload
             usleep(100);
         }
@@ -181,7 +181,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
         }
 
         // Retrieve the request asynchronously
-        getTxn.processAsync(group);
+        REQUIRE(getTxn.processAsync(group));
 
         // Wait for the download
         while (finishedMessages != 2)
@@ -207,7 +207,7 @@ TEST_CASE("MinIO Asynchronous Integration") {
         }
 
         // Process the request asynchronously
-        deleteTxn.processAsync(group);
+        REQUIRE(deleteTxn.processAsync(group));
 
         // Wait for the deletion
         while (finishedMessages != 2)

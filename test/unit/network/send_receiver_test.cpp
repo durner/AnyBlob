@@ -49,7 +49,7 @@ TEST_CASE("send_receiver") {
     group.process(true);
 
     unique_ptr<uint8_t[]> currentMessage;
-    size_t skip;
+    size_t skip = 0u;
     for (auto i = 0u; i < msgs.size();) {
         auto& original = msgs[i];
         switch (original->result.getState()) {
