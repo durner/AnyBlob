@@ -27,7 +27,7 @@ void Transaction::processSync(TaskedSendReceiverHandle& sendReceiverHandle)
             if (multipart.state == MultipartUpload::State::Sending) {
                 for (auto i = 0ull; i < multipart.eTags.size(); i++)
                     sendReceiverHandle.sendSync(multipart.messages[i].get());
-                multipart.state = MultipartUpload::State::Default;
+                multipart.state = MultipartUpload::State::Processing;
             } else if (multipart.state == MultipartUpload::State::Validating) {
                 sendReceiverHandle.sendSync(multipart.messages[multipart.eTags.size()].get());
                 multipart.state = MultipartUpload::State::Default;
@@ -49,6 +49,7 @@ bool Transaction::processAsync(TaskedSendReceiverGroup& group)
         multiPartSize += multipart.messages.size();
     }
     submissions.reserve(_messages.size() + multiPartSize);
+    auto previousCounter = _messageCounter.load();
     for (; _messageCounter < _messages.size(); _messageCounter++) {
         submissions.emplace_back(_messages[_messageCounter].get());
     }
@@ -56,16 +57,24 @@ bool Transaction::processAsync(TaskedSendReceiverGroup& group)
         if (multipart.state == MultipartUpload::State::Sending) {
             for (auto i = 0ull; i < multipart.eTags.size(); i++)
                 submissions.emplace_back(multipart.messages[i].get());
+            multipart.state = MultipartUpload::State::Processing;
         } else if (multipart.state == MultipartUpload::State::Validating) {
             submissions.emplace_back(multipart.messages[multipart.eTags.size()].get());
+            multipart.state = MultipartUpload::State::Default;
         }
     }
+    if (submissions.empty())
+        return true;
     auto success = group.send(submissions);
-    if (!success) [[unlikely]]
-        return success;
-    for (auto& multipart : _multipartUploads) {
-        if (multipart.state == MultipartUpload::State::Sending || multipart.state == MultipartUpload::State::Validating) {
-            multipart.state = MultipartUpload::State::Default;
+    if (!success) [[unlikely]] {
+        // If the send failed, we need to reset the message counter and the multipart uploads
+        _messageCounter = previousCounter;
+
+        for (auto& multipart : _multipartUploads) {
+            if (multipart.state == MultipartUpload::State::Processing)
+                multipart.state = MultipartUpload::State::Sending;
+            else if (multipart.state == MultipartUpload::State::Default)
+                multipart.state = MultipartUpload::State::Validating;
         }
     }
     return success;

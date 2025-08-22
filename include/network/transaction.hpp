@@ -42,7 +42,8 @@ class Transaction {
         enum State : uint8_t {
             Default = 0,
             Sending = 1,
-            Validating = 2,
+            Processing = 2,
+            Validating = 3,
             Aborted = 1u << 7
         };
         /// The uploadId
@@ -73,7 +74,7 @@ class Transaction {
 
     /// The message
     message_vector_type _messages;
-    // The message coutner
+    // The message counter
     std::atomic<uint64_t> _messageCounter;
     /// Multipart uploads
     std::vector<MultipartUpload> _multipartUploads;
@@ -94,9 +95,15 @@ class Transaction {
 
     /// Set the provider
     constexpr void setProvider(cloud::Provider* provider) { this->_provider = provider; }
+
     /// Sends the request messages to the task group
+    /// This function does not block and other threads may pick the messages directly
+    /// Note that this function needs to be called repeatably if multi-part messages are involved
     bool processAsync(network::TaskedSendReceiverGroup& group);
+
     /// Processes the request messages
+    /// This function blocks and does all the necessary IO
+    /// It is also processing multi-part messages until they are completed or aborted
     void processSync(TaskedSendReceiverHandle& sendReceiverHandle);
 
     /// Function to ensure fresh keys before creating messages
