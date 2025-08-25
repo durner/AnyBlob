@@ -122,6 +122,62 @@ TEST_CASE("MinIO Asynchronous Integration") {
         }
     }
     {
+        // Test class to access multipart uploads
+        class TestTransaction : public anyblob::network::Transaction {
+            public:
+            /// Constructor
+            explicit TestTransaction(cloud::Provider* provider) : Transaction(provider) {}
+            /// Access the multipart uploads
+            const vector<MultipartUpload>& getMultipartUploads() {
+                return _multipartUploads;
+            }
+        };
+
+        // Create the multipart put request
+        auto minio = static_cast<anyblob::cloud::MinIO*>(provider.get());
+        minio->setMultipartUploadSize(6ull << 20);
+        TestTransaction putTxn(provider.get());
+
+        // Check the state machine
+        atomic<uint16_t> finishedMessages = 0;
+        auto checkSuccess = [&finishedMessages](anyblob::network::MessageResult& result) {
+            // Sucessful request
+            REQUIRE(result.success());
+            finishedMessages++;
+        };
+
+        // Upload the large file
+        auto putObjectRequest = [&putTxn, &fileName, &content, &checkSuccess]() {
+            return putTxn.putObjectRequest(checkSuccess, fileName[1], content[1].data(), content[1].size());
+        };
+        putTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
+
+        // Upload the new request asynchronously
+        REQUIRE(putTxn.processAsync(group));
+        while (putTxn.getMultipartUploads()[0].state != network::Transaction::MultipartUpload::State::Sending) {
+            REQUIRE(putTxn.getMultipartUploads()[0].state != network::Transaction::MultipartUpload::Aborted);
+            // Wait for the init upload
+            usleep(100);
+        }
+
+        // Upload the multipart parts request asynchronously
+        REQUIRE(putTxn.processAsync(group));
+        while (putTxn.getMultipartUploads()[0].state != network::Transaction::MultipartUpload::State::Validating) {
+            REQUIRE(putTxn.getMultipartUploads()[0].state != network::Transaction::MultipartUpload::Aborted);
+            // Wait for the upload
+            usleep(100);
+        }
+
+        // Upload the validation finish message
+        REQUIRE(putTxn.processAsync(group));
+        while (finishedMessages != 1) {
+            // Wait for the upload
+            usleep(100);
+        }
+        REQUIRE(putTxn.getMultipartUploads()[0].state == network::Transaction::MultipartUpload::State::Default);
+    }
+
+    {
         // Check the upload for failure due to too small part
         atomic<uint16_t> finishedMessages = 0;
         auto checkSuccess = [&finishedMessages](anyblob::network::MessageResult& result) {
