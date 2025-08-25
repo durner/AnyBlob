@@ -32,7 +32,7 @@ class Transaction {
     class Iterator;
     class ConstIterator;
 
-    protected:
+    public:
     /// The message typedef
     using message_vector_type = std::vector<std::unique_ptr<network::OriginalMessage>>;
 
@@ -69,6 +69,7 @@ class Transaction {
         MultipartUpload& operator=(MultipartUpload other) = delete;
     };
 
+    protected:
     /// The provider
     cloud::Provider* _provider;
 
