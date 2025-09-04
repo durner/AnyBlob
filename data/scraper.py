@@ -1,89 +1,195 @@
+#!/usr/bin/env python3
 import requests
-from bs4 import BeautifulSoup
 import csv
+import sys
+import re
 
-def remove_sup_tags(cell):
-    for sup_tag in cell.find_all('sup'):
-        print(sup_tag.decompose())
-    return cell.text.strip()
+# ---------- Config ----------
+OWNER = "MicrosoftDocs"
+REPO = "azure-compute-docs"
+SIZES_ROOT = "articles/virtual-machines/sizes"
+SUBFOLDERS = [
+    "general-purpose",
+    "compute-optimized",
+    "memory-optimized",
+    "storage-optimized",
+    "gpu-accelerated",
+    "fpga-accelerated",
+]
 
-def remove_nics(cell):
-    res = cell.split('/')
-    if len(res) > 1:
-        return res[len(res) - 1]
-    else:
-        return cell
+GITHUB_API = "https://api.github.com"
+RAW_ROOT = "https://raw.githubusercontent.com/{owner}/{repo}/main/{path}"
 
-def scrape_and_write_to_csv(url_list, csv_filename):
-    required_headers = ["Size", "vC", "Memory", "Network Bandwidth"]
+HEADERS_API = {"User-Agent": "AnyBlob", "Accept": "application/vnd.github+json"}
+HEADERS_RAW = {"User-Agent": "AnyBlob"}
+REQ_TIMEOUT = 30
 
-    with open(csv_filename, 'w', newline='', encoding='utf-8') as csv_file:
-        writer = csv.writer(csv_file)
+# ---------- Tiny helpers ----------
+def getJson(url, debug=False):
+    try:
+        r = requests.get(url, headers=HEADERS_API, timeout=REQ_TIMEOUT)
+        if r.status_code == 200:
+            return r.json()
+        if debug:
+            print(f"[warn] {url} -> {r.status_code}")
+    except Exception as e:
+        if debug:
+            print(f"[error] {url}: {e}")
+    return None
 
-        writer.writerow(required_headers)
+def getTextRaw(path, debug=False):
+    url = RAW_ROOT.format(owner=OWNER, repo=REPO, path=path)
+    try:
+        r = requests.get(url, headers=HEADERS_RAW, timeout=REQ_TIMEOUT)
+        if r.status_code == 200:
+            return r.text
+        if debug:
+            print(f"[warn] {url} -> {r.status_code}")
+    except Exception as e:
+        if debug:
+            print(f"[error] {url}: {e}")
+    return ""
 
-        for url in url_list:
-            response = requests.get(url)
+def normHeader(h):
+    t = h.strip().lower()
+    if "size" in t: return "Size"
+    if "vcpu" in t or "vcpus" in t or "core" in t: return "vC"
+    if "memory" in t or "ram" in t: return "Memory"
+    if "network" in t and "bandwidth" in t: return "Network Bandwidth"
+    return h.strip()
 
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
+# Best-effort integer extraction: "16,000+", "16k", "16,000 Mb/s", "672 GB" -> 16000, 16000, 16000, 672
+def toIntGuess(value):
+    if not value:
+        return None
+    s = value.strip().lower()
+    # Handle shorthand like "16k", "50k", "1.5k"
+    m = re.match(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*k\b", s)
+    if m:
+        try:
+            return int(float(m.group(1)) * 1000)
+        except:
+            pass
+    # Find all numeric chunks; pick the largest (common when notes add multiple numbers)
+    nums = []
+    for n in re.findall(r"[0-9][0-9,\.]*", s):
+        try:
+            n_clean = n.replace(",", "")
+            # if decimal, floor
+            nums.append(int(float(n_clean)))
+        except:
+            continue
+    if nums:
+        return max(nums)
+    return None
 
-                tables = soup.find_all('table')
+def extractTables(mdText):
+    # contiguous blocks of lines that start with '|'
+    blocks = re.findall(r"(?:^\|.*\n)+", mdText, flags=re.MULTILINE)
+    tables = []
+    for block in blocks:
+        lines = [ln.rstrip() for ln in block.strip().splitlines() if ln.strip().startswith("|")]
+        if len(lines) >= 2:
+            tables.append(lines)
+    return tables
 
-                for table in tables:
-                    rows = table.select('tbody tr')
+# ---------- Discovery ----------
+def discoverSeriesMarkdownPaths(debug=False):
+    seriesPaths = set()
+    for sub in SUBFOLDERS:
+        url = f"{GITHUB_API}/repos/{OWNER}/{REPO}/contents/{SIZES_ROOT}/{sub}"
+        data = getJson(url, debug=debug)
+        if not isinstance(data, list):
+            continue
+        for item in data:
+            if item.get("type") == "file":
+                name = item.get("name", "")
+                path = item.get("path", "")
+                if name.endswith(".md") and "-series.md" in name:
+                    seriesPaths.add(path)
+    if debug:
+        print(f"[info] discovered series files: {len(seriesPaths)}")
+    return sorted(seriesPaths)
 
-                    headers = [header.text.strip() for header in table.select('thead th')]
+# ---------- Parsing ----------
+def parseSeriesMarkdown(path, debug=False):
+    text = getTextRaw(path, debug=debug)
+    if not text:
+        return []
 
-                    headers = []
-                    for header in table.select('thead th'):
-                        added = False
-                        for rheader in required_headers:
-                            if rheader.lower() in header.text.strip().lower() and rheader != "Size":
-                                headers.append(rheader)
-                                added = True
-                            elif rheader.lower() == header.text.strip().lower():
-                                headers.append(rheader)
-                                added = True
-                        if not added:
-                            headers.append(header.text.strip())
+    basics = {}  # size -> {"Size":..., "vC":..., "Memory":...}
+    nets = {}    # size -> {"Network Bandwidth":...}
 
-                    print(headers)
-                    if all(header in headers for header in required_headers):
-                        for row in rows:
-                            row_data = [remove_nics(remove_sup_tags(cell)) for cell in row.find_all('td')]
-                            row_data_filtered = [row_data[headers.index(header)] for header in required_headers]
-                            writer.writerow(row_data_filtered)
-            else:
-                print(f"Failed {url}. Status code: {response.status_code}")
+    for lines in extractTables(text):
+        headers = [c.strip() for c in lines[0].strip("|").split("|")]
+        hNorm = [normHeader(h) for h in headers]
+        col = {h: i for i, h in enumerate(hNorm)}
 
+        hasSize = "Size" in col
+        hasVC = "vC" in col
+        hasMem = "Memory" in col
+        hasNet = "Network Bandwidth" in col
+        if not hasSize:
+            continue
+
+        isBasics = hasSize and (hasVC or hasMem)
+        isNetwork = hasSize and hasNet
+        if not (isBasics or isNetwork):
+            continue
+
+        for line in lines[2:]:
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if len(cells) < len(hNorm):
+                continue
+            size = cells[col["Size"]]
+            if not size:
+                continue
+
+            if isBasics:
+                vc = toIntGuess(cells[col["vC"]]) if hasVC else None
+                mem = toIntGuess(cells[col["Memory"]]) if hasMem else None
+                cur = basics.get(size, {"Size": size, "vC": None, "Memory": None})
+                if vc is not None:   cur["vC"] = vc
+                if mem is not None:  cur["Memory"] = mem
+                basics[size] = cur
+
+            if isNetwork:
+                nbw = toIntGuess(cells[col["Network Bandwidth"]]) if hasNet else None
+                if nbw is not None:
+                    nets[size] = {"Network Bandwidth": nbw}
+
+    # join by Size
+    rows = []
+    for size, b in basics.items():
+        nbw = nets.get(size, {}).get("Network Bandwidth")
+        if b.get("vC") is not None and b.get("Memory") is not None and nbw is not None:
+            rows.append([b["Size"], b["vC"], b["Memory"], nbw])
+
+    if debug:
+        print(f"[info] {path}: basics={len(basics)} nets={len(nets)} rows={len(rows)}")
+    return rows
+
+# ---------- Main ----------
+def scrapeAndWriteToCsv(csvFilename, debug=False):
+    header = ["Size", "vC", "Memory", "Network Bandwidth"]
+    seriesPaths = discoverSeriesMarkdownPaths(debug=debug)
+    if not seriesPaths:
+        raise SystemExit("No series markdown files found via GitHub API.")
+
+    total = 0
+    with open(csvFilename, "w", newline="", encoding="utf-8") as f:
+        wr = csv.writer(f)
+        wr.writerow(header)
+        for path in seriesPaths:
+            rows = parseSeriesMarkdown(path, debug=debug)
+            for r in rows:
+                wr.writerow(r)
+            total += len(rows)
+
+    if debug:
+        print(f"[done] wrote {total} rows to {csvFilename}")
 
 if __name__ == "__main__":
-    # Azure website URLs
-    urls = ["https://learn.microsoft.com/en-us/azure/virtual-machines/av2-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/sizes-b-series-burstable",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/bsv2-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/basv2",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/bpsv2-arm",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/dcv2-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/dcv3-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/dv2-dsv2-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/dv3-dsv3-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/dv5-dsv5-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/ddv5-ddsv5-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/dasv5-dadsv5-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/dcasv5-dcadsv5-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/dpsv5-dpdsv5-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/dplsv5-dpldsv5-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/dlsv5-dldsv5-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/dcesv5-dcedsv5-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/dav4-dasv4-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/dv4-dsv4-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/ddv4-ddsv4-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/fsv2-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/fx-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/dv2-dsv2-series-memory", "https://learn.microsoft.com/en-us/azure/virtual-machines/ev3-esv3-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/eav4-easv4-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/edv4-edsv4-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/ev4-esv4-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/ev5-esv5-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/ebdsv5-ebsv5-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/edv5-edsv5-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/easv5-eadsv5-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/ecasv5-ecadsv5-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/ecasccv5-ecadsccv5-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/ecesv5-ecedsv5-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/epsv5-epdsv5-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/m-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/msv2-mdsv2-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/msv3-mdsv3-medium-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/mv2-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/lsv2-series", "https://learn.microsoft.com/en-us/azure/virtual-machines/lsv3-series",
-            "https://learn.microsoft.com/en-us/azure/virtual-machines/lasv3-series"]  # Add your URLs here
+    debug = "--debug" in sys.argv
+    scrapeAndWriteToCsv("azure.csv", debug=debug)
 
-    output_csv_filename = "azure.csv"
-
-    scrape_and_write_to_csv(urls, output_csv_filename)

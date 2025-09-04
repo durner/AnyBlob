@@ -94,7 +94,7 @@ def main():
     columns = {
         "AWS": ["API Name", "Instance Memory", "vCPUs", "Network Performance"],
         "Azure": ["Size", "Memory", "vC", "Network Bandwidth"],
-        "GCP": ["name", "memoryGiB", "vCpus", "bandwidth", "tier1"],
+        "GCP": ["name", "memoryGB", "vCpus", "bandwidth", "tier1"],
     }
     for vendor in vendors:
         output_data = read_csv(vendor.lower()+".csv", columns.get(vendor), vendor)
