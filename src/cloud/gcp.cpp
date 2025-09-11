@@ -36,7 +36,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::downloadInstanceInfo(const string& i
 {
     string httpHeader = "GET /computeMetadata/v1/instance/" + info + " HTTP/1.1\r\nHost: ";
     httpHeader += getIAMAddress();
-    httpHeader += "\r\nMetadata-Flavor: Google\r\n\r\n";
+    httpHeader += "\r\nContent-Length: 0\r\nMetadata-Flavor: Google\r\n\r\n";
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
@@ -99,6 +99,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, c
         rangeString << "bytes=" << range.first << "-" << range.second;
         request.headers.emplace("Range", rangeString.str());
     }
+    request.headers.emplace("Content-Length", "0");
 
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
     request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
@@ -165,6 +166,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequestGeneric(const string& f
     auto date = testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp();
     request.queries.emplace("X-Goog-Date", date);
     request.headers.emplace("Host", getAddress());
+    request.headers.emplace("Content-Length", "0");
 
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
     request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
@@ -193,6 +195,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::createMultiPartRequest(const string&
     request.queries.emplace("X-Goog-Date", date);
     request.headers.emplace("Host", getAddress());
     request.headers.emplace("Date", date);
+    request.headers.emplace("Content-Length", "0");
 
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
     request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
