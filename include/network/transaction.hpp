@@ -215,6 +215,7 @@ class Transaction {
         auto uploadMessages = [callback = std::forward<Callback>(callback), position, parts, data, remotePath, traceId, splitSize, size, this](network::MessageResult& initalRequestResult) {
             if (!initalRequestResult.success()) {
                 _completedMultiparts++;
+                callback(initalRequestResult);
                 return;
             }
             _provider->getSecret();

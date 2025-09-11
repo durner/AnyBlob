@@ -3,7 +3,6 @@
 #include "cloud/gcp_instances.hpp"
 #include "cloud/gcp_signer.hpp"
 #include "utils/data_vector.hpp"
-#include <cstring>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -68,12 +67,12 @@ class GCPTester {
         REQUIRE(gcp.getIAMPort() == 80);
 
         auto dv = gcp.downloadInstanceInfo();
-        string resultString = "GET /computeMetadata/v1/instance/machine-type HTTP/1.1\r\nHost: 169.254.169.254\r\nMetadata-Flavor: Google\r\n\r\n";
+        string resultString = "GET /computeMetadata/v1/instance/machine-type HTTP/1.1\r\nHost: 169.254.169.254\r\nContent-Length: 0\r\nMetadata-Flavor: Google\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
         auto p = pair<uint64_t, uint64_t>(numeric_limits<uint64_t>::max(), numeric_limits<uint64_t>::max());
         dv = gcp.getRequest("a/b/c.d", p);
-        resultString = "GET /a/b/c.d?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=test%40test.com%2F21000101%2Ftest%2Fstorage%2Fgoog4_request&X-Goog-Date=21000101T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&x-goog-signature=a1c87c0ad67997db2ee05a5a24a711374bca17edac0ce4d43f435b7e48d9c5c9eafd0a1da4cea1ffbe4d0e2cd6da1433556b97166b302e27d7ba5213739d5e054a6f8610676a13b696f2068aac6af1399f307b83c8a700d4adc6bfba371959fdcbcc8de94ee5d753a8a3d22c006e5176410cee3c1e026b1309440de0ceb21aae3ce7f2699111d5964fa487a7d22a5434d21598b53e254c81e004a98bb9df7bb159e1cd4ec49dae1d1451aad8119e6b433722adb044709fcdcbd394b46552dcd4936e2bd04ea1db9a58f792027e8a60e47553338c92f30baa056738c6e4fac681ebd7d79b3be116bdc3d5dd20823581a27f356d160f8875fda7d704abcb6ebfd6ca8ed986da5ff524da0aefbcdbc6c5be7556f8c551ca873bdb7a619f7816cf575c28a50740efaa2616c75f660dfec184f66afe2a7ea22e26418fc2548104391563994bd28c565ed710ad0fd325dcc7cf281e505bc28660f91cfbb07d2ef81398ef8c15dfb697695dd17c9f561999f866b4127adfa74d37ed3b33a3f499c1ccf3 HTTP/1.1\r\nHost: test.storage.googleapis.com\r\n\r\n";
+        resultString = "GET /a/b/c.d?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=test%40test.com%2F21000101%2Ftest%2Fstorage%2Fgoog4_request&X-Goog-Date=21000101T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=content-length%3Bhost&x-goog-signature=4d52e029caa27a065af6b04b2aa9518bb2dd51f2d7e748241a86329460bd7374050687b6ba04a5d898ffa45f8e8eb8b71fb2c846b1781fba9975fc67774f51cd0df3a02f8c5912a8cc25e934ced97a61c01545419c292f411140b75ac05c26cb6ff4fba7ba39bcb4e86ebcc711f0f1cf3257e1d0a7a1f1c15f04a2136b29cd3cbd545d2cb13656337406cad17ccbfe3fc406187a3a336fdb83ad9f2012083938524001b244090265ea97b565ffc616fd2070fd98246141bb1382b9ebfed5adba50676e390ac417c60a174ffbf0613a9ade3c7fa173cf0139a9cff15b998137469a6d52907a6730e7c928597ba902559baa286250c27ebebc81f7e9c93dc08fdd66f58e1a967a2da22725b0a73712862b1912d2bad7e642493a4eebed9a1d65d6ec2fd7fa9c14a63f1c91aac1660b51b4ddae74980a402ad159fac2624b148e12342687f656974cdf90e7c009f8f143358e784a48153e185df7c7858d96ddbe7d5db251096fd0afd28ef9fef86f6262e893c652b8a3179b844e3923a52bac8de4 HTTP/1.1\r\nContent-Length: 0\r\nHost: test.storage.googleapis.com\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
         utils::DataVector<uint8_t> putData(10);
@@ -84,7 +83,7 @@ class GCPTester {
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
         dv = gcp.deleteRequest("a/b/c.d");
-        resultString = "DELETE /a/b/c.d?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=test%40test.com%2F21000101%2Ftest%2Fstorage%2Fgoog4_request&X-Goog-Date=21000101T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&x-goog-signature=bcd0bf851dd3121aa2b06a53b7abfd368c99d3424a37e87b71e45dc2c966e66d84ff6cee740835e07b808eba439ec9ffdc8c147138754e12eb68b89f1eaf47a08dc6b7a09d8aab85740e7e1007091caca7427a5f6d11998102214abd3086d403894bc38f4be97a30b9fa99b9247516636074558a9cb0caea7ae12de67780c2ff0c19db60136e3e7d5c9e196123a22b6aeb634a953e6bd3a0e18218dbaee362776fd7d50ccff4afc5ee3e5ed5c5c2610c8c2e30d786d7d5e8a272914942541f914395fa0b71a94ce4684a493b007d83bffc2ee2e06765cab000d5fdbbe07a46e26d3bb11c47617c53d62a4450af03c5100f6641fa7bd3ce816e859610cbd0b9d7f2a9f49f9c1ad25ea47c4e54afd1b91ce785fe7232515f89982d82163ea97df6cf50404fae8c5d738aa219b3907478d265c684033c12fc535b8c27863914881620df1462a4307f2b61b38291bb2e040f037a13b5841d5908aa069b2c4b878c972e3a646bce4a254d47ccee3a1da670ff40a614bf0a631729fa4e2fd161ce98ec HTTP/1.1\r\nHost: test.storage.googleapis.com\r\n\r\n";
+        resultString = "DELETE /a/b/c.d?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=test%40test.com%2F21000101%2Ftest%2Fstorage%2Fgoog4_request&X-Goog-Date=21000101T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=content-length%3Bhost&x-goog-signature=593ae6ef0a7b54a2934dba440397a223032536b4ffdfbbdcbf467b67b291abe0a2fca2a4e4ee24840d84e0621d5c055cec772b004a6a3c29bdc053d4a51a80a37115db02932ec6def88714131a5d7d5f9594801ff817ddd1ce76d5a1c6f205376bb5d69ee431608d008d153072177fce80b8f41f40306b8d3fc81a7bdc2f7eaa8828876795264a84707aec5d0fec96944c45a9c5a730554d3f6127b902a9b89fe85c4e037f8a0c4878fb240a5994895b8cc578c07e53042cb3ac45a83136b5e3c67ed301009949947776757cab1f64b106fc07f9c63616b7802d1102f7464ca89d0a5fdf523c7172815961c5a842621608c59d6b2099443f8d7a8a38cf3eff897f9ce15cbd564adb29a60c8b90e58633250a55aff3b688d6c21b7ca9ab4f9c6fcba91096636d5b4b79e0fc04713a68a248f063a8eebc3c92b140849ad733b56cb06fd7775d8ff436d8c16ac88a945889c0c997c73210868ecc4150e5faded57fc885c28303b26ce81d782be9fa4e37844feae1b45d84455e19339109834e32a8 HTTP/1.1\r\nContent-Length: 0\r\nHost: test.storage.googleapis.com\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
         ignore = GCPInstance::getInstanceDetails();
