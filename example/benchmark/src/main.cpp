@@ -132,8 +132,8 @@ int main(int argc, char* argv[]) {
         anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
     }
 
-    if (!strcmp(argv[1], "gcp") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
-        string uri = "gcp://" + gcpSettings.bucket + ":" + gcpSettings.region + "/";
+    if (!strcmp(argv[1], "gs") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
+        string uri = "gs://" + gcpSettings.bucket + ":" + gcpSettings.region + "/";
         anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
     }
 

@@ -33,7 +33,7 @@ class Provider {
     /// The remote prefixes count
     static constexpr unsigned remoteFileCount = 8;
     /// The remote prefixes
-    static constexpr std::string_view remoteFile[] = {"https://", "http://", "s3://", "azure://", "gcp://", "oci://", "ibm://", "minio://"};
+    static constexpr std::string_view remoteFile[] = {"https://", "http://", "s3://", "azure://", "gs://", "oci://", "ibm://", "minio://"};
     /// Are we currently testing the provdiers
     static bool testEnviornment;
 
