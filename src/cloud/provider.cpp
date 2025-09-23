@@ -109,7 +109,7 @@ string Provider::getETag(string_view header)
     if (pos == header.npos)
         return "";
     pos += needle.length();
-    auto end = header.find("\"", pos);
+    auto end = header.find('\"', pos);
     return string(header.substr(pos, end - pos));
 }
 //---------------------------------------------------------------------------
@@ -209,6 +209,7 @@ unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, 
 
             if (keyId.empty()) {
                 auto aws = make_unique<anyblob::cloud::AWS>(info);
+                assert(sendReceiverHandle);
                 aws->initSecret(*sendReceiverHandle);
                 return aws;
             }

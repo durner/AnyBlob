@@ -175,7 +175,7 @@ class TaskedSendReceiverHandle {
     /// Default constructor is deleted
     TaskedSendReceiverHandle() = delete;
     /// Consturctor
-    explicit TaskedSendReceiverHandle(TaskedSendReceiverGroup* group);
+    explicit TaskedSendReceiverHandle(TaskedSendReceiverGroup* group, TaskedSendReceiver* _sendReceiver);
     /// Delete copy
     TaskedSendReceiverHandle(TaskedSendReceiverHandle& other) = delete;
     /// Delete copy assignment
@@ -186,9 +186,9 @@ class TaskedSendReceiverHandle {
 
     public:
     /// Move constructor
-    TaskedSendReceiverHandle(TaskedSendReceiverHandle&& other);
+    TaskedSendReceiverHandle(TaskedSendReceiverHandle&& other) noexcept;
     /// Move assignment
-    TaskedSendReceiverHandle& operator=(TaskedSendReceiverHandle&& other);
+    TaskedSendReceiverHandle& operator=(TaskedSendReceiverHandle&& other) noexcept;
     /// Destructor
     ~TaskedSendReceiverHandle();
 

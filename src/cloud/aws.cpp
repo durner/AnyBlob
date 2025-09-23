@@ -110,7 +110,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadIAMUser() const
 unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content, string& iamUser)
 // Builds the secret http request
 {
-    auto pos = content.find("\n");
+    auto pos = content.find('\n');
     string httpHeader = "GET /latest/meta-data/iam/security-credentials/";
     if (!content.substr(0, pos).size())
         return nullptr;
@@ -132,7 +132,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
     if (pos == content.npos)
         return false;
     pos += needle.length();
-    auto end = content.find("\"", pos);
+    auto end = content.find('\"', pos);
     secret->keyId = content.substr(pos, end - pos);
 
     needle = "\"SecretAccessKey\" : \"";
@@ -140,7 +140,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
     if (pos == content.npos)
         return false;
     pos += needle.length();
-    end = content.find("\"", pos);
+    end = content.find('\"', pos);
     secret->secret = content.substr(pos, end - pos);
 
     needle = "\"Token\" : \"";
@@ -148,7 +148,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
     if (pos == content.npos)
         return false;
     pos += needle.length();
-    end = content.find("\"", pos);
+    end = content.find('\"', pos);
     secret->token = content.substr(pos, end - pos);
 
     needle = "\"Expiration\" : \"";
@@ -156,7 +156,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
     if (pos == content.npos)
         return false;
     pos += needle.length();
-    end = content.find("\"", pos);
+    end = content.find('\"', pos);
     auto sv = content.substr(pos, end - pos);
     string timestamp(sv.begin(), sv.end());
     secret->expiration = convertIAMTimestamp(timestamp);

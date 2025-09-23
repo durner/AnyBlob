@@ -12,7 +12,7 @@ namespace anyblob::utils {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-Timer& Timer::operator=(Timer&& rhs)
+Timer& Timer::operator=(Timer&& rhs) noexcept
 // Starts timer for step s
 {
     for (auto it : _totalTimer) {
@@ -55,7 +55,7 @@ void Timer::printResult(ostream& s)
     string reverseSteps[] = {"Overall", "Upload", "Download", "Submit", "Request", "Response", "Buffer", "BufferCapacity", "BufferResize", "Finishing", "Waiting", "Queue", "SocketCreation", "BufferCapacitySend"};
 
     if (_writeHeader)
-        s << "Step,Pct,Time,CPUUserTime,CPUSysTime,CPUElapsedTime,CPUActiveAllProcesses,CPUIdleAllProcesses" << _headerInfo << endl;
+        s << "Step,Pct,Time,CPUUserTime,CPUSysTime,CPUElapsedTime,CPUActiveAllProcesses,CPUIdleAllProcesses" << _headerInfo << '\n';
     uint64_t total = 0;
     for (auto it : _totalTimer) {
         total += it.second;
@@ -67,7 +67,7 @@ void Timer::printResult(ostream& s)
             s << "," << elem->second->at(0)->userTime << "," << elem->second->at(0)->sysTime << "," << elem->second->at(0)->elapsedTime << "," << elem->second->at(0)->activeTimeAllProcesses << "," << elem->second->at(0)->idleTimeAllProcesses;
         else
             s << ",-1,-1,-1,-1,-1";
-        s << _contentInfo << endl;
+        s << _contentInfo << '\n';
     }
 }
 //---------------------------------------------------------------------------

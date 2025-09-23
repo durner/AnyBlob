@@ -54,15 +54,11 @@ TaskedSendReceiverHandle TaskedSendReceiverGroup::getHandle()
 {
     auto result = _sendReceiverCache.consume();
     if (result.has_value()) {
-        TaskedSendReceiverHandle handle(this);
-        handle._sendReceiver = result.value();
-        return handle;
+        return TaskedSendReceiverHandle(this, result.value());
     }
     lock_guard<mutex> lg(_resizeMutex);
     auto& ref = _sendReceivers.emplace_back(unique_ptr<TaskedSendReceiver>(new TaskedSendReceiver(*this)));
-    TaskedSendReceiverHandle handle(this);
-    handle._sendReceiver = ref.get();
-    return handle;
+    return TaskedSendReceiverHandle(this, ref.get());
 }
 //---------------------------------------------------------------------------
 void TaskedSendReceiverGroup::process(bool oneQueueInvocation)
@@ -72,12 +68,12 @@ void TaskedSendReceiverGroup::process(bool oneQueueInvocation)
     handle.process(oneQueueInvocation);
 }
 //---------------------------------------------------------------------------
-TaskedSendReceiverHandle::TaskedSendReceiverHandle(TaskedSendReceiverGroup* group) : _group(group)
+TaskedSendReceiverHandle::TaskedSendReceiverHandle(TaskedSendReceiverGroup* group, TaskedSendReceiver* sendReceiver) : _group(group), _sendReceiver(sendReceiver)
 // The constructor
 {
 }
 //---------------------------------------------------------------------------
-TaskedSendReceiverHandle::TaskedSendReceiverHandle(TaskedSendReceiverHandle&& other)
+TaskedSendReceiverHandle::TaskedSendReceiverHandle(TaskedSendReceiverHandle&& other) noexcept
 // Move constructor
 {
     _group = other._group;
@@ -85,7 +81,7 @@ TaskedSendReceiverHandle::TaskedSendReceiverHandle(TaskedSendReceiverHandle&& ot
     other._sendReceiver = nullptr;
 }
 //---------------------------------------------------------------------------
-TaskedSendReceiverHandle& TaskedSendReceiverHandle::operator=(TaskedSendReceiverHandle&& other)
+TaskedSendReceiverHandle& TaskedSendReceiverHandle::operator=(TaskedSendReceiverHandle&& other) noexcept
 // Move assignment
 {
     if (other._group == _group) {
