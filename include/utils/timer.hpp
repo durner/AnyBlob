@@ -93,7 +93,7 @@ class Timer {
     /// Default copy constructor
     Timer(const Timer&) = default;
     /// Move Assignment - Timer and Merge
-    Timer& operator=(Timer&& rhs);
+    Timer& operator=(Timer&& rhs) noexcept;
     /// Destructor
     ~Timer() {
         if (_outStream)

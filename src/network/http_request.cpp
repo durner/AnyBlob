@@ -67,7 +67,7 @@ HttpRequest HttpRequest::deserialize(string_view data)
             }
 
             // parse path, requires HTTP type, otherwise invalid
-            pos = line.find(" ", 1);
+            pos = line.find(' ', 1);
             if (pos == line.npos)
                 throw runtime_error("Invalid HttpRequest: Could not find path, or missing HTTP type!");
             auto pathQuery = line.substr(1, pos - 1);

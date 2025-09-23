@@ -155,7 +155,6 @@ TLSConnection::Progress TLSConnection::shutdown(ConnectionManager& connectionMan
         _context.cacheSession(_message->fd, ssl);
     } else if (status == Progress::Aborted) {
         if (!failedOnce) [[likely]] {
-            status = Progress::Init;
             return shutdown(connectionManager, true);
         } else {
             _context.dropSession(_message->fd);

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
 
 project(AnyBlob)
 
@@ -53,6 +53,13 @@ if (ANYBLOB_LIBCXX_COMPAT)
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -stdlib=libc++")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -stdlib=libc++")
     set(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_COVERAGE} -stdlib=libc++")
+endif()
+
+# Allow enabling clang-tidy
+option(ANYBLOB_CLANG_TIDY "enable clang-tidy" OFF)
+if(ANYBLOB_CLANG_TIDY)
+    find_program(ANYBLOB_CLANG_TIDY_BINARY "clang-tidy" REQUIRED)
+    set(CMAKE_CXX_CLANG_TIDY "${ANYBLOB_CLANG_TIDY_BINARY}")
 endif()
 
 # ---------------------------------------------------------------------------

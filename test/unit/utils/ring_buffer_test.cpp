@@ -32,6 +32,7 @@ TEST_CASE("single_threaded_insert_multi_threaded_consume") {
         REQUIRE(rb.insert<true>(i) != ~0ull);
     }
     std::vector<std::thread> threads;
+    threads.reserve(10u);
     for (auto i = 0u; i < 10u; i++) {
         threads.push_back(std::thread([&] {
             for (int j = 0; j < 100; j++) {
@@ -48,6 +49,7 @@ TEST_CASE("single_threaded_insert_multi_threaded_consume") {
 TEST_CASE("multi_threaded_ring_buffer") {
     RingBuffer<uint64_t> rb(1000);
     std::vector<std::thread> threads;
+    threads.reserve(10u);
     for (auto i = 0u; i < 10u; i++) {
         threads.push_back(std::thread([&] {
             for (auto j = 0u; j < 100u; j++) {
@@ -67,6 +69,7 @@ TEST_CASE("multi_threaded_ring_buffer") {
 TEST_CASE("multi_threaded_ring_buffer_multi_threaded_consume") {
     RingBuffer<uint64_t> rb(1000);
     std::vector<std::thread> threads;
+    threads.reserve(10);
     for (int i = 0; i < 10; i++) {
         threads.push_back(std::thread([&] {
             for (auto j = 0u; j < 100u; j++) {

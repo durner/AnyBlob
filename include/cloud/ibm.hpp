@@ -18,20 +18,23 @@ namespace cloud {
 //---------------------------------------------------------------------------
 /// Implements the IBM logic using the AWS S3 compatibility API
 class IBM : public AWS {
+    /// Get the address of the server
+    [[nodiscard]] std::string getAddressImpl() const;
+
     public:
     /// The constructor
     explicit IBM(const RemoteInfo& info) : AWS(info) {
         assert(info.provider == Provider::CloudService::IBM);
         // COS requires path-style bucket URLs - similar to MinIO, thus we use the endpoint setting
-        _settings.endpoint = getAddress();
+        _settings.endpoint = getAddressImpl();
     }
     /// The custom endpoint constructor
     IBM(const RemoteInfo& info, const std::string& keyId, const std::string& key) : AWS(info, keyId, key) {
         // COS requires path-style bucket URLs - similar to MinIO, thus we use the endpoint setting
-        _settings.endpoint = getAddress();
+        _settings.endpoint = getAddressImpl();
     }
     /// Get the address of the server
-    [[nodiscard]] std::string getAddress() const override;
+    [[nodiscard]] std::string getAddress() const override { return getAddressImpl(); }
     /// Get the instance details
     [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiver) override;
 

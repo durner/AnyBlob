@@ -20,7 +20,7 @@ Provider::Instance IBM::getInstanceDetails(network::TaskedSendReceiverHandle& /*
     return IBMInstance{"ibm", 0, 0, 0};
 }
 //---------------------------------------------------------------------------
-string IBM::getAddress() const
+string IBM::getAddressImpl() const
 // Gets the address of IBM COS
 {
     return "s3." + _settings.region + ".cloud-object-storage.appdomain.cloud";
