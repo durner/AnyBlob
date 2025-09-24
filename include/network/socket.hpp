@@ -2,7 +2,7 @@
 #include <chrono>
 #include <cstdint>
 #ifdef ANYBLOB_HAS_IO_URING
-#include <linux/time_types.h>
+#include <liburing.h>
 #endif
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
