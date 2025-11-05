@@ -4,16 +4,19 @@
 #include <utility>
 #include <openssl/aes.h>
 #include <openssl/bio.h>
-#include <openssl/core_names.h>
-#include <openssl/encoder.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/md5.h>
-#include <openssl/params.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#include <openssl/core_names.h>
+#include <openssl/encoder.h>
+#include <openssl/params.h>
+#endif
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -134,6 +137,15 @@ string md5Encode(const uint8_t* data, uint64_t length)
 pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t keyLength, const uint8_t* msgData, uint64_t msgLength)
 // Encodes the msg with the key with hmac-sha256
 {
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
+    // OpenSSL 1.x fallback
+    unsigned int len = SHA256_DIGEST_LENGTH;
+    auto hash = make_unique<uint8_t[]>(len);
+    if (!HMAC(EVP_sha256(), keyData, static_cast<int>(keyLength), msgData, msgLength, hash.get(), &len))
+        throw runtime_error("OpenSSL Error!");
+    return {move(hash), SHA256_DIGEST_LENGTH};
+#else
+    // OpenSSL 3.x implementation
     auto mac = EVP_MAC_fetch(nullptr, "HMAC", nullptr);
     if (!mac)
         throw runtime_error("OpenSSL Error!");
@@ -167,6 +179,7 @@ pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t 
     EVP_MAC_free(mac);
 
     return {move(hash), SHA256_DIGEST_LENGTH};
+#endif
 }
 //---------------------------------------------------------------------------
 pair<unique_ptr<uint8_t[]>, uint64_t> rsaSign(const uint8_t* keyData, uint64_t keyLength, const uint8_t* msgData, uint64_t msgLength)

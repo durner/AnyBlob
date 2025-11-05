@@ -1,6 +1,10 @@
 #pragma once
 #include <memory>
+#include <openssl/ssl.h>
+#include <openssl/bio.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
 #include <openssl/types.h>
+#endif
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023
