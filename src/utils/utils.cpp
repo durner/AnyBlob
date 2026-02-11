@@ -11,7 +11,6 @@
 #include <openssl/md5.h>
 #include <openssl/params.h>
 #include <openssl/pem.h>
-#include <openssl/rsa.h>
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
 //---------------------------------------------------------------------------
@@ -90,51 +89,49 @@ string sha256Encode(const uint8_t* data, uint64_t length)
 // Encodes the data as sha256 hex string
 {
     unsigned char hash[SHA256_DIGEST_LENGTH];
-    EVP_MD_CTX* mdctx;
-    if ((mdctx = EVP_MD_CTX_new()) == nullptr)
+    unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> mdctx(EVP_MD_CTX_new(), EVP_MD_CTX_free);
+    if (!mdctx)
         throw runtime_error("OpenSSL Error!");
 
-    if (EVP_DigestInit_ex(mdctx, EVP_sha256(), nullptr) <= 0)
+    if (EVP_DigestInit_ex(mdctx.get(), EVP_sha256(), nullptr) <= 0)
         throw runtime_error("OpenSSL Error!");
 
-    if (EVP_DigestUpdate(mdctx, data, length) <= 0)
+    if (EVP_DigestUpdate(mdctx.get(), data, length) <= 0)
         throw runtime_error("OpenSSL Error!");
 
     unsigned digestLength = SHA256_DIGEST_LENGTH;
-    if (EVP_DigestFinal_ex(mdctx, reinterpret_cast<unsigned char*>(hash), &digestLength) <= 0)
+    if (EVP_DigestFinal_ex(mdctx.get(), reinterpret_cast<unsigned char*>(hash), &digestLength) <= 0)
         throw runtime_error("OpenSSL Error!");
 
-    EVP_MD_CTX_free(mdctx);
     return hexEncode(hash, SHA256_DIGEST_LENGTH);
 }
 //---------------------------------------------------------------------------
 string md5Encode(const uint8_t* data, uint64_t length)
 // Encodes the data as md5 string
 {
-    EVP_MD_CTX* mdctx;
     unsigned char hash[MD5_DIGEST_LENGTH];
+    unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> mdctx(EVP_MD_CTX_new(), EVP_MD_CTX_free);
 
-    if ((mdctx = EVP_MD_CTX_new()) == nullptr)
+    if (!mdctx)
         throw runtime_error("OpenSSL Error!");
 
-    if (EVP_DigestInit_ex(mdctx, EVP_md5(), nullptr) <= 0)
+    if (EVP_DigestInit_ex(mdctx.get(), EVP_md5(), nullptr) <= 0)
         throw runtime_error("OpenSSL Error!");
 
-    if (EVP_DigestUpdate(mdctx, data, length) <= 0)
+    if (EVP_DigestUpdate(mdctx.get(), data, length) <= 0)
         throw runtime_error("OpenSSL Error!");
 
     unsigned digestLength = MD5_DIGEST_LENGTH;
-    if (EVP_DigestFinal_ex(mdctx, reinterpret_cast<unsigned char*>(hash), &digestLength) <= 0)
+    if (EVP_DigestFinal_ex(mdctx.get(), reinterpret_cast<unsigned char*>(hash), &digestLength) <= 0)
         throw runtime_error("OpenSSL Error!");
 
-    EVP_MD_CTX_free(mdctx);
     return string(reinterpret_cast<char*>(hash), digestLength);
 }
 //---------------------------------------------------------------------------
 pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t keyLength, const uint8_t* msgData, uint64_t msgLength)
 // Encodes the msg with the key with hmac-sha256
 {
-    auto mac = EVP_MAC_fetch(nullptr, "HMAC", nullptr);
+    unique_ptr<EVP_MAC, decltype(&EVP_MAC_free)> mac(EVP_MAC_fetch(nullptr, "HMAC", nullptr), EVP_MAC_free);
     if (!mac)
         throw runtime_error("OpenSSL Error!");
 
@@ -144,27 +141,24 @@ pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t 
     *p++ = OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_DIGEST, digest.data(), digest.size());
     *p = OSSL_PARAM_construct_end();
 
-    auto mctx = EVP_MAC_CTX_new(mac);
+    unique_ptr<EVP_MAC_CTX, decltype(&EVP_MAC_CTX_free)> mctx(EVP_MAC_CTX_new(mac.get()), EVP_MAC_CTX_free);
     if (!mctx)
         throw runtime_error("OpenSSL Error!");
 
-    if (EVP_MAC_init(mctx, keyData, keyLength, params) <= 0)
+    if (EVP_MAC_init(mctx.get(), keyData, keyLength, params) <= 0)
         throw runtime_error("OpenSSL Error!");
 
-    if (EVP_MAC_update(mctx, msgData, msgLength) <= 0)
+    if (EVP_MAC_update(mctx.get(), msgData, msgLength) <= 0)
         throw runtime_error("OpenSSL Error!");
 
     size_t len;
-    if (EVP_MAC_final(mctx, NULL, &len, 0) <= 0)
+    if (EVP_MAC_final(mctx.get(), NULL, &len, 0) <= 0)
         throw runtime_error("OpenSSL Error!");
 
     auto hash = make_unique<uint8_t[]>(len);
 
-    if (EVP_MAC_final(mctx, hash.get(), &len, len) <= 0)
+    if (EVP_MAC_final(mctx.get(), hash.get(), &len, len) <= 0)
         throw runtime_error("OpenSSL len!");
-
-    EVP_MAC_CTX_free(mctx);
-    EVP_MAC_free(mac);
 
     return {move(hash), SHA256_DIGEST_LENGTH};
 }
@@ -173,32 +167,32 @@ pair<unique_ptr<uint8_t[]>, uint64_t> rsaSign(const uint8_t* keyData, uint64_t k
 // Encodes the msg with the key with rsa
 {
     assert(in_range<int>(keyLength));
-    auto* keybio = BIO_new_mem_buf(reinterpret_cast<const void*>(keyData), static_cast<int>(keyLength));
+    unique_ptr<BIO, decltype(&BIO_free_all)> keybio(BIO_new_mem_buf(reinterpret_cast<const void*>(keyData), static_cast<int>(keyLength)), BIO_free_all);
     if (!keybio)
         throw runtime_error("OpenSSL Error - No Buffer Mem!");
 
-    EVP_PKEY* priKey = nullptr;
-    if (!PEM_read_bio_PrivateKey(keybio, &priKey, nullptr, nullptr))
+    EVP_PKEY* priKeyRaw = nullptr;
+    if (!PEM_read_bio_PrivateKey(keybio.get(), &priKeyRaw, nullptr, nullptr))
         throw runtime_error("OpenSSL Error - Read Private Key!");
+    unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> priKey(priKeyRaw, EVP_PKEY_free);
 
-    auto* rsaSign = EVP_MD_CTX_new();
-    if (EVP_DigestSignInit(rsaSign, nullptr, EVP_sha256(), nullptr, priKey) <= 0)
+    unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> rsaSign(EVP_MD_CTX_new(), EVP_MD_CTX_free);
+    if (!rsaSign)
+        throw runtime_error("OpenSSL Error - Sign Init!");
+    if (EVP_DigestSignInit(rsaSign.get(), nullptr, EVP_sha256(), nullptr, priKey.get()) <= 0)
         throw runtime_error("OpenSSL Error - Sign Init!");
 
-    if (EVP_DigestSignUpdate(rsaSign, msgData, msgLength) <= 0)
+    if (EVP_DigestSignUpdate(rsaSign.get(), msgData, msgLength) <= 0)
         throw runtime_error("OpenSSL Error - Sign Update!");
 
     size_t msgLenghtEnc;
-    if (EVP_DigestSignFinal(rsaSign, nullptr, &msgLenghtEnc) <= 0)
+    if (EVP_DigestSignFinal(rsaSign.get(), nullptr, &msgLenghtEnc) <= 0)
         throw runtime_error("OpenSSL Error - Sign Final!");
 
     auto hash = make_unique<uint8_t[]>(msgLenghtEnc);
-    if (EVP_DigestSignFinal(rsaSign, hash.get(), &msgLenghtEnc) <= 0)
+    if (EVP_DigestSignFinal(rsaSign.get(), hash.get(), &msgLenghtEnc) <= 0)
         throw runtime_error("OpenSSL Error - Sign Final!");
 
-    BIO_free_all(keybio);
-    EVP_MD_CTX_free(rsaSign);
-    EVP_PKEY_free(priKey);
     return {move(hash), msgLenghtEnc};
 }
 //---------------------------------------------------------------------------
@@ -210,7 +204,7 @@ uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uin
     uint64_t plainLength;
 
     unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
-    if (!ctx.get())
+    if (!ctx)
         throw runtime_error("OpenSSL Cipher Error!");
 
     if (EVP_DecryptInit(ctx.get(), EVP_aes_256_cbc(), key, iv) <= 0)
@@ -237,7 +231,7 @@ uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uin
     uint64_t encLength;
 
     unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)> ctx(EVP_CIPHER_CTX_new(), EVP_CIPHER_CTX_free);
-    if (!ctx.get())
+    if (!ctx)
         throw runtime_error("OpenSSL Cipher Error!");
 
     if (EVP_EncryptInit(ctx.get(), EVP_aes_256_cbc(), key, iv) <= 0)
