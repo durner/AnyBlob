@@ -32,7 +32,8 @@ static string buildAMZTimestamp()
 {
     stringstream s;
     const auto t = chrono::system_clock::to_time_t(chrono::system_clock::now());
-    s << put_time(gmtime(&t), "%Y%m%dT%H%M%SZ");
+    std::tm timedata{};
+    s << put_time(gmtime_r(&t, &timedata), "%Y%m%dT%H%M%SZ");
     return s.str();
 }
 //---------------------------------------------------------------------------

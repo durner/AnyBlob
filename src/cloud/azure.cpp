@@ -28,7 +28,8 @@ static string buildXMSTimestamp()
 {
     stringstream s;
     const auto t = chrono::system_clock::to_time_t(chrono::system_clock::now());
-    s << put_time(gmtime(&t), "%a, %d %b %Y %H:%M:%S GMT");
+    std::tm timedata{};
+    s << put_time(gmtime_r(&t, &timedata), "%a, %d %b %Y %H:%M:%S GMT");
     return s.str();
 }
 //---------------------------------------------------------------------------

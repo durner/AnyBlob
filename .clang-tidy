@@ -62,6 +62,7 @@ Checks: >
   bugprone-virtual-near-miss,
   -bugprone-forwarding-reference-overload,
   -clang-diagnostic-unqualified-std-cast-call,
+  concurrency-mt-unsafe,
   misc-new-delete-overloads,
   misc-non-copyable-objects,
   misc-redundant-expression,
@@ -86,4 +87,6 @@ CheckOptions:
   value: 'true'
 - key: modernize-use-override.AllowOverrideAndFinal
   value: 'true'
+- key: concurrency-mt-unsafe.FunctionSet
+  value: 'glibc'
 HeaderFilterRegex: '.*(codegen|plan|rts|infra)/.*'
