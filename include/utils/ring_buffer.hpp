@@ -127,6 +127,11 @@ class RingBuffer {
     [[nodiscard]] constexpr bool empty() const {
         return !(_insert.commited.load(std::memory_order_acquire) - _seen.commited.load(std::memory_order_acquire));
     }
+
+    /// Get the number of elements
+    [[nodiscard]] constexpr uint64_t size() const {
+        return _insert.commited.load(std::memory_order_acquire) - _seen.commited.load(std::memory_order_acquire);
+    }
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::utils
