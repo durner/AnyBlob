@@ -45,6 +45,11 @@ bool TLSConnection::init(HTTPSMessage* message)
             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
             return false;
         }
+        const auto& hostname = _message->originalMessage->provider.getAddress();
+        if (SSL_ctrl(_ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, const_cast<char*>(hostname.c_str())) != 1) {
+            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+            return false;
+        }
         SSL_set_connect_state(_ssl);
         BIO_new_bio_pair(&_internalBio, _message->chunkSize, &_networkBio, _message->chunkSize);
         SSL_set_bio(_ssl, _internalBio, _internalBio);
