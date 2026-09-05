@@ -18,6 +18,7 @@ class Bandwidth {
     /// Different bandwith systems
     enum class Systems : uint8_t {
         Uring,
+        UringAdaptive,
         S3,
         S3Crt
     };
@@ -58,7 +59,7 @@ class Bandwidth {
     /// Benchmark runner
     static void run(const Settings& benchmarkSettings, const std::string& uri);
     /// Uring benchmark runner
-    static void runUring(const Settings& benchmarkSettings, const std::string& uri);
+    static void runUring(const Settings& benchmarkSettings, const std::string& uri, bool adaptive = false);
     /// S3 benchmark runner
     template <typename S3SendReceiver>
     static void runS3(const Settings& benchmarkSettings, const std::string& uri);
