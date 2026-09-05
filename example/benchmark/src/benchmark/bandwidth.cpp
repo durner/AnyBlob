@@ -3,6 +3,7 @@
 #include "cloud/aws_cache.hpp"
 #include "cloud/azure.hpp"
 #include "cloud/gcp.hpp"
+#include "network/adaptive_controller.hpp"
 #include "network/original_message.hpp"
 #include "network/s3_send_receiver.hpp"
 #include "network/tasked_send_receiver.hpp"
@@ -34,6 +35,9 @@ void Bandwidth::run(const Settings& benchmarkSettings, const string& uri)
         switch (s) {
             case Systems::Uring:
                 runUring(benchmarkSettings, uri);
+                break;
+            case Systems::UringAdaptive:
+                runUring(benchmarkSettings, uri, true);
                 break;
             case Systems::S3Crt:
                 runS3<network::S3CrtSendReceiver>(benchmarkSettings, uri);
@@ -150,10 +154,10 @@ void Bandwidth::runS3(const Settings& benchmarkSettings, const string& uri)
     }
 }
 //---------------------------------------------------------------------------
-void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
+void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri, bool adaptive)
 // The bandwith benchmark for uring interface
 {
-    network::TaskedSendReceiverGroup group(benchmarkSettings.chunkSize, benchmarkSettings.requests << 1);
+    network::TaskedSendReceiverGroup group(benchmarkSettings.chunkSize, benchmarkSettings.requests << 1, 0, max(32u, benchmarkSettings.concurrentRequests));
     group.setConcurrentRequests(benchmarkSettings.concurrentRequests);
     vector<unique_ptr<network::TaskedSendReceiverHandle>> sendReceiverHandles;
     vector<unique_ptr<network::TaskedSendReceiverGroup>> taskGroups;
@@ -167,10 +171,24 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         key = cloud::Provider::getKey(benchmarkSettings.rsaKeyFile);
     auto cloudProvider = cloud::Provider::makeProvider(uri, benchmarkSettings.https, benchmarkSettings.account, key, sendReceiverHandles.back().get());
 
+    // use the threads and requests
+    unique_ptr<network::AdaptiveController> controller;
+    if (adaptive) {
+        // Seed the controller from instance bandwidth
+        auto instance = cloudProvider->getInstanceDetails(*sendReceiverHandles.back());
+        network::Config config{network::Config::defaultCoreThroughput, network::Config::defaultCoreConcurrency, instance.network};
+        auto seed = network::AdaptiveController::seedThreads(config, benchmarkSettings.https, thread::hardware_concurrency());
+        controller = make_unique<network::AdaptiveController>(group.maxConcurrentRequests(), seed);
+        group.setConcurrentRequests(controller->current().requestsPerThread);
+        while (sendReceiverHandles.size() < controller->maxThreads())
+            sendReceiverHandles.push_back(make_unique<network::TaskedSendReceiverHandle>(group.getHandle()));
+    }
+    auto workerSlots = static_cast<unsigned>(sendReceiverHandles.size());
+
     if (cloudProvider->getType() == cloud::Provider::CloudService::AWS) {
         auto awsProvider = static_cast<cloud::AWS*>(cloudProvider.get());
         if (!benchmarkSettings.resolver.compare("aws")) {
-            for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
+            for (auto i = 0u; i < workerSlots; i++) {
                 awsProvider->initCache(*sendReceiverHandles[i].get());
             }
         }
@@ -184,7 +202,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
         vector<future<void>> requestCreatorThreads;
         vector<utils::TimingHelper> timings;
         timings.resize(benchmarkSettings.requests);
-        for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
+        for (auto i = 0u; i < workerSlots; i++) {
             sendReceiverHandles[i]->get()->setTimings(&timings);
         }
 
@@ -270,18 +288,46 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
             timer = make_unique<utils::Timer>(&cout, headerNeeded);
         }
 
+        asyncSendReceiverThreads.resize(workerSlots);
+        auto runningWorkers = 0u;
+        auto reconcileWorkers = [&](unsigned target) {
+            while (runningWorkers < min(target, workerSlots)) {
+                auto idx = runningWorkers++;
+                asyncSendReceiverThreads[idx] = async(launch::async, [&sendReceiverHandles, idx]() {
+                    sendReceiverHandles[idx]->process(false);
+                });
+            }
+            while (runningWorkers > target) {
+                auto idx = --runningWorkers;
+                sendReceiverHandles[idx]->stop();
+                asyncSendReceiverThreads[idx].get();
+            }
+        };
+
+        // Adaptive trace with one row per second
+        vector<tuple<size_t, unsigned, unsigned, uint64_t>> adaptiveTrace;
         {
             utils::Timer::TimerGuard guard(utils::Timer::Steps::Download, timer.get());
 
-            for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++) {
-                auto perfEventThread = [&](uint64_t recv) {
-                    sendReceiverHandles[recv]->process(false);
-                };
-                asyncSendReceiverThreads.push_back(async(launch::async, perfEventThread, i));
+            if (controller) {
+                reconcileWorkers(controller->current().threads);
+                auto lastTrace = chrono::steady_clock::now();
+                while (finishedMessages != benchmarkSettings.requests) {
+                    auto rec = controller->recommend(group);
+                    group.setConcurrentRequests(rec.requestsPerThread);
+                    reconcileWorkers(rec.threads);
+                    auto now = chrono::steady_clock::now();
+                    if (now - lastTrace >= chrono::seconds(1)) {
+                        adaptiveTrace.emplace_back(systemClockToMys(now), runningWorkers, group.getConcurrentRequests(), group.getTransferredBytes());
+                        lastTrace = now;
+                    }
+                    usleep(100);
+                }
+            } else {
+                reconcileWorkers(benchmarkSettings.concurrentThreads);
+                while (finishedMessages != benchmarkSettings.requests)
+                    usleep(100);
             }
-
-            while (finishedMessages != benchmarkSettings.requests)
-                usleep(100);
         }
 
         if (benchmarkSettings.testUpload) {
@@ -338,7 +384,8 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
             totalSize += t.size;
 
         string header = ",Algorithm,Resolver,Iteration,Threads,Concurrency,Requests,Datasize,HTTPS,Encryption";
-        string content = ",Uring," + string(benchmarkSettings.resolver) + "," + to_string(iteration) + "," + to_string(benchmarkSettings.concurrentThreads) + "," + to_string(benchmarkSettings.concurrentRequests) + "," + to_string(benchmarkSettings.requests) + "," + to_string(totalSize) + "," + to_string(benchmarkSettings.https) + "," + to_string(benchmarkSettings.encryption);
+        string algorithm = adaptive ? "UringAdaptive" : "Uring";
+        string content = "," + algorithm + "," + string(benchmarkSettings.resolver) + "," + to_string(iteration) + "," + to_string(benchmarkSettings.concurrentThreads) + "," + to_string(benchmarkSettings.concurrentRequests) + "," + to_string(benchmarkSettings.requests) + "," + to_string(totalSize) + "," + to_string(benchmarkSettings.https) + "," + to_string(benchmarkSettings.encryption);
         timer->setInfo(header, content);
 
         if (benchmarkSettings.report.size()) {
@@ -347,13 +394,17 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri)
                 report << "Algorithm,Resolver,Iteration,Threads,Concurrency,HTTPS,Encryption,Start,Finish,Diff,ReceiveLatency,Size" << endl;
             for (const auto& t : timings)
                 if (t.size > 0)
-                    report << "Uring," + string(benchmarkSettings.resolver) << "," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << to_string(benchmarkSettings.https) << "," << to_string(benchmarkSettings.encryption) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << chrono::duration_cast<chrono::microseconds>(t.recieve - t.start).count() << "," << t.size << endl;
+                    report << algorithm + "," + string(benchmarkSettings.resolver) << "," << to_string(iteration) << "," << to_string(benchmarkSettings.concurrentThreads) << "," << to_string(benchmarkSettings.concurrentRequests) << "," << to_string(benchmarkSettings.https) << "," << to_string(benchmarkSettings.encryption) << "," << systemClockToMys(t.start) << "," << systemClockToMys(t.finish) << "," << chrono::duration_cast<chrono::microseconds>(t.finish - t.start).count() << "," << chrono::duration_cast<chrono::microseconds>(t.recieve - t.start).count() << "," << t.size << endl;
         }
-        for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
-            sendReceiverHandles[i]->stop();
+        if (controller && benchmarkSettings.report.size()) {
+            auto adaptiveReport = fstream(benchmarkSettings.report + ".adaptive", s.app | s.in | s.out);
+            if (headerNeeded)
+                adaptiveReport << "Iteration,Time,Threads,Concurrency,TransferredBytes" << endl;
+            for (const auto& [time, threads, concurrency, transferredBytes] : adaptiveTrace)
+                adaptiveReport << to_string(iteration) << "," << time << "," << threads << "," << concurrency << "," << transferredBytes << endl;
+        }
 
-        for (auto i = 0u; i < benchmarkSettings.concurrentThreads; i++)
-            asyncSendReceiverThreads[i].get();
+        reconcileWorkers(0);
     }
 }
 //---------------------------------------------------------------------------
