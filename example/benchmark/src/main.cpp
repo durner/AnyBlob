@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     helpText += "-t concurrent Number of Threads\n";
     helpText += "-i number of iterations (default: 1)\n";
     helpText += "-s chunkSize\n";
-    helpText += "-a algorithm [uring, s3, s3crt]\n";
+    helpText += "-a algorithm [uring, uringadaptive, s3, s3crt]\n";
     helpText += "-o csv output file\n";
     helpText += "-d dnsresolver (default: throughput [aws])\n";
     helpText += "-e clientEmail [required for IBM, Oracle, GCP & Azure]\n";
@@ -102,6 +102,8 @@ int main(int argc, char* argv[]) {
                 bandwithSettings.systems = {anyblob::benchmark::Bandwidth::Systems::S3};
             else if (!strcmp(argv[i], "s3crt"))
                 bandwithSettings.systems = {anyblob::benchmark::Bandwidth::Systems::S3Crt};
+            else if (!strcmp(argv[i], "uringadaptive"))
+                bandwithSettings.systems = {anyblob::benchmark::Bandwidth::Systems::UringAdaptive};
             else
                 bandwithSettings.systems = {anyblob::benchmark::Bandwidth::Systems::Uring};
         } else if (!strcmp(argv[i], "-l")) {
@@ -122,22 +124,22 @@ int main(int argc, char* argv[]) {
         Aws::ShutdownAPI(options);
     }
 
-    if (!strcmp(argv[1], "oracle") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
+    if (!strcmp(argv[1], "oracle") && (bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring || bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::UringAdaptive) && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
         string uri = "oci://" + oracleSettings.bucket + ":" + oracleSettings.region + "/";
         anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
     }
 
-    if (!strcmp(argv[1], "ibm") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
+    if (!strcmp(argv[1], "ibm") && (bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring || bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::UringAdaptive) && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
         string uri = "ibm://" + ibmSettings.bucket + ":" + ibmSettings.region + "/";
         anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
     }
 
-    if (!strcmp(argv[1], "gs") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
+    if (!strcmp(argv[1], "gs") && (bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring || bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::UringAdaptive) && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
         string uri = "gs://" + gcpSettings.bucket + ":" + gcpSettings.region + "/";
         anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
     }
 
-    if (!strcmp(argv[1], "azure") && bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
+    if (!strcmp(argv[1], "azure") && (bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::Uring || bandwithSettings.systems.front() == anyblob::benchmark::Bandwidth::Systems::UringAdaptive) && !bandwithSettings.account.empty() && !bandwithSettings.rsaKeyFile.empty()) {
         string uri = "azure://" + azureSettings.container + "/";
         anyblob::benchmark::Bandwidth::run(bandwithSettings, uri);
     }
