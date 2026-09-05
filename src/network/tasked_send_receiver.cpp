@@ -172,8 +172,6 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
     assert(countThreads == 0);
     countThreads++;
 #endif
-    // Reset the stop
-    _stopDeamon = false;
     exception_ptr firstException = nullptr;
 
     // Current requests in flight
@@ -326,8 +324,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             _stopDeamon = true;
         }
     }
-    if (oneQueueInvocation)
-        _stopDeamon = false;
+    _stopDeamon = false;
 
 #ifndef NDEBUG
     countThreads--;
@@ -350,6 +347,7 @@ int32_t TaskedSendReceiver::submitRequests()
 void TaskedSendReceiver::reset()
 // Reset the receiver
 {
+    _stopDeamon = false;
     while (!_submissions.empty())
         _submissions.pop();
     for (auto& task : _messageTasks) {
