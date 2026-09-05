@@ -178,7 +178,7 @@ class TaskedSendReceiver {
 
     /// Adds a message to the submission queue
     void sendSync(OriginalMessage* msg);
-    /// Stops the deamon
+    /// Stops the deamon, also before it starts
     void stop() { _stopDeamon = true; }
     /// Submits queue and waits for result
     void sendReceive(bool local = false, bool oneQueueInvocation = true);
@@ -225,7 +225,7 @@ class TaskedSendReceiverHandle {
     inline bool processSync(bool oneQueueInvocation = true) { return sendReceive(true, oneQueueInvocation); }
     /// Adds a message to the submission queue
     bool sendSync(OriginalMessage* msg);
-    /// Stops the handle thread if deamon
+    /// Stops the handle thread if deamon, also before it starts
     void stop();
     /// Returns the underlying TaskedSendReceiver
     TaskedSendReceiver* get() { return _sendReceiver; }
