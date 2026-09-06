@@ -211,6 +211,10 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             }
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
+            const auto active = _group._activeRequests.fetch_add(1) + 1;
+            auto observed = _group._observedConcurrency.load();
+            while (observed < active && !_group._observedConcurrency.compare_exchange_weak(observed, active)) {
+            }
 
             if (_messageTasks.size() >= _group._concurrentRequests)
                 break;
@@ -248,6 +252,10 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             }
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
+            const auto active = _group._activeRequests.fetch_add(1) + 1;
+            auto observed = _group._observedConcurrency.load();
+            while (observed < active && !_group._observedConcurrency.compare_exchange_weak(observed, active)) {
+            }
 
             if (_messageTasks.size() >= _group._concurrentRequests)
                 break;
@@ -281,6 +289,8 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 if (status == MessageState::Finished || status == MessageState::Aborted) {
                     for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
                         if (it->get() == task) {
+                            _group._retryAttempts += task->failures;
+                            --_group._activeRequests;
                             // Remove the second param with the real data
                             if (_timings) {
                                 (*_timings)[task->originalMessage->traceId].size = status == MessageState::Aborted ? 0 : task->originalMessage->result.getSize();

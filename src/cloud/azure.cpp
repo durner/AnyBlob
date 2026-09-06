@@ -10,6 +10,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -22,6 +23,18 @@
 namespace anyblob::cloud {
 //---------------------------------------------------------------------------
 using namespace std;
+//---------------------------------------------------------------------------
+Azure::Azure(const RemoteInfo& info, const BearerToken& token) : _settings({info.bucket, info.port}), _endpoint(info.endpoint), _bearerToken(token.value) {
+    if (info.provider != CloudService::Azure || info.port != 443)
+        throw invalid_argument("Azure bearer authentication requires HTTPS");
+    if (_endpoint != "onelake.blob.fabric.microsoft.com" && !_endpoint.ends_with(".blob.core.windows.net"))
+        throw invalid_argument("Unsupported Azure bearer endpoint");
+    if (_endpoint.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789.-") != string::npos)
+        throw invalid_argument("Invalid Azure bearer endpoint");
+    if (_bearerToken.empty() || _bearerToken.find_first_of("\r\n") != string::npos)
+        throw invalid_argument("Invalid Azure bearer token");
+    _type = info.provider;
+}
 //---------------------------------------------------------------------------
 static string buildXMSTimestamp()
 // Creates the X-MS timestamp
@@ -121,7 +134,12 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
         request.headers.emplace("Range", rangeString.str());
     }
 
-    request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
+    if (_bearerToken.empty()) {
+        request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
+    } else {
+        request.headers.emplace("Authorization", "Bearer " + _bearerToken);
+        request.headers.emplace("x-ms-version", "2021-06-08");
+    }
 
     string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " " + request.path + " ";
@@ -137,6 +155,8 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
 unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath, string_view object) const
 // Builds the http request for putting objects without the object data itself
 {
+    if (!_bearerToken.empty())
+        throw logic_error("Azure bearer mode currently supports reads only");
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::PUT;
     request.type = network::HttpRequest::Type::HTTP_1_1;
@@ -165,6 +185,8 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath,
 unique_ptr<utils::DataVector<uint8_t>> Azure::deleteRequest(const string& filePath) const
 // Builds the http request for deleting objects
 {
+    if (!_bearerToken.empty())
+        throw logic_error("Azure bearer mode currently supports reads only");
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::DELETE;
     request.type = network::HttpRequest::Type::HTTP_1_1;
@@ -196,6 +218,8 @@ uint32_t Azure::getPort() const
 string Azure::getAddress() const
 // Gets the address of Azure
 {
+    if (!_bearerToken.empty())
+        return _endpoint;
     return _secret->accountName + ".blob.core.windows.net";
 }
 //---------------------------------------------------------------------------

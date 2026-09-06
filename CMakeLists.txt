@@ -1,6 +1,19 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.18)
 
 project(AnyBlob)
+
+option(ANYBLOB_BUILD_BENCHMARK "Build the benchmark and its pinned SDK dependencies" ON)
+if(ANYBLOB_BUILD_BENCHMARK)
+    enable_testing()
+    add_subdirectory(example/benchmark)
+    return()
+endif()
+
+if(EXISTS "${CMAKE_SOURCE_DIR}/.deps/prefix")
+    list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/.deps/prefix")
+    list(PREPEND CMAKE_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/.deps/prefix/include")
+    list(PREPEND CMAKE_LIBRARY_PATH "${CMAKE_SOURCE_DIR}/.deps/prefix/lib")
+endif()
 
 # ---------------------------------------------------------------------------
 # OS
@@ -17,6 +30,7 @@ endif (NOT UNIX)
 
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_library(JEMALLOC_LIBRARY NAMES jemalloc REQUIRED)
 
 # ---------------------------------------------------------------------------
 # Environment
@@ -124,7 +138,7 @@ include("${PROJECT_SOURCE_DIR}/test/integration/local.cmake")
 # ---------------------------------------------------------------------------
 
 add_library(AnyBlob STATIC ${SRC_CPP} ${INCLUDE_HPP})
-target_link_libraries(AnyBlob PUBLIC OpenSSL::SSL Threads::Threads jemalloc)
+target_link_libraries(AnyBlob PUBLIC OpenSSL::SSL Threads::Threads ${JEMALLOC_LIBRARY})
 target_include_directories(AnyBlob PUBLIC ${PROJECT_SOURCE_DIR}/include)
 if (ANYBLOB_LIBCXX_COMPAT)
     target_compile_definitions(AnyBlob PRIVATE ANYBLOB_LIBCXX_COMPAT)

@@ -60,5 +60,33 @@ TEST_CASE("azure") {
     AzureTester tester;
     tester.test();
 }
+TEST_CASE("azure_bearer") {
+    Provider::RemoteInfo info;
+    info.provider = Provider::CloudService::Azure;
+    info.bucket = "workspace";
+    info.endpoint = "onelake.blob.fabric.microsoft.com";
+    info.port = 443;
+    auto azure = make_unique<Azure>(info, Azure::BearerToken{"test-token"});
+    Provider& provider = *azure;
+    auto request = provider.getRequest("lakehouse.Lakehouse/Files/data.parquet", {0, 4095});
+    string_view text(reinterpret_cast<const char*>(request->data()), request->size());
+    REQUIRE(text.starts_with("GET /workspace/lakehouse.Lakehouse/Files/data.parquet HTTP/1.1\r\n"));
+    REQUIRE(text.find("Authorization: Bearer test-token\r\n") != text.npos);
+    REQUIRE(text.find("Host: onelake.blob.fabric.microsoft.com\r\n") != text.npos);
+    REQUIRE(text.find("Range: bytes=0-4095\r\n") != text.npos);
+    REQUIRE(text.find("x-ms-version: 2021-06-08\r\n") != text.npos);
+    REQUIRE(text.find("SharedKey") == text.npos);
+    REQUIRE(provider.getPort() == 443);
+    REQUIRE(provider.verifyTlsPeer());
+    REQUIRE_THROWS(provider.putRequest("file", "data"));
+    REQUIRE_THROWS(provider.deleteRequest("file"));
+    REQUIRE_THROWS_AS(Azure(info, Azure::BearerToken{""}), invalid_argument);
+    REQUIRE_THROWS_AS(Azure(info, Azure::BearerToken{"bad\r\ntoken"}), invalid_argument);
+    info.port = 80;
+    REQUIRE_THROWS_AS(Azure(info, Azure::BearerToken{"test-token"}), invalid_argument);
+    info.port = 443;
+    info.endpoint = "untrusted.example";
+    REQUIRE_THROWS_AS(Azure(info, Azure::BearerToken{"test-token"}), invalid_argument);
+}
 //---------------------------------------------------------------------------
 } // namespace anyblob::cloud::test

@@ -3,6 +3,8 @@ compile_commands.json
 .ccls-cache/
 .ccls_cache/
 build/
+.deps/
+build-logs/
 bin/
 include/gen/
 src/gen/

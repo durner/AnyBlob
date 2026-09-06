@@ -1,0 +1,8 @@
+if(NOT DEFINED ANYBLOB_SHARED_PREFIX)
+    message(FATAL_ERROR "ANYBLOB_SHARED_PREFIX is required")
+endif()
+
+find_package(
+    CURL CONFIG REQUIRED
+    PATHS "${ANYBLOB_SHARED_PREFIX}/lib/cmake/CURL"
+    NO_DEFAULT_PATH)

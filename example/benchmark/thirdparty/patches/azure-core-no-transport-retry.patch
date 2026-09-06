@@ -1,0 +1,8 @@
+diff --git a/sdk/core/azure-core/src/http/curl/curl_connection_private.hpp b/sdk/core/azure-core/src/http/curl/curl_connection_private.hpp
+--- a/sdk/core/azure-core/src/http/curl/curl_connection_private.hpp
++++ b/sdk/core/azure-core/src/http/curl/curl_connection_private.hpp
+@@ -55,3 +55,3 @@
+           = "Fail to get a new connection for: ";
+-      constexpr static int32_t DefaultMaxOpenNewConnectionIntentsAllowed = 10;
++      constexpr static int32_t DefaultMaxOpenNewConnectionIntentsAllowed = 1;
+       // After 3 connections are received from the pool and failed to send a request, the next

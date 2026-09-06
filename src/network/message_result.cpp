@@ -1,5 +1,7 @@
 #include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
+#include <algorithm>
+#include <cctype>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023
@@ -107,6 +109,22 @@ uint64_t MessageResult::getResponseCodeNumber() const
     else if (response)
         return HttpResponse::getResponseCodeNumber(response->response.code);
     return 0;
+}
+//---------------------------------------------------------------------------
+std::string_view MessageResult::getResponseHeader(std::string_view name) const
+// Get an HTTP response header using a case-insensitive name
+{
+    if (originError)
+        return originError->getResponseHeader(name);
+    if (!response)
+        return ""sv;
+    for (const auto& [key, value] : response->response.headers) {
+        if (key.size() == name.size() && equal(key.begin(), key.end(), name.begin(), [](char lhs, char rhs) {
+                return tolower(static_cast<unsigned char>(lhs)) == tolower(static_cast<unsigned char>(rhs));
+            }))
+            return value;
+    }
+    return ""sv;
 }
 //---------------------------------------------------------------------------
 std::string_view MessageResult::getErrorResponse() const

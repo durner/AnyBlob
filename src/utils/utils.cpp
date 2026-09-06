@@ -4,12 +4,17 @@
 #include <utility>
 #include <openssl/aes.h>
 #include <openssl/bio.h>
+#ifndef OPENSSL_IS_AWSLC
 #include <openssl/core_names.h>
 #include <openssl/encoder.h>
+#endif
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/md5.h>
+#ifndef OPENSSL_IS_AWSLC
 #include <openssl/params.h>
+#endif
 #include <openssl/pem.h>
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
@@ -32,7 +37,11 @@ string base64Encode(const uint8_t* input, uint64_t length)
     auto baseLength = 4 * ((length + 2) / 3);
     auto buffer = make_unique<char[]>(baseLength + 1);
     auto encodeLength = EVP_EncodeBlock(reinterpret_cast<unsigned char*>(buffer.get()), input, static_cast<int>(length));
+#ifdef OPENSSL_IS_AWSLC
+    if (encodeLength != baseLength)
+#else
     if (encodeLength < 0 || static_cast<unsigned>(encodeLength) != baseLength)
+#endif
         throw runtime_error("OpenSSL Error!");
     return string(buffer.get(), static_cast<unsigned>(encodeLength));
 }
@@ -131,6 +140,14 @@ string md5Encode(const uint8_t* data, uint64_t length)
 pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t keyLength, const uint8_t* msgData, uint64_t msgLength)
 // Encodes the msg with the key with hmac-sha256
 {
+#ifdef OPENSSL_IS_AWSLC
+    assert(in_range<int>(keyLength));
+    auto hash = make_unique<uint8_t[]>(SHA256_DIGEST_LENGTH);
+    unsigned len = 0;
+    if (!HMAC(EVP_sha256(), keyData, static_cast<int>(keyLength), msgData, msgLength, hash.get(), &len))
+        throw runtime_error("OpenSSL Error!");
+    return {move(hash), len};
+#else
     unique_ptr<EVP_MAC, decltype(&EVP_MAC_free)> mac(EVP_MAC_fetch(nullptr, "HMAC", nullptr), EVP_MAC_free);
     if (!mac)
         throw runtime_error("OpenSSL Error!");
@@ -161,6 +178,7 @@ pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t 
         throw runtime_error("OpenSSL len!");
 
     return {move(hash), SHA256_DIGEST_LENGTH};
+#endif
 }
 //---------------------------------------------------------------------------
 pair<unique_ptr<uint8_t[]>, uint64_t> rsaSign(const uint8_t* keyData, uint64_t keyLength, const uint8_t* msgData, uint64_t msgLength)

@@ -1,7 +1,6 @@
 #pragma once
 #include <array>
 #include <openssl/ssl.h>
-#include <openssl/types.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023

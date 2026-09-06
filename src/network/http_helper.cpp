@@ -1,4 +1,5 @@
 #include "network/http_helper.hpp"
+#include <algorithm>
 #include <cassert>
 #include <charconv>
 #include <cstring>
@@ -17,6 +18,19 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
+static bool equalIgnoreCase(string_view left, string_view right)
+// Compare ASCII HTTP tokens case-insensitively
+{
+    const auto asciiLower = [](unsigned char character) {
+        if (character >= 'A' && character <= 'Z')
+            return static_cast<unsigned char>(character + ('a' - 'A'));
+        return character;
+    };
+    return left.size() == right.size() && equal(left.begin(), left.end(), right.begin(), [asciiLower](unsigned char leftChar, unsigned char rightChar) {
+               return asciiLower(leftChar) == asciiLower(rightChar);
+           });
+}
+//---------------------------------------------------------------------------
 HttpHelper::Info HttpHelper::detect(string_view header)
 // Detect the protocol
 {
@@ -30,12 +44,12 @@ HttpHelper::Info HttpHelper::detect(string_view header)
 
     info.encoding = Encoding::Unknown;
     for (auto& keyValue : info.response.headers) {
-        if (transferEncoding == keyValue.first && chunkedEncoding == keyValue.second) {
+        if (equalIgnoreCase(transferEncoding, keyValue.first) && equalIgnoreCase(chunkedEncoding, keyValue.second)) {
             info.encoding = Encoding::ChunkedEncoding;
             auto end = header.find(headerEnd);
             assert(end != string_view::npos);
             info.headerLength = static_cast<unsigned>(end) + static_cast<unsigned>(headerEnd.length());
-        } else if (contentLength == keyValue.first) {
+        } else if (equalIgnoreCase(contentLength, keyValue.first)) {
             info.encoding = Encoding::ContentLength;
             from_chars(keyValue.second.data(), keyValue.second.data() + keyValue.second.size(), info.length);
             auto end = header.find(headerEnd);

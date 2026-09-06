@@ -117,6 +117,8 @@ class S3SendReceiver {
     std::unique_ptr<S3Client> _client;
     /// The s3 client config
     std::unique_ptr<ClientConfiguration> _config;
+    /// The optional CRT TLS context
+    std::shared_ptr<Aws::Crt::Io::TlsContext> _tlsContext;
     /// Current requests in flight
     std::atomic<uint64_t> _currentSubmissions;
     /// Total submissions
@@ -141,15 +143,21 @@ class S3SendReceiver {
             _config->scheme = Aws::Http::Scheme::HTTPS;
         else
             _config->scheme = Aws::Http::Scheme::HTTP;
+        _config->verifySSL = false;
 
         if constexpr (std::is_same_v<ClientConfiguration, Aws::Client::ClientConfiguration>) {
             _config->maxConnections = threadsOrThroughput;
-            _config->verifySSL = false;
             _config->enableTcpKeepAlive = true;
             if (threadsOrThroughput >= (std::thread::hardware_concurrency() << 2))
                 _config->executor = Aws::MakeShared<Aws::Utils::Threading::PooledThreadExecutor>("s3-downloader", threadsOrThroughput);
         } else {
             _config->throughputTargetGbps = threadsOrThroughput;
+            if (https) {
+                auto tlsOptions = Aws::Crt::Io::TlsContextOptions::InitDefaultClient();
+                tlsOptions.SetVerifyPeer(false);
+                _tlsContext = std::make_shared<Aws::Crt::Io::TlsContext>(tlsOptions, Aws::Crt::Io::TlsMode::CLIENT);
+                _config->tlsConnectionOptions = std::make_shared<Aws::Crt::Io::TlsConnectionOptions>(_tlsContext->NewConnectionOptions());
+            }
         }
 
         _client = std::make_unique<S3Client>(*_config.get());
@@ -289,7 +297,8 @@ class S3SendReceiver {
                 submissions--;
                 _cv.notify_all();
             } else {
-                std::cout << "S3 download error - retry object!" << std::endl;
+                const auto& error = outcome.GetError();
+                std::cout << "S3 download error - retry object: " << error.GetExceptionName() << " (HTTP " << static_cast<int>(error.GetResponseCode()) << "): " << error.GetMessage() << std::endl;
                 while (!this->send(req)) {}
                 submissions--;
                 _cv.notify_all();

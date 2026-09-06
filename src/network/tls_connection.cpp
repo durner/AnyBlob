@@ -20,7 +20,7 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TLSConnection::TLSConnection(TLSContext& context) : _message(nullptr), _context(context), _ssl(nullptr), _state(), _connected(false)
+TLSConnection::TLSConnection(TLSContext& context) : _message(nullptr), _context(context), _ssl(nullptr), _internalBio(nullptr), _networkBio(nullptr), _state(), _connected(false)
 // The consturctor
 {
 }
@@ -45,12 +45,35 @@ bool TLSConnection::init(HTTPSMessage* message)
             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
             return false;
         }
+        const auto& hostname = _message->originalMessage->provider.getAddress();
+        const bool verifyPeer = _message->originalMessage->provider.verifyTlsPeer();
+        if (verifyPeer) {
+            if (SSL_CTX_set_default_verify_paths(_context._ctx) != 1 ||
+                X509_VERIFY_PARAM_set1_host(SSL_get0_param(_ssl), hostname.c_str(), hostname.size()) != 1) {
+                _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+                return false;
+            }
+            SSL_set_verify(_ssl, SSL_VERIFY_PEER, nullptr);
+        }
+#ifdef OPENSSL_IS_AWSLC
+        if (SSL_set_tlsext_host_name(_ssl, hostname.c_str()) != 1) {
+#else
+        if (SSL_ctrl(_ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, const_cast<char*>(hostname.c_str())) != 1) {
+#endif
+            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+            return false;
+        }
         SSL_set_connect_state(_ssl);
         BIO_new_bio_pair(&_internalBio, _message->chunkSize, &_networkBio, _message->chunkSize);
         SSL_set_bio(_ssl, _internalBio, _internalBio);
-        _context.reuseSession(_message->fd, _ssl);
+        if (!verifyPeer)
+            _context.reuseSession(_message->fd, _ssl);
     } else {
         _message = message;
+        if (_message->originalMessage->provider.verifyTlsPeer() && !(SSL_get_verify_mode(_ssl) & SSL_VERIFY_PEER)) {
+            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+            return false;
+        }
         BIO_free(_networkBio);
         BIO_new_bio_pair(&_internalBio, _message->chunkSize, &_networkBio, _message->chunkSize);
         SSL_set_bio(_ssl, _internalBio, _internalBio);

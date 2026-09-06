@@ -1,0 +1,35 @@
+diff --git a/sdk/core/azure-core/src/http/curl/curl.cpp b/sdk/core/azure-core/src/http/curl/curl.cpp
+index 4ad9d75..f8d15d7 100644
+--- a/sdk/core/azure-core/src/http/curl/curl.cpp
++++ b/sdk/core/azure-core/src/http/curl/curl.cpp
+@@ -1515,6 +1515,7 @@ static int CurlLoggingCallback(
+ // On Windows and macOS, libcurl uses native crypto backends, this functionality depends on
+ // the OpenSSL backend.
+ #if !defined(AZ_PLATFORM_WINDOWS) && !defined(AZ_PLATFORM_MAC)
++#if !defined(OPENSSL_IS_AWSLC)
+ namespace Azure { namespace Core {
+   namespace _detail {
+ 
+@@ -2161,6 +2162,22 @@ int CurlConnection::SslCtxCallback(CURL*, void* sslctx)
+   }
+   return CURLE_OK;
+ }
++#else
++int CurlConnection::VerifyCertificateError(int ok, X509_STORE_CTX*)
++{
++  return ok;
++}
++
++int CurlConnection::CurlSslCtxCallback(CURL*, void*, void*)
++{
++  return CURLE_NOT_BUILT_IN;
++}
++
++int CurlConnection::SslCtxCallback(CURL*, void*)
++{
++  return CURLE_NOT_BUILT_IN;
++}
++#endif // !defined(OPENSSL_IS_AWSLC)
+ #endif
+ 
+ std::unique_ptr<CurlNetworkConnection> CurlConnectionPool::ExtractOrCreateCurlConnection(

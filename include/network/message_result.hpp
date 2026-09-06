@@ -105,6 +105,8 @@ class MessageResult {
     [[nodiscard]] std::string_view getResponseCode() const;
     /// Get the error response code number
     [[nodiscard]] uint64_t getResponseCodeNumber() const;
+    /// Get an HTTP response header using a case-insensitive name
+    [[nodiscard]] std::string_view getResponseHeader(std::string_view name) const;
     /// Is the data owned by this object
     [[nodiscard]] bool owned() const;
     /// Was the request successful

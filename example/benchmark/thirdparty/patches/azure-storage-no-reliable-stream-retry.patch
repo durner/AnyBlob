@@ -1,0 +1,8 @@
+diff --git a/sdk/storage/azure-storage-common/inc/azure/storage/common/internal/constants.hpp b/sdk/storage/azure-storage-common/inc/azure/storage/common/internal/constants.hpp
+--- a/sdk/storage/azure-storage-common/inc/azure/storage/common/internal/constants.hpp
++++ b/sdk/storage/azure-storage-common/inc/azure/storage/common/internal/constants.hpp
+@@ -21,3 +21,3 @@
+ 
+-  constexpr int ReliableStreamRetryCount = 3;
++  constexpr int ReliableStreamRetryCount = 1;
+ }}} // namespace Azure::Storage::_internal

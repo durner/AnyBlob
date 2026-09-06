@@ -22,6 +22,12 @@ TEST_CASE("utils") {
     len = utils::aesDecrypt(key, iv, buffer, len, result);
     string_view res(reinterpret_cast<char*>(result), len);
     REQUIRE(!plain.compare(res));
+
+    constexpr string_view hmacKey = "key";
+    constexpr string_view message = "The quick brown fox jumps over the lazy dog";
+    auto [signature, signatureLength] = utils::hmacSign(reinterpret_cast<const uint8_t*>(hmacKey.data()), hmacKey.size(), reinterpret_cast<const uint8_t*>(message.data()), message.size());
+    REQUIRE(signatureLength == 32);
+    REQUIRE(utils::hexEncode(signature.get(), signatureLength) == "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8");
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::utils::test

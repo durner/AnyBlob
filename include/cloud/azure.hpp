@@ -42,6 +42,10 @@ class Azure : public Provider {
         std::string privateKey;
     };
 
+    struct BearerToken {
+        std::string value;
+    };
+
     /// The fake XMS timestamp
     const char* fakeXMSTimestamp = "Fri, 01 Jan 2100 00:00:00 GMT";
 
@@ -50,6 +54,8 @@ class Azure : public Provider {
     Settings _settings;
     /// The secret
     std::unique_ptr<Secret> _secret;
+    std::string _endpoint;
+    std::string _bearerToken;
 
     /// Inits key from file
     void initKey();
@@ -69,6 +75,9 @@ class Azure : public Provider {
         _secret->privateKey = key;
         initKey();
     }
+
+    Azure(const RemoteInfo& info, const BearerToken& token);
+    [[nodiscard]] bool verifyTlsPeer() const override { return !_bearerToken.empty(); }
 
     private:
     /// Get the settings

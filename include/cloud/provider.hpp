@@ -97,6 +97,7 @@ class Provider {
     [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
     [[nodiscard]] virtual uint32_t getPort() const = 0;
+    [[nodiscard]] virtual bool verifyTlsPeer() const { return false; }
 
     /// Is multipart upload supported, if size > 0?
     [[nodiscard]] virtual uint64_t multipartUploadSize() const { return 0; }
