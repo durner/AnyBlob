@@ -93,6 +93,10 @@ class TaskedSendReceiverGroup {
     unsigned getConcurrentRequests() const {
         return _concurrentRequests;
     }
+    /// Get the TCP settings
+    ConnectionManager::TCPSettings& getTCPSettings() {
+        return *_tcpSettings;
+    }
 
     friend TaskedSendReceiver;
     friend TaskedSendReceiverHandle;

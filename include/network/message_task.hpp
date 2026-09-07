@@ -4,6 +4,8 @@
 #include "network/original_message.hpp"
 #include "network/socket.hpp"
 #include "utils/data_vector.hpp"
+#include <algorithm>
+#include <chrono>
 #include <memory>
 #include <string_view>
 //---------------------------------------------------------------------------
@@ -47,13 +49,36 @@ struct MessageTask {
     uint32_t chunkSize;
     /// The failures
     uint16_t failures;
+    /// The failures since the connection last made progress
+    uint16_t stalls;
     /// The message task class
     Type type;
+    /// The start time of the first attempt
+    std::chrono::steady_clock::time_point startTime;
 
     /// The failure limit during recv and send
     static constexpr uint16_t failuresMax = 32;
     /// The limit of failures to connect
     static constexpr uint16_t connectionFailuresMax = 4;
+    /// The maximum shift for the per-attempt timeout
+    static constexpr uint16_t timeoutShiftMax = 4;
+
+    /// Exponential timeout backoff between progress events
+    [[nodiscard]] std::chrono::milliseconds attemptTimeout() const {
+        return tcpSettings.timeout * (1u << std::min(stalls, timeoutShiftMax));
+    }
+
+    /// Count a failure and check the retry limit
+    [[nodiscard]] bool exhausted(uint16_t limit) {
+        stalls++;
+        return failures++ > limit;
+    }
+
+    /// Restore the base timeout after progress
+    void progressed() { stalls = 0; }
+
+    /// Allowed multiple of predicted transfer duration
+    static constexpr unsigned deadlineFactor = 4;
 
     /// The pure virtual  callback
     virtual MessageState execute(ConnectionManager& connectionManager) = 0;

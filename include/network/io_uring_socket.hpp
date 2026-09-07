@@ -52,13 +52,23 @@ class IOUringSocket : public Socket {
     }
     /// Prepare a submission send with timeout
     bool send_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override {
-        req.kernelTimeout = __kernel_timespec(0, std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count());
+        if (!timeout.count())
+            return send_prep(req, msg_flags);
+        req.kernelTimeout = toKernelTimespec(timeout);
         return send_prep_to(req, msg_flags);
     }
     /// Prepare a submission recv with timeout
     bool recv_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override {
-        req.kernelTimeout = __kernel_timespec(0, std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count());
+        if (!timeout.count())
+            return recv_prep(req, msg_flags);
+        req.kernelTimeout = toKernelTimespec(timeout);
         return recv_prep_to(req, msg_flags);
+    }
+
+    /// Convert a timeout into kernel timespec
+    static constexpr __kernel_timespec toKernelTimespec(std::chrono::milliseconds timeout) {
+        auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count();
+        return {ns / 1'000'000'000, ns % 1'000'000'000};
     }
 
     /// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests

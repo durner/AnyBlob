@@ -59,6 +59,17 @@ ConnectionManager::ConnectionManager([[maybe_unused]] unsigned uringEntries) : _
 #endif
 }
 //---------------------------------------------------------------------------
+void ConnectionManager::recordThroughput(uint64_t bytes, chrono::nanoseconds elapsed)
+// Learn the current throughput
+{
+    auto seconds = chrono::duration<double>(elapsed).count();
+    if (seconds <= 0)
+        return;
+    auto rate = static_cast<double>(bytes) / seconds;
+    // Do a weighted average
+    _healthyRate = _healthyRate > 0 ? (7 * _healthyRate + rate) / 8 : rate;
+}
+//---------------------------------------------------------------------------
 int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit, chrono::milliseconds timeoutOverride)
 // Creates a new socket connection
 {

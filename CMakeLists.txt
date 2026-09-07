@@ -131,7 +131,7 @@ if (ANYBLOB_LIBCXX_COMPAT)
 endif()
 if(LIBURING_FOUND AND NOT ANYBLOB_URING_COMPAT)
     target_link_libraries(AnyBlob PUBLIC ${LIBURING_LIBRARY})
-    target_compile_definitions(AnyBlob PRIVATE ANYBLOB_HAS_IO_URING)
+    target_compile_definitions(AnyBlob PUBLIC ANYBLOB_HAS_IO_URING)
 endif()
 
 # ---------------------------------------------------------------------------

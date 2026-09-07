@@ -66,6 +66,8 @@ class ConnectionManager {
     std::unordered_map<std::string, std::unique_ptr<Cache>> _cache;
     /// The tls context
     std::unique_ptr<network::TLSContext> _context;
+    /// Per-request throughput estimate in bytes/s
+    double _healthyRate = 0;
 
     /// The counter of current connection managers
     static std::atomic<unsigned> _activeConnectionManagers;
@@ -85,6 +87,10 @@ class ConnectionManager {
 
     /// Add domain-specific cache
     void addCache(const std::string& hostname, std::unique_ptr<Cache> cache);
+    /// Learn the current throughput
+    void recordThroughput(uint64_t bytes, std::chrono::nanoseconds elapsed);
+    /// Estimated bytes/s
+    [[nodiscard]] double healthyRate() const { return _healthyRate; }
     /// Checks for a timeout
     bool checkTimeout(int fd, const TCPSettings& settings);
 

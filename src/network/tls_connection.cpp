@@ -185,7 +185,7 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     if (_message->request->length > 0) {
                         _state.socketWrite += static_cast<uint64_t>(_message->request->length);
                     } else if (_message->request->length != -EINPROGRESS && _message->request->length != -EAGAIN) {
-                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR) {
+                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR || _message->request->length == -ETIMEDOUT) {
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
                             _state.progress = Progress::Aborted;
                             return _state.progress;
@@ -203,7 +203,7 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     const uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketWrite;
                     _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = static_cast<int64_t>(writeSize), .fd = _message->fd, .event = Socket::EventType::write, .messageTask = _message});
                     if (writeSize <= _message->chunkSize)
-                        connectionManager.getSocketConnection().send_to(*_message->request, _message->tcpSettings.timeout);
+                        connectionManager.getSocketConnection().send_to(*_message->request, _message->attemptTimeout());
                     else
                         connectionManager.getSocketConnection().send(*_message->request);
                     return _state.progress;
@@ -233,7 +233,7 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                         _state.socketRead += static_cast<size_t>(_message->request->length);
                         assert(_state.networkBioWrite >= 0 && static_cast<size_t>(_state.networkBioWrite) == _state.socketRead);
                     } else if (_message->request->length != -EINPROGRESS && _message->request->length != -EAGAIN) {
-                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR)
+                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR || _message->request->length == -ETIMEDOUT)
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
                         else
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Recv);
@@ -247,7 +247,7 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketRead;
                     assert(in_range<int64_t>(readSize));
                     _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.data = ptr}, .length = static_cast<int64_t>(readSize), .fd = _message->fd, .event = Socket::EventType::read, .messageTask = _message});
-                    connectionManager.getSocketConnection().recv_to(*_message->request, _message->tcpSettings.timeout, _message->tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+                    connectionManager.getSocketConnection().recv_to(*_message->request, _message->attemptTimeout(), _message->tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
                     return _state.progress;
                 } else {
                     _state.progress = Progress::Finished;
