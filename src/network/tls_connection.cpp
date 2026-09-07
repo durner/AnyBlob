@@ -191,7 +191,8 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                             return _state.progress;
                         } else {
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
-                            _state.progress = Progress::ReceivingInit;
+                            _state.progress = Progress::Aborted;
+                            return _state.progress;
                         }
                     }
                 }

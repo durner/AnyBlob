@@ -97,6 +97,8 @@ class Provider {
     [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
     [[nodiscard]] virtual uint32_t getPort() const = 0;
+    /// Does the endpoint expect a tls encrypted connection
+    [[nodiscard]] virtual bool useTls() const { return getPort() == 443; }
 
     /// Is multipart upload supported, if size > 0?
     [[nodiscard]] virtual uint64_t multipartUploadSize() const { return 0; }
