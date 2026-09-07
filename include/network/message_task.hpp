@@ -64,7 +64,7 @@ struct MessageTask {
     template <typename... Args>
     static std::unique_ptr<MessageTask> buildMessageTask(OriginalMessage* sendingMessage, Args&&... args) {
         std::string_view s(reinterpret_cast<char*>(sendingMessage->message->data()), sendingMessage->message->size());
-        if (s.find("HTTP") != std::string_view::npos && sendingMessage->provider.getPort() == 443) {
+        if (s.find("HTTP") != std::string_view::npos && sendingMessage->provider.useTls()) {
             return std::make_unique<HTTPSMessage>(sendingMessage, std::forward<Args>(args)...);
         } else if (s.find("HTTP") != std::string_view::npos) {
             return std::make_unique<HTTPMessage>(sendingMessage, std::forward<Args>(args)...);
