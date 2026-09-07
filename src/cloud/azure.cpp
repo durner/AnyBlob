@@ -7,6 +7,7 @@
 #include "utils/data_vector.hpp"
 #include "utils/utils.hpp"
 #include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -116,8 +117,9 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
     request.headers.emplace("x-ms-date", testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp());
     request.headers.emplace("Host", getAddress());
     if (range.first != range.second) {
+        assert(range.second > range.first);
         stringstream rangeString;
-        rangeString << "bytes=" << range.first << "-" << range.second;
+        rangeString << "bytes=" << range.first << "-" << (range.second - 1);
         request.headers.emplace("Range", rangeString.str());
     }
 

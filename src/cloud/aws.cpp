@@ -6,6 +6,7 @@
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
 #include "utils/utils.hpp"
+#include <cassert>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -386,8 +387,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
         request.path = "/" + _settings.bucket + "/" + filePath;
 
     if (range.first != range.second) {
+        assert(range.second > range.first);
         stringstream rangeString;
-        rangeString << "bytes=" << range.first << "-" << range.second;
+        rangeString << "bytes=" << range.first << "-" << (range.second - 1);
         request.headers.emplace("Range", rangeString.str());
     }
 

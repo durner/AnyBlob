@@ -76,6 +76,20 @@ class AWSTester {
         auto vec = AWSInstance::getInstanceDetails();
         REQUIRE(vec.size() > 0);
 
+        // Signing preserves the inclusive HTTP range for [0, 1 MiB)
+        REQUIRE(aws.supportsResigning());
+        auto range = pair<uint64_t, uint64_t>(0, 1u << 20);
+        dv = aws.getRequest("a/b/c.d", range);
+        auto rangedRequest = string(reinterpret_cast<char*>(dv->data()), dv->size());
+        REQUIRE(rangedRequest.find("Range: bytes=0-1048575") != string::npos);
+        dvResigned = aws.resignRequest(*dv.get());
+        REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == rangedRequest);
+
+        // A single byte range
+        range = pair<uint64_t, uint64_t>(0, 1);
+        dv = aws.getRequest("a/b/c.d", range);
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()).find("Range: bytes=0-0") != string_view::npos);
+
         Provider::testEnviornment = false;
     }
 };
