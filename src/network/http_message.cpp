@@ -27,6 +27,11 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
 {
     int32_t fd = -1;
     auto& state = originalMessage->result.state;
+    if (expired(connectionManager)) {
+        originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
+        reset(connectionManager, true);
+        return state;
+    }
     switch (state) {
         case MessageState::Init: {
             try {
@@ -35,7 +40,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                 if (request)
                     request->fd = -1;
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
-                reset(connectionManager, failures++ > connectionFailuresMax);
+                reset(connectionManager, exhausted(connectionFailuresMax));
                 return execute(connectionManager);
             }
             state = MessageState::InitSending;
@@ -47,10 +52,11 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                 fd = request->fd;
                 if (request->length > 0) {
                     sendBufferOffset += request->length;
+                    progressed();
                 } else if (request->length != -EINPROGRESS && request->length != -EAGAIN) {
-                    if (request->length == -ECANCELED || request->length == -EINTR) {
+                    if (request->length == -ECANCELED || request->length == -EINTR || request->length == -ETIMEDOUT) {
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
-                        reset(connectionManager, failures++ > failuresMax);
+                        reset(connectionManager, exhausted(failuresMax));
                         return execute(connectionManager);
                     } else {
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
@@ -79,7 +85,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                 }
                 request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = length, .fd = fd, .event = Socket::EventType::write, .messageTask = this});
                 if (length <= static_cast<int64_t>(chunkSize))
-                    connectionManager.getSocketConnection().send_to(*request, tcpSettings.timeout);
+                    connectionManager.getSocketConnection().send_to(*request, attemptTimeout());
                 else
                     connectionManager.getSocketConnection().send(*request);
             }
@@ -92,38 +98,45 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
             if (state != MessageState::InitReceiving) {
                 if (request->length == 0) {
                     originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Empty);
-                    reset(connectionManager, failures++ > failuresMax);
+                    reset(connectionManager, exhausted(failuresMax));
                     return execute(connectionManager);
                 } else if (request->length > 0) {
                     // resize according to real downloaded size
                     receive.resize(receive.size() - (chunkSize - static_cast<uint64_t>(request->length)));
                     receiveBufferOffset += request->length;
+                    progressed();
 
                     try {
                         // check whether finished http
                         if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
                             originalMessage->result.response = move(info);
-                            auto success = HttpResponse::checkSuccess(originalMessage->result.response->response.code);
+                            auto code = originalMessage->result.response->response.code;
+                            auto success = HttpResponse::checkSuccess(code);
                             connectionManager.disconnect(request->fd, &tcpSettings, static_cast<uint64_t>(sendBufferOffset + receiveBufferOffset), !success);
                             if (success) {
                                 state = MessageState::Finished;
                             } else {
                                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
+                                if (HttpResponse::checkRetryable(code)) {
+                                    request->fd = -1;
+                                    reset(connectionManager, exhausted(failuresMax));
+                                    return execute(connectionManager);
+                                }
                                 state = MessageState::Aborted;
                             }
                             return state;
                         }
                     } catch (exception&) {
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
-                        reset(connectionManager, failures++ > failuresMax);
+                        reset(connectionManager, exhausted(failuresMax));
                         return execute(connectionManager);
                     }
                 } else if (request->length != -EINPROGRESS && request->length != -EAGAIN) {
-                    if (request->length == -ECANCELED || request->length == -EINTR)
+                    if (request->length == -ECANCELED || request->length == -EINTR || request->length == -ETIMEDOUT)
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
                     else
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Recv);
-                    reset(connectionManager, failures++ > failuresMax);
+                    reset(connectionManager, exhausted(failuresMax));
                     return execute(connectionManager);
                 } else {
                     receive.resize(receive.size() - chunkSize);
@@ -135,7 +148,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
             }
             receive.resize(receive.size() + chunkSize);
             request = std::make_unique<Socket::Request>(Socket::Request{.data = {.data = receive.data() + receiveBufferOffset}, .length = static_cast<int64_t>(chunkSize), .fd = request->fd, .event = Socket::EventType::read, .messageTask = this});
-            connectionManager.getSocketConnection().recv_to(*request, tcpSettings.timeout, tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+            connectionManager.getSocketConnection().recv_to(*request, attemptTimeout(), tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
             state = MessageState::Receiving;
             break;
         }
@@ -145,20 +158,50 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
     return state;
 }
 //---------------------------------------------------------------------------
+bool HTTPMessage::expired(const ConnectionManager& connectionManager) const
+// Check the deadline
+{
+    if (!tcpSettings.requestDeadline.count())
+        return false;
+    auto elapsed = chrono::steady_clock::now() - startTime;
+    if (elapsed <= tcpSettings.requestDeadline)
+        return false;
+    // Extend the deadline for large responses using measured throughput
+    auto rate = connectionManager.healthyRate();
+    if (rate > 0 && info && info->length >= chunkSize) {
+        auto predicted = chrono::duration<double>(static_cast<double>(info->length) / rate);
+        return elapsed > deadlineFactor * predicted;
+    }
+    return true;
+}
+//---------------------------------------------------------------------------
 void HTTPMessage::reset(ConnectionManager& connectionManager, bool aborted)
 // Reset for restart
 {
+    // Abort only when retry budget was used
+    if (!aborted && expired(connectionManager)) {
+        originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
+        aborted = true;
+    }
+    // Resign the request
+    if (!aborted && originalMessage->provider.supportsResigning()) {
+        originalMessage->provider.getSecret();
+        if (auto resigned = originalMessage->provider.resignRequest(*originalMessage->message, originalMessage->putData, originalMessage->putLength)) [[likely]] {
+            originalMessage->message = move(resigned);
+        } else {
+            originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Resign);
+            aborted = true;
+        }
+    }
     if (!aborted) {
         originalMessage->result.getDataVector().clear();
+        originalMessage->result.response.reset();
         receiveBufferOffset = 0;
         sendBufferOffset = 0;
         info.reset();
         originalMessage->result.state = MessageState::Init;
     } else {
         originalMessage->result.state = MessageState::Aborted;
-    }
-    if ((originalMessage->result.failureCode & static_cast<uint16_t>(MessageFailureCode::HTTP)) && originalMessage->provider.supportsResigning()) {
-        originalMessage->message = originalMessage->provider.resignRequest(*originalMessage->message, originalMessage->putData, originalMessage->putLength);
     }
     if (request && request->fd >= 0) {
         connectionManager.disconnect(request->fd, &tcpSettings, 0, true);

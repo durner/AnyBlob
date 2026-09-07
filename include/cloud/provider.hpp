@@ -18,6 +18,7 @@ class TaskedSendReceiver;
 class TaskedSendReceiverHandle;
 class Transaction;
 struct Config;
+struct HTTPMessage;
 struct OriginalMessage;
 } // namespace network
 namespace utils {
@@ -145,6 +146,7 @@ class Provider {
     [[nodiscard]] virtual network::Config getConfig(network::TaskedSendReceiverHandle& sendReceiverHandle);
 
     friend network::Transaction;
+    friend struct network::HTTPMessage;
 };
 //---------------------------------------------------------------------------
 } // namespace cloud

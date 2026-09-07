@@ -56,7 +56,9 @@ enum class MessageFailureCode : uint16_t {
     /// HTTP header error
     HTTP = 1 << 5,
     /// TLS error
-    TLS = 1 << 6
+    TLS = 1 << 6,
+    /// Resigning the request failed
+    Resign = 1 << 7
 };
 //---------------------------------------------------------------------------
 /// The result class

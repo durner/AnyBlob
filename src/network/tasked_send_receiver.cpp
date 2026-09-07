@@ -279,6 +279,11 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 auto status = task->execute(*_connectionManager);
                 // check if finished
                 if (status == MessageState::Finished || status == MessageState::Aborted) {
+                    if (status == MessageState::Finished) {
+                        auto size = task->originalMessage->result.getSize();
+                        if (size >= _group._chunkSize)
+                            _connectionManager->recordThroughput(size, chrono::steady_clock::now() - task->startTime);
+                    }
                     for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
                         if (it->get() == task) {
                             // Remove the second param with the real data

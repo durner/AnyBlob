@@ -35,7 +35,8 @@ bool PollSocket::send_to(Request& req, std::chrono::milliseconds timeout, int32_
 // Prepare a submission send with timeout
 {
     if (req.event != EventType::write) return false;
-    enqueue(req.fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(&req), .timeout = chrono::steady_clock::now() + timeout, .flags = msg_flags});
+    auto deadline = timeout.count() ? chrono::steady_clock::now() + timeout : chrono::time_point<chrono::steady_clock>::max();
+    enqueue(req.fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(&req), .timeout = deadline, .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------
@@ -43,7 +44,8 @@ bool PollSocket::recv_to(Request& req, std::chrono::milliseconds timeout, int32_
 // Prepare a submission recv with timeout
 {
     if (req.event != EventType::read) return false;
-    enqueue(req.fd, POLLIN, RequestInfo{.request = &req, .timeout = chrono::steady_clock::now() + timeout, .flags = msg_flags});
+    auto deadline = timeout.count() ? chrono::steady_clock::now() + timeout : chrono::time_point<chrono::steady_clock>::max();
+    enqueue(req.fd, POLLIN, RequestInfo{.request = &req, .timeout = deadline, .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------
