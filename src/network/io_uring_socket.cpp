@@ -44,7 +44,7 @@ io_uring_sqe* IOUringSocket::send_prep(const Request& req, int32_t msg_flags, ui
 {
     assert(req.length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags);
+    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags | MSG_NOSIGNAL);
     sqe->flags |= flags;
     sqe->user_data = reinterpret_cast<uintptr_t>(&req);
     return sqe;
@@ -66,7 +66,7 @@ io_uring_sqe* IOUringSocket::send_prep_to(const Request& req, int32_t msg_flags,
 {
     assert(req.length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags);
+    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags | MSG_NOSIGNAL);
     sqe->flags |= flags | IOSQE_IO_LINK;
     sqe->user_data = reinterpret_cast<uintptr_t>(&req);
     auto timeoutSqe = io_uring_get_sqe(&_uring);
