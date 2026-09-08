@@ -85,6 +85,21 @@ string encodeUrlParameters(const string& encode)
     return result;
 }
 //---------------------------------------------------------------------------
+string encodeUrlPath(const string& encode)
+// Encodes a url path keeping the segment separators
+{
+    string result;
+    for (auto c : encode) {
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~' || c == '/')
+            result += c;
+        else {
+            result += "%";
+            result += hexEncode(reinterpret_cast<uint8_t*>(&c), 1, true);
+        }
+    }
+    return result;
+}
+//---------------------------------------------------------------------------
 string sha256Encode(const uint8_t* data, uint64_t length)
 // Encodes the data as sha256 hex string
 {
