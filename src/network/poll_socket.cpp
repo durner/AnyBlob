@@ -71,7 +71,7 @@ PollSocket::Request* PollSocket::complete()
                     if (req.request->event == EventType::read) {
                         req.request->length = ::recv(it->first, req.request->data.data, static_cast<size_t>(req.request->length), req.flags | MSG_DONTWAIT);
                     } else if (req.request->event == EventType::write) {
-                        req.request->length = ::send(it->first, req.request->data.cdata, static_cast<size_t>(req.request->length), req.flags | MSG_DONTWAIT);
+                        req.request->length = ::send(it->first, req.request->data.cdata, static_cast<size_t>(req.request->length), req.flags | MSG_DONTWAIT | MSG_NOSIGNAL);
                     }
 
                     // Simulate io uring by returning -errno
