@@ -382,9 +382,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
     if (range.first != range.second) {
         assert(range.second > range.first);
@@ -409,9 +409,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& file
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
     // Is it a multipart upload?
     if (part) {
@@ -437,9 +437,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequestGeneric(const string& f
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
     // Is it a multipart upload?
     if (!uploadId.empty()) {
@@ -461,9 +461,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::createMultiPartRequest(const string&
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
     request.queries.emplace("uploads", "");
 
     return buildRequest(request);
@@ -491,9 +491,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const strin
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
     request.queries.emplace("uploadId", uploadId);
     auto bodyData = reinterpret_cast<const uint8_t*>(content.data());

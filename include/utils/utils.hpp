@@ -19,6 +19,8 @@ namespace anyblob::utils {
 //---------------------------------------------------------------------------
 /// Encode url special characters in %HEX
 std::string encodeUrlParameters(const std::string& encode);
+/// Encode url path keeping the segment separators
+std::string encodeUrlPath(const std::string& encode);
 /// Encode everything from binary representation to hex
 std::string hexEncode(const uint8_t* input, uint64_t length, bool upper = false);
 /// Encode everything from binary representation to base64
