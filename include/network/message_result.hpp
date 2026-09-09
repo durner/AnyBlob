@@ -22,6 +22,7 @@ class DataVector;
 namespace network {
 //---------------------------------------------------------------------------
 struct OriginalMessage;
+struct MessageTask;
 struct HTTPMessage;
 struct HTTPSMessage;
 class TLSConnection;
@@ -118,6 +119,7 @@ class MessageResult {
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> moveDataVector();
 
     /// Define the friend message and message tasks
+    friend MessageTask;
     friend HTTPMessage;
     friend HTTPSMessage;
     friend OriginalMessage;

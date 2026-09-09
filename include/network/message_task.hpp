@@ -77,6 +77,14 @@ struct MessageTask {
     /// Restore the base timeout after progress
     void progressed() { stalls = 0; }
 
+    /// Report an abandoned request
+    void abort() {
+        originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
+        originalMessage->result.state = MessageState::Aborted;
+        if (originalMessage->requiresFinish())
+            originalMessage->finish();
+    }
+
     /// Allowed multiple of predicted transfer duration
     static constexpr unsigned deadlineFactor = 4;
 
