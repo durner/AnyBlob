@@ -335,6 +335,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
     // Rethrow the first caught exception (if any)
     if (firstException) {
         _connectionManager.reset();
+        reset();
         rethrow_exception(firstException);
     }
 }
@@ -350,6 +351,12 @@ void TaskedSendReceiver::reset()
 {
     while (!_submissions.empty())
         _submissions.pop();
+    for (auto& task : _messageTasks) {
+        try {
+            task->abort();
+        } catch (...) {
+        }
+    }
     _group._inflightMessages.fetch_sub(_messageTasks.size(), memory_order_acq_rel);
     _messageTasks.clear();
     if (_timings)
