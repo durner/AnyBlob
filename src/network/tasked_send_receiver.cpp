@@ -22,7 +22,7 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _sendReceiverCache(submissions), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _tcpSettings(make_unique<ConnectionManager::TCPSettings>()), _cv(), _mutex()
+TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _sendReceiverCache(submissions), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _inflightMessages(0), _tcpSettings(make_unique<ConnectionManager::TCPSettings>()), _cv(), _mutex()
 // Initializes the global submissions and completions
 {
     TLSContext::initOpenSSL();
@@ -211,6 +211,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             }
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
+            _group._inflightMessages.fetch_add(1, memory_order_acq_rel);
 
             if (_messageTasks.size() >= _group._concurrentRequests)
                 break;
@@ -248,6 +249,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             }
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
+            _group._inflightMessages.fetch_add(1, memory_order_acq_rel);
 
             if (_messageTasks.size() >= _group._concurrentRequests)
                 break;
@@ -295,6 +297,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                             if (task->originalMessage->requiresFinish())
                                 task->originalMessage->finish();
                             _messageTasks.erase(it);
+                            _group._inflightMessages.fetch_sub(1, memory_order_acq_rel);
                             _group._cv.notify_all();
                             break;
                         }
@@ -345,6 +348,7 @@ void TaskedSendReceiver::reset()
 {
     while (!_submissions.empty())
         _submissions.pop();
+    _group._inflightMessages.fetch_sub(_messageTasks.size(), memory_order_acq_rel);
     _messageTasks.clear();
     if (_timings)
         _timings->clear();
