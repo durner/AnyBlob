@@ -94,13 +94,15 @@ TaskedSendReceiverHandle& TaskedSendReceiverHandle::operator=(TaskedSendReceiver
 TaskedSendReceiverHandle::~TaskedSendReceiverHandle()
 // The destructor
 {
-    if (!_sendReceiver || !_sendReceiver->_connectionManager.get())
+    if (!_sendReceiver)
         return;
-    _sendReceiver->reset();
     auto ptr = _sendReceiver;
-    if (_group->_sendReceiverCache.insert(ptr) == ~0ull) {
+    auto reusable = ptr->_connectionManager && ptr->_messageTasks.empty();
+    ptr->reset();
+    if (!reusable || _group->_sendReceiverCache.insert(ptr) == ~0ull) {
         lock_guard<mutex> lg(_group->_resizeMutex);
-        _group->_sendReceivers.erase(remove_if(_group->_sendReceivers.begin(), _group->_sendReceivers.end(), [this](auto& val) { return val.get() == _sendReceiver; }));
+        auto& receivers = _group->_sendReceivers;
+        receivers.erase(remove_if(receivers.begin(), receivers.end(), [ptr](auto& val) { return val.get() == ptr; }), receivers.end());
     }
     _sendReceiver = nullptr;
 }
@@ -125,7 +127,7 @@ void TaskedSendReceiverHandle::stop()
 bool TaskedSendReceiverHandle::sendReceive(bool local, bool oneQueueInvocation)
 // Calls the underlying TaskedSendReceiver's sendReceive
 {
-    if (!_sendReceiver)
+    if (!_sendReceiver || !_sendReceiver->_connectionManager)
         return false;
     _sendReceiver->sendReceive(local, oneQueueInvocation);
     return true;
