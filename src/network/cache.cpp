@@ -5,6 +5,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <arpa/inet.h>
+#include <poll.h>
 #include <sys/types.h>
 #include <unistd.h>
 //---------------------------------------------------------------------------
@@ -132,6 +133,14 @@ unique_ptr<Cache::SocketEntry> Cache::findSocketEntry(const string& hostname, un
             socketEntry->dns->cachePriority--;
             _fifo.erase(socketEntry->timestamp);
             _cache.erase(it);
+            if (socketEntry->fd >= 0) {
+                pollfd event = {.fd = socketEntry->fd, .events = POLLRDHUP, .revents = 0};
+                if (poll(&event, 1, 0) > 0 && event.revents & (POLLRDHUP | POLLHUP | POLLERR)) {
+                    socketEntry->tls.reset();
+                    close(socketEntry->fd);
+                    socketEntry->fd = -1;
+                }
+            }
             return socketEntry;
         }
         it++;
