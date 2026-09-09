@@ -122,7 +122,7 @@ string imdsFetch(network::TaskedSendReceiverHandle& sendReceiverHandle, unique_p
     info.provider = Provider::CloudService::HTTP;
     HTTP http(info);
     auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-    if (!sendReceiverHandle.sendSync(originalMsg.get()) || !sendReceiverHandle.processSync())
+    if (!sendReceiverHandle.sendSync(originalMsg.get()) || !sendReceiverHandle.processSync() || !originalMsg->result.success())
         return {};
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
@@ -300,53 +300,47 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to initialize the secret
 {
     if (_type == Provider::CloudService::AWS && !validKeys(180)) {
+        unique_lock lock(_mutex);
+        _secret = _globalSecret;
+        _validInstance = this;
         // Bound retries when metadata cannot supply credentials
-        for (auto attempt = 0u; attempt < secretAttempts; attempt++) {
-            if (_mutex.try_lock()) {
-                _secret = _globalSecret;
-                _validInstance = this;
-                if (validKeys(180)) {
-                    _mutex.unlock();
-                    return;
-                }
-                auto token = imdsToken(sendReceiverHandle, getIAMAddress(), getIAMPort());
-                auto s = imdsFetch(sendReceiverHandle, downloadIAMUser(token), getIAMAddress(), getIAMPort());
-                string iamUser;
-                s = imdsFetch(sendReceiverHandle, downloadSecret(s, iamUser, token), getIAMAddress(), getIAMPort());
-                updateSecret(s, iamUser);
-                _mutex.unlock();
-            }
+        for (auto attempt = 0u; !validKeys(180) && attempt < secretAttempts; attempt++) {
+            auto token = imdsToken(sendReceiverHandle, getIAMAddress(), getIAMPort());
+            auto s = imdsFetch(sendReceiverHandle, downloadIAMUser(token), getIAMAddress(), getIAMPort());
+            string iamUser;
+            s = imdsFetch(sendReceiverHandle, downloadSecret(s, iamUser, token), getIAMAddress(), getIAMPort());
+            updateSecret(s, iamUser);
             if (validKeys(60))
-                return;
+                break;
         }
+        if (!validKeys(60))
+            throw runtime_error("AWS IAM credential initialization exhausted its retry budget");
     }
     if (_type == Provider::CloudService::AWS && _settings.zonal && !validSession(180)) {
-        for (auto attempt = 0u; attempt < secretAttempts; attempt++) {
-            if (_mutex.try_lock()) {
-                _sessionSecret = _globalSessionSecret;
-                _validInstance = this;
-                if (validKeys(180)) {
-                    _mutex.unlock();
-                    return;
-                }
-                auto message = getSessionToken();
-                RemoteInfo info;
-                info.endpoint = _settings.bucket + ".s3.amazonaws.com";
-                info.port = getPort();
-                info.provider = CloudService::HTTP;
-                HTTP http(info);
-                auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                verify(sendReceiverHandle.sendSync(originalMsg.get()));
-                verify(sendReceiverHandle.processSync());
+        unique_lock lock(_mutex);
+        _sessionSecret = _globalSessionSecret;
+        _validInstance = this;
+        for (auto attempt = 0u; !validSession(180) && attempt < secretAttempts; attempt++) {
+            auto message = getSessionToken();
+            if (!message)
+                break;
+            RemoteInfo info;
+            info.endpoint = _settings.bucket + ".s3.amazonaws.com";
+            info.port = getPort();
+            info.provider = CloudService::HTTP;
+            HTTP http(info);
+            auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
+            if (sendReceiverHandle.sendSync(originalMsg.get()) && sendReceiverHandle.processSync() && originalMsg->result.success()) {
                 auto& secretContent = originalMsg->result.getDataVector();
                 unique_ptr<network::HttpHelper::Info> infoPtr;
                 auto s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
                 updateSessionToken(s);
-                _mutex.unlock();
             }
             if (validSession(60))
-                return;
+                break;
         }
+        if (!validSession(60))
+            throw runtime_error("AWS zonal session initialization exhausted its retry budget");
     }
 }
 //---------------------------------------------------------------------------
@@ -393,7 +387,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::resignRequest(const utils::DataVecto
 unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(network::HttpRequest& request, const uint8_t* bodyData, uint64_t bodyLength, bool initHeaders) const
 // Creates and signs the request
 {
-    shared_ptr<Secret> secret;
+    shared_ptr<Secret> secret = _secret;
     if (initHeaders) {
         request.headers.emplace("Host", getAddress());
         request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
