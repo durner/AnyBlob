@@ -54,12 +54,10 @@ PollSocket::Request* PollSocket::complete()
 {
     while (ready.empty()) {
         // Activly poll here as well to match io_uring because we have to check for new arrivals
-        if (readyFds <= 0) {
-            // Poll wait up to 1ms
+        // Poll wait up to 1ms
+        if (readyFds <= 0)
             readyFds = ::poll(pollfds.data(), pollfds.size(), 1);
-            // No events ready
-            if (readyFds <= 0) continue;
-        }
+        readyFds = 0;
 
         // Check for completed events
         auto currentTime = chrono::steady_clock::now();
