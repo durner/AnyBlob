@@ -1,9 +1,11 @@
 #include "network/tls_connection.hpp"
+#include "cloud/provider.hpp"
 #include "network/https_message.hpp"
 #include "network/tls_context.hpp"
 #include <cassert>
 #include <memory>
 #include <utility>
+#include <arpa/inet.h>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
@@ -48,6 +50,14 @@ bool TLSConnection::init(HTTPSMessage* message)
         SSL_set_connect_state(_ssl);
         BIO_new_bio_pair(&_internalBio, _message->chunkSize, &_networkBio, _message->chunkSize);
         SSL_set_bio(_ssl, _internalBio, _internalBio);
+        // The sni must not be an ip
+        auto address = _message->originalMessage->provider.getAddress();
+        sockaddr_in6 numeric;
+        auto named = inet_pton(AF_INET, address.c_str(), &numeric) != 1 && inet_pton(AF_INET6, address.c_str(), &numeric) != 1;
+        if (named && !SSL_ctrl(_ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, const_cast<char*>(address.c_str()))) {
+            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+            return false;
+        }
         _context.reuseSession(_message->fd, _ssl);
     } else {
         _message = message;
