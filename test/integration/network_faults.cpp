@@ -77,13 +77,15 @@ unique_ptr<network::TaskedSendReceiverGroup> makeGroup() {
 }
 //---------------------------------------------------------------------------
 /// Check GET completion time and optional content
-bool boundedGet(cloud::Provider& provider, network::TaskedSendReceiverHandle& handle, const string& file, const string* expected) {
+bool boundedGet(cloud::Provider& provider, network::TaskedSendReceiverHandle& handle, const string& file, const string* expected, uint16_t* failure = nullptr) {
     network::Transaction txn(&provider);
     txn.verifyKeyRequest(handle, [&]() { return txn.getObjectRequest(file); });
     auto start = chrono::steady_clock::now();
     txn.processSync(handle);
     CHECK(chrono::steady_clock::now() - start < 15s);
     for (const auto& it : txn) {
+        if (failure)
+            *failure |= it.getFailureCode();
         if (!it.success())
             return false;
         if (expected) {
@@ -220,9 +222,13 @@ TEST_CASE("Network Fault Integration") {
         CHECK(boundedGet(*provider, handle, "faults/data.bin", &content));
         CHECK(proxy.getAccepted() == 1);
         // Let the proxy close the idle connection
-        this_thread::sleep_for(1s);
-        CHECK(boundedGet(*provider, handle, "faults/data.bin", &content));
-        CHECK(proxy.getAccepted() == 2);
+        uint16_t failure = 0;
+        for (auto i = 0u; i != 3u; i++) {
+            this_thread::sleep_for(1s);
+            CHECK(boundedGet(*provider, handle, "faults/data.bin", &content, &failure));
+        }
+        CHECK(proxy.getAccepted() == 4);
+        CHECK(failure == 0);
     }
 
     SECTION("async storm through transient faults") {
