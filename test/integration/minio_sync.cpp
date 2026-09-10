@@ -158,7 +158,7 @@ TEST_CASE("MinIO Sync Integration") {
         // A ranged get reports the size of the whole object
         anyblob::network::Transaction rangeTxn(provider.get());
         auto rangeRequest = [&rangeTxn, &fileName]() {
-            return rangeTxn.getObjectRequest(fileName[1], pair<uint64_t, uint64_t>(8, 24));
+            return rangeTxn.getObjectRequest(fileName[1], {8, 24});
         };
         rangeTxn.verifyKeyRequest(sendReceiverHandle, move(rangeRequest));
         rangeTxn.processSync(sendReceiverHandle);

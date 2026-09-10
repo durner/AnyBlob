@@ -4,6 +4,7 @@
 #include "network/http_message.hpp"
 #include "network/message_result.hpp"
 #include "network/original_message.hpp"
+#include "network/transaction.hpp"
 #include "utils/data_vector.hpp"
 #include <chrono>
 //---------------------------------------------------------------------------
@@ -23,9 +24,17 @@ using namespace std::chrono_literals;
 struct FakeProvider : cloud::Provider {
     /// The resign result
     utils::DataVector<uint8_t>* resignResult = nullptr;
+    /// The path of the last request
+    mutable string lastPath;
+    /// The range of the last request
+    mutable pair<uint64_t, uint64_t> lastRange = {};
 
     FakeProvider() { _type = CloudService::HTTP; }
-    unique_ptr<utils::DataVector<uint8_t>> getRequest(const string&, const pair<uint64_t, uint64_t>&) const override { return nullptr; }
+    unique_ptr<utils::DataVector<uint8_t>> getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const override {
+        lastPath = filePath;
+        lastRange = range;
+        return make_unique<utils::DataVector<uint8_t>>();
+    }
     unique_ptr<utils::DataVector<uint8_t>> putRequest(const string&, string_view) const override { return nullptr; }
     unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const string&) const override { return nullptr; }
     string getAddress() const override { return "localhost"; }
@@ -111,6 +120,22 @@ TEST_CASE("messages") {
     unlimitedTask.startTime -= 31s;
     unlimitedTask.reset(connectionManager, false);
     REQUIRE(unlimitedMessage.result.getState() == MessageState::Init);
+}
+//---------------------------------------------------------------------------
+TEST_CASE("transaction_overloads") {
+    FakeProvider provider;
+    Transaction txn(&provider);
+    string remotePath = "dir/file.parquet";
+
+    // A braced range must not be taken for a callback
+    REQUIRE(txn.getObjectRequest(remotePath, {8, 23}));
+    REQUIRE(provider.lastPath == remotePath);
+    REQUIRE(provider.lastRange == pair<uint64_t, uint64_t>(8, 23));
+
+    auto callback = [](MessageResult&) {};
+    REQUIRE(txn.getObjectRequest(callback, remotePath, {16, 32}));
+    REQUIRE(provider.lastPath == remotePath);
+    REQUIRE(provider.lastRange == pair<uint64_t, uint64_t>(16, 32));
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::network::test
