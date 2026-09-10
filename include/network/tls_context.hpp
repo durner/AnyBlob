@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include <openssl/ssl.h>
 #include <openssl/types.h>
 //---------------------------------------------------------------------------
@@ -20,15 +21,18 @@ class TLSConnection;
 // we allow only one context per thread to avoid locking.
 // This simplifies also the caching of sessions.
 class TLSContext {
-    /// A cached session and its endpoint
+    /// The cached sessions of one endpoint
     struct SessionEntry {
-        /// The session
-        SSL_SESSION* session = nullptr;
+        /// The unused sessions, a ticket resumes at most once
+        std::vector<SSL_SESSION*> sessions;
         /// The port
         uint32_t port = 0;
         /// Was the peer verified
         bool verifyPeer = false;
     };
+
+    /// The number of sessions kept per endpoint
+    static constexpr unsigned maxSessionsPerEndpoint = 8;
 
     /// The ssl context
     SSL_CTX* _ctx;
@@ -46,15 +50,17 @@ class TLSContext {
     /// Is the trust store available
     [[nodiscard]] bool hasTrustStore() const { return _trustStore; }
 
-    /// Caches the SSL session
-    bool cacheSession(const std::string& hostname, uint32_t port, bool verifyPeer, SSL* ssl);
-    /// Drops the SSL session
+    /// Caches the SSL session, takes ownership of the session when it is kept
+    bool cacheSession(const std::string& hostname, uint32_t port, bool verifyPeer, SSL_SESSION* session);
+    /// Drops the SSL sessions of the endpoint
     bool dropSession(const std::string& hostname, uint32_t port);
     /// Reuses a SSL session
     bool reuseSession(const std::string& hostname, uint32_t port, bool verifyPeer, SSL* ssl);
 
     /// Init the OpenSSL algos and errors
     static void initOpenSSL();
+    /// The ssl slot that points back to the connection
+    static int connectionSlot();
 
     friend TLSConnection;
 };
