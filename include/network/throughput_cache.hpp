@@ -40,6 +40,8 @@ class ThroughputCache : public network::Cache {
     uint64_t _throughputIterator;
     /// The maximum history
     const unsigned _maxHistory = 128;
+    /// The share of the median throughput a connection must carry to keep its priority
+    static constexpr double retentionBand = 0.8;
 
     public:
     /// The constructor
