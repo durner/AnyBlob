@@ -90,6 +90,24 @@ class AWSTester {
         dv = aws.getRequest("a/b/c.d", range);
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()).find("Range: bytes=0-0") != string_view::npos);
 
+        // A list request signs its query, so the whole target has to survive a resign
+        dv = aws.listRequest("dir/", "", 0);
+        resultString = "GET /?list-type=2&prefix=dir%2F HTTP/1.1\r\nAuthorization: AWS4-HMAC-SHA256 Credential=ABC/21000101/test/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-request-payer;x-amz-security-token, Signature=c207c3effc015311506838735d1f16ba8ccc795564814187024b46b85f69cdc2\r\nHost: test.s3.test.amazonaws.com\r\nx-amz-content-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\r\nx-amz-date: ";
+        resultString += aws.fakeAMZTimestamp;
+        resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+        dvResigned = aws.resignRequest(*dv.get());
+        REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
+
+        // A truncated result is continued with the token it came back with
+        dv = aws.listRequest("dir/", "1ueGcxLPRx1Tr/XYExHnhbYLgveDs2J/wm36Hy4vbOwM=", 1);
+        resultString = "GET /?continuation-token=1ueGcxLPRx1Tr%2FXYExHnhbYLgveDs2J%2Fwm36Hy4vbOwM%3D&list-type=2&max-keys=1&prefix=dir%2F HTTP/1.1\r\nAuthorization: AWS4-HMAC-SHA256 Credential=ABC/21000101/test/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-request-payer;x-amz-security-token, Signature=293b884103946cd960172e764909d982749a16495cc1b13d9532594e18f5324b\r\nHost: test.s3.test.amazonaws.com\r\nx-amz-content-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\r\nx-amz-date: ";
+        resultString += aws.fakeAMZTimestamp;
+        resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+        dvResigned = aws.resignRequest(*dv.get());
+        REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
+
         // A public bucket is asked without a signature and without asking it to charge anyone
         auto anonymousProvider = Provider::makeAnonymousProvider("s3://test:test/a/b/c.d");
         AWS& anonymous = *static_cast<AWS*>(anonymousProvider.get());

@@ -186,6 +186,71 @@ TEST_CASE("MinIO Sync Integration") {
         group.getTCPSettings().timeout = storedTimeout;
     }
     {
+        // List what the bucket holds under a prefix
+        string listPrefix = "list/";
+        string listNames[]{listPrefix + "a.parquet", listPrefix + "b.parquet"};
+        anyblob::network::Transaction listPutTxn(provider.get());
+        for (auto i = 0u; i < 2; i++) {
+            auto& currentFileName = listNames[i];
+            auto putObjectRequest = [&listPutTxn, &currentFileName, &content]() {
+                return listPutTxn.putObjectRequest(currentFileName, content[0].data(), content[0].size());
+            };
+            listPutTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
+        }
+        listPutTxn.processSync(sendReceiverHandle);
+        for (const auto& it : listPutTxn)
+            REQUIRE(it.success());
+
+        anyblob::network::Transaction listTxn(provider.get());
+        auto listObjectsRequest = [&listTxn, &listPrefix]() {
+            return listTxn.listObjectsRequest(listPrefix);
+        };
+        listTxn.verifyKeyRequest(sendReceiverHandle, move(listObjectsRequest));
+        listTxn.processSync(sendReceiverHandle);
+        string continuationToken = "unset";
+        for (const auto& it : listTxn) {
+            REQUIRE(it.success());
+            auto keys = cloud::Provider::getListObjectKeys(it.getResult(), continuationToken);
+            REQUIRE(keys.size() == 2);
+            REQUIRE(keys[0] == listNames[0]);
+            REQUIRE(keys[1] == listNames[1]);
+            REQUIRE(continuationToken.empty());
+        }
+
+        // A truncated result is continued with the token it came back with
+        vector<string> pagedKeys;
+        auto pages = 0u;
+        do {
+            anyblob::network::Transaction pageTxn(provider.get());
+            auto pageRequest = [&pageTxn, &listPrefix, &continuationToken]() {
+                return pageTxn.listObjectsRequest(listPrefix, continuationToken, 1);
+            };
+            pageTxn.verifyKeyRequest(sendReceiverHandle, move(pageRequest));
+            pageTxn.processSync(sendReceiverHandle);
+            for (const auto& it : pageTxn) {
+                REQUIRE(it.success());
+                auto keys = cloud::Provider::getListObjectKeys(it.getResult(), continuationToken);
+                REQUIRE(keys.size() == 1);
+                pagedKeys.push_back(keys[0]);
+            }
+        } while (!continuationToken.empty() && ++pages < 8);
+        REQUIRE(pagedKeys.size() == 2);
+        REQUIRE(pagedKeys[0] == listNames[0]);
+        REQUIRE(pagedKeys[1] == listNames[1]);
+
+        anyblob::network::Transaction listDeleteTxn(provider.get());
+        for (auto i = 0u; i < 2; i++) {
+            auto& currentFileName = listNames[i];
+            auto deleteObjectRequest = [&listDeleteTxn, &currentFileName]() {
+                return listDeleteTxn.deleteObjectRequest(currentFileName);
+            };
+            listDeleteTxn.verifyKeyRequest(sendReceiverHandle, move(deleteObjectRequest));
+        }
+        listDeleteTxn.processSync(sendReceiverHandle);
+        for (const auto& it : listDeleteTxn)
+            REQUIRE(it.success());
+    }
+    {
         // Create the delete request
         anyblob::network::Transaction deleteTxn(provider.get());
         for (auto i = 0u; i < 2; i++) {

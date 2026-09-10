@@ -143,8 +143,10 @@ class AWS : public Provider {
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> resignRequest(const utils::DataVector<uint8_t>& data, const uint8_t* bodyData = nullptr, uint64_t bodyLength = 0) const override;
     /// Supports resigning the request
     [[nodiscard]] bool supportsResigning() const override { return true; }
-    /// Builds the http request for downloading a blob or listing the directory
+    /// Builds the http request for downloading a blob
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
+    /// Builds the http request for listing the objects
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> listRequest(const std::string& prefix, std::string_view continuationToken, uint32_t maxKeys) const override;
     /// Builds the http request for putting objects without the object data itself
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequestGeneric(const std::string& filePath, std::string_view object, uint16_t part, std::string_view uploadId) const override;
     /// Builds the http request for putting objects without the object data itself

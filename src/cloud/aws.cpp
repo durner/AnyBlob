@@ -449,6 +449,33 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
     return buildRequest(request);
 }
 //---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::listRequest(const string& prefix, string_view continuationToken, uint32_t maxKeys) const
+// Builds the http request for listing the objects
+{
+    if (!validKeys() || (_settings.zonal && !validSession()))
+        return nullptr;
+
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::GET;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
+
+    // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
+    if (_settings.endpoint.empty())
+        request.path = "/";
+    else
+        request.path = "/" + _settings.bucket;
+
+    request.queries.emplace("list-type", "2");
+    if (!prefix.empty())
+        request.queries.emplace("prefix", prefix);
+    if (!continuationToken.empty())
+        request.queries.emplace("continuation-token", continuationToken);
+    if (maxKeys)
+        request.queries.emplace("max-keys", to_string(maxKeys));
+
+    return buildRequest(request);
+}
+//---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& filePath, string_view object, uint16_t part, string_view uploadId) const
 // Builds the http request for putting objects without the object data itself
 {
