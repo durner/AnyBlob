@@ -98,7 +98,7 @@ HttpRequest HttpRequest::deserialize(string_view data)
                         value = query.substr(keyPos + 1);
                     }
                     if (key.size() > 0)
-                        request.queries.emplace(key, value);
+                        request.queries.emplace(utils::decodeUrlParameters(key), utils::decodeUrlParameters(value));
                     if (queryPos == queries.npos)
                         break;
                     queries = queries.substr(queryPos + 1);
