@@ -92,12 +92,14 @@ class Provider {
     virtual void getSecret() {}
 
     public:
-    /// Builds the http request for downloading a blob or listing a directory
+    /// Builds the http request for downloading a blob
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const = 0;
     /// Builds the http request for putting an object without the actual data (header only according to the data and length provided)
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, std::string_view object) const = 0;
     /// Builds the http request for deleting an object
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const = 0;
+    /// Builds the http request for listing the objects
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> listRequest(const std::string& /*prefix*/, std::string_view /*continuationToken*/, uint32_t /*maxKeys*/) const;
     /// Get the address of the server
     [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
@@ -142,6 +144,8 @@ class Provider {
     [[nodiscard]] static std::string getETag(std::string_view header);
     /// Get the upload id from the multipart request body
     [[nodiscard]] static std::string getUploadId(std::string_view body);
+    /// Get the object keys of a list objects and the continuation token
+    [[nodiscard]] static std::vector<std::string> getListObjectKeys(std::string_view body, std::string& continuationToken);
     /// Parse a row from csv file
     [[nodiscard]] static std::vector<std::string> parseCSVRow(std::string_view body);
 

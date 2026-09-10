@@ -135,6 +135,33 @@ string Provider::getUploadId(string_view body)
     return string(body.substr(pos, end - pos));
 }
 //---------------------------------------------------------------------------
+vector<string> Provider::getListObjectKeys(string_view body, string& continuationToken)
+// Get the object keys of a list objects and the continuation token
+{
+    vector<string> keys;
+    string needle = "<Key>";
+    auto pos = body.find(needle);
+    while (pos != body.npos) {
+        pos += needle.length();
+        auto end = body.find("</Key>", pos);
+        if (end == body.npos)
+            break;
+        keys.emplace_back(body.substr(pos, end - pos));
+        pos = body.find(needle, end);
+    }
+
+    continuationToken = "";
+    needle = "<NextContinuationToken>";
+    pos = body.find(needle);
+    if (pos != body.npos) {
+        pos += needle.length();
+        auto end = body.find("</NextContinuationToken>", pos);
+        if (end != body.npos)
+            continuationToken = body.substr(pos, end - pos);
+    }
+    return keys;
+}
+//---------------------------------------------------------------------------
 vector<string> Provider::parseCSVRow(string_view body)
 // Read a csv row (simplified, no quotes in quotes and no new lines)
 {
@@ -164,6 +191,12 @@ vector<string> Provider::parseCSVRow(string_view body)
         }
     }
     return row;
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Provider::listRequest(const string& /*prefix*/, string_view /*continuationToken*/, uint32_t /*maxKeys*/) const
+// Builds the http request for listing the objects
+{
+    return nullptr;
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Provider::putRequestGeneric(const string& /*filePath*/, string_view /*object*/, uint16_t /*part*/, string_view /*uploadId*/) const
