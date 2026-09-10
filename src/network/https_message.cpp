@@ -32,6 +32,8 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
 // executes the task
 {
     auto& state = originalMessage->result.state;
+    // A rejected certificate cannot be retried
+    auto rejectedCertificate = [this]() { return (originalMessage->result.failureCode & static_cast<uint16_t>(MessageFailureCode::Certificate)) != 0; };
     if (expired(connectionManager)) {
         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
         reset(connectionManager, true);
@@ -40,7 +42,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
     switch (state) {
         case MessageState::Init: {
             try {
-                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), true, tcpSettings);
+                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), true, originalMessage->provider.verifyPeer(), tcpSettings);
             } catch (exception& /*e*/) {
                 if (request)
                     request->fd = -1;
@@ -51,7 +53,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
             tlsLayer = connectionManager.getTLSConnection(fd);
             if (!tlsLayer->init(this)) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
-                reset(connectionManager, exhausted(connectionFailuresMax));
+                reset(connectionManager, rejectedCertificate() || exhausted(connectionFailuresMax));
                 return execute(connectionManager);
             }
             state = MessageState::TLSHandshake;
@@ -64,7 +66,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                 state = MessageState::InitSending;
             } else if (status == TLSConnection::Progress::Aborted) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
-                reset(connectionManager, exhausted(failuresMax));
+                reset(connectionManager, rejectedCertificate() || exhausted(failuresMax));
                 return execute(connectionManager);
             } else {
                 return state;

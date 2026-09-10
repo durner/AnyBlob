@@ -81,7 +81,7 @@ class ConnectionManager {
     ~ConnectionManager();
 
     /// Connect using settings.timeout unless timeoutOverride is nonzero
-    [[nodiscard]] int32_t connect(const std::string& hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit = 0, std::chrono::milliseconds timeoutOverride = std::chrono::milliseconds::zero());
+    [[nodiscard]] int32_t connect(const std::string& hostname, uint32_t port, bool tls, bool verifyPeer, const TCPSettings& tcpSettings, int retryLimit = 0, std::chrono::milliseconds timeoutOverride = std::chrono::milliseconds::zero());
     /// Disconnects the socket
     void disconnect(int32_t fd, const TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
 

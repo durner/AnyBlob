@@ -118,7 +118,7 @@ void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*by
     }
 }
 //---------------------------------------------------------------------------
-unique_ptr<Cache::SocketEntry> Cache::findSocketEntry(const string& hostname, unsigned port, bool tls)
+unique_ptr<Cache::SocketEntry> Cache::findSocketEntry(const string& hostname, unsigned port, bool tls, bool verifyPeer)
 // Returns a matching cached socket entry
 {
     for (auto it = _cache.find(hostname); it != _cache.end();) {
@@ -128,7 +128,11 @@ unique_ptr<Cache::SocketEntry> Cache::findSocketEntry(const string& hostname, un
             it = _cache.erase(it);
             continue;
         }
-        if (it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
+        if (it->first == hostname && it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
+            if (tls && it->second->fd >= 0 && it->second->tls->verifiesPeer() != verifyPeer) {
+                it++;
+                continue;
+            }
             auto socketEntry = move(it->second);
             socketEntry->dns->cachePriority--;
             _fifo.erase(socketEntry->timestamp);
@@ -169,10 +173,10 @@ unique_ptr<Cache::SocketEntry> Cache::forceResolve(const string& hostname, unsig
     return socketEntry;
 }
 //---------------------------------------------------------------------------
-unique_ptr<Cache::SocketEntry> Cache::resolve(const string& hostname, unsigned port, bool tls)
+unique_ptr<Cache::SocketEntry> Cache::resolve(const string& hostname, unsigned port, bool tls, bool verifyPeer)
 // Resolve the request
 {
-    if (auto socketEntry = findSocketEntry(hostname, port, tls))
+    if (auto socketEntry = findSocketEntry(hostname, port, tls, verifyPeer))
         return socketEntry;
     return forceResolve(hostname, port);
 }

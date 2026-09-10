@@ -35,7 +35,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
     switch (state) {
         case MessageState::Init: {
             try {
-                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), false, tcpSettings);
+                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), false, false, tcpSettings);
             } catch (exception& /*e*/) {
                 if (request)
                     request->fd = -1;

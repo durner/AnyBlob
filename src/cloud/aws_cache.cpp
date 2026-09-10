@@ -24,10 +24,10 @@ AWSCache::AWSCache() : Cache(), _mtuCache()
 {
 }
 //---------------------------------------------------------------------------
-unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(const string& hostname, unsigned port, bool tls)
+unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(const string& hostname, unsigned port, bool tls, bool verifyPeer)
 // Resolve the request
 {
-    if (auto socketEntry = findSocketEntry(hostname, port, tls))
+    if (auto socketEntry = findSocketEntry(hostname, port, tls, verifyPeer))
         return socketEntry;
     auto socketEntry = forceResolve(hostname, port);
 

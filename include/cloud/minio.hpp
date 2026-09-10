@@ -22,9 +22,12 @@ class MinIO : public AWS {
     /// The constructor
     explicit MinIO(const RemoteInfo& info) : AWS(info) {
         assert(info.provider == Provider::CloudService::MinIO);
+        _verifyPeer = false;
     }
     /// The custom endpoint constructor
-    MinIO(const RemoteInfo& info, const std::string& keyId, const std::string& key) : AWS(info, keyId, key) {}
+    MinIO(const RemoteInfo& info, const std::string& keyId, const std::string& key) : AWS(info, keyId, key) {
+        _verifyPeer = false;
+    }
     /// Get the address of the server
     [[nodiscard]] std::string getAddress() const override;
     /// Get the instance details
