@@ -136,6 +136,53 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Azure::listRequest(const string& prefix, string_view continuationToken, uint32_t maxKeys) const
+// Builds the http request for listing the blobs of the container
+{
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::GET;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
+    request.path = "/" + _settings.container;
+
+    request.queries.emplace("restype", "container");
+    request.queries.emplace("comp", "list");
+    if (!prefix.empty())
+        request.queries.emplace("prefix", prefix);
+    if (!continuationToken.empty())
+        request.queries.emplace("marker", continuationToken);
+    if (maxKeys)
+        request.queries.emplace("maxresults", to_string(maxKeys));
+
+    request.headers.emplace("x-ms-date", testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp());
+    request.headers.emplace("Host", getAddress());
+
+    request.path = AzureSigner::createSignedRequest(_secret->accountName, _secret->privateKey, request);
+
+    string httpHeader = network::HttpRequest::getRequestMethod(request.method);
+    httpHeader += " " + request.path + " ";
+    httpHeader += network::HttpRequest::getRequestType(request.type);
+    httpHeader += "\r\n";
+    for (const auto& h : request.headers)
+        httpHeader += h.first + ": " + h.second + "\r\n";
+    httpHeader += "\r\n";
+
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+vector<string> Azure::getListObjectKeys(string_view body, string& continuationToken) const
+// Get the object keys of a list objects and the continuation token
+{
+    vector<string> keys;
+    uint64_t pos = 0;
+    while (auto name = getXMLTagValue(body, "Name", pos))
+        keys.emplace_back(*name);
+
+    pos = 0;
+    auto marker = getXMLTagValue(body, "NextMarker", pos);
+    continuationToken = marker ? string(*marker) : "";
+    return keys;
+}
+//---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath, string_view object) const
 // Builds the http request for putting objects without the object data itself
 {
