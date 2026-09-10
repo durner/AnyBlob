@@ -57,11 +57,11 @@ TEST_CASE("cache") {
     REQUIRE(CacheTester::selectAddress(chain.data(), failed, now) == chain.data());
 
     Cache cache;
-    auto entry = cache.resolve("localhost", 80, false);
+    auto entry = cache.resolve("localhost", 80, false, false);
     REQUIRE(entry->dns);
     REQUIRE(entry->dns->selected);
     cache.shutdownSocket(move(entry), 8);
-    entry = cache.resolve("localhost", 80, false);
+    entry = cache.resolve("localhost", 80, false, false);
     REQUIRE(entry->dns);
     REQUIRE(entry->dns->selected);
 }

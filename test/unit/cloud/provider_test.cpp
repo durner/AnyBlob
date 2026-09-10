@@ -22,4 +22,17 @@ TEST_CASE("provider") {
     REQUIRE(info.region == "");
 }
 //---------------------------------------------------------------------------
+TEST_CASE("provider_verify_peer") {
+    auto aws = Provider::makeProvider("s3://bucket:region/file", true, "key", "secret");
+    REQUIRE(aws->verifyPeer());
+    auto https = Provider::makeProvider("https://host/file");
+    REQUIRE(https->verifyPeer());
+    auto minio = Provider::makeProvider("minio://127.0.0.1:9000/bucket:region/file", false, "key", "secret");
+    REQUIRE(!minio->verifyPeer());
+    minio->setVerifyPeer(true);
+    REQUIRE(minio->verifyPeer());
+    https->setVerifyPeer(false);
+    REQUIRE(!https->verifyPeer());
+}
+//---------------------------------------------------------------------------
 } // namespace anyblob::cloud::test

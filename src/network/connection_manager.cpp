@@ -70,7 +70,7 @@ void ConnectionManager::recordThroughput(uint64_t bytes, chrono::nanoseconds ela
     _healthyRate = _healthyRate > 0 ? (7 * _healthyRate + rate) / 8 : rate;
 }
 //---------------------------------------------------------------------------
-int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit, chrono::milliseconds timeoutOverride)
+int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool tls, bool verifyPeer, const TCPSettings& tcpSettings, int retryLimit, chrono::milliseconds timeoutOverride)
 // Creates a new socket connection
 {
     auto connectTimeout = timeoutOverride.count() ? timeoutOverride : tcpSettings.timeout;
@@ -84,7 +84,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
     }
 
     // Did we use
-    auto socketEntry = resCache->resolve(hostname, port, tls);
+    auto socketEntry = resCache->resolve(hostname, port, tls, verifyPeer);
 
     auto fd = socketEntry->fd;
     if (fd >= 0) {
@@ -237,7 +237,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
     if (connectRes < 0 && errno != EINPROGRESS) {
         resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
         if (retryLimit > 0) {
-            return connect(hostname, port, tls, tcpSettings, retryLimit - 1, timeoutOverride);
+            return connect(hostname, port, tls, verifyPeer, tcpSettings, retryLimit - 1, timeoutOverride);
         } else {
             throw runtime_error("Socket creation error! " + string(strerror(errno)));
         }
@@ -281,7 +281,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
             // Reached timeout
             resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             if (retryLimit > 0) {
-                return connect(hostname, port, tls, tcpSettings, retryLimit - 1);
+                return connect(hostname, port, tls, verifyPeer, tcpSettings, retryLimit - 1);
             } else {
                 throw runtime_error("Socket creation error! Timeout reached");
             }

@@ -59,7 +59,9 @@ enum class MessageFailureCode : uint16_t {
     /// TLS error
     TLS = 1 << 6,
     /// Resigning the request failed
-    Resign = 1 << 7
+    Resign = 1 << 7,
+    /// Peer verification failed
+    Certificate = 1 << 8
 };
 //---------------------------------------------------------------------------
 /// The result class

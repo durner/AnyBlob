@@ -1,5 +1,7 @@
 #pragma once
-#include <array>
+#include <cstdint>
+#include <string>
+#include <unordered_map>
 #include <openssl/ssl.h>
 #include <openssl/types.h>
 //---------------------------------------------------------------------------
@@ -18,14 +20,22 @@ class TLSConnection;
 // we allow only one context per thread to avoid locking.
 // This simplifies also the caching of sessions.
 class TLSContext {
+    /// A cached session and its endpoint
+    struct SessionEntry {
+        /// The session
+        SSL_SESSION* session = nullptr;
+        /// The port
+        uint32_t port = 0;
+        /// Was the peer verified
+        bool verifyPeer = false;
+    };
+
     /// The ssl context
     SSL_CTX* _ctx;
-    /// The cache size as power of 2
-    static constexpr uint8_t cachePower = 8;
-    /// The cache mask
-    static constexpr uint64_t cacheMask = (~0ull) >> (64 - cachePower);
-    /// The session cache
-    std::array<std::pair<uint64_t, SSL_SESSION*>, 1ull << cachePower> _sessionCache;
+    /// Is the trust store loaded
+    bool _trustStore;
+    /// The session cache, uses the hostname as key
+    std::unordered_map<std::string, SessionEntry> _sessionCache;
 
     public:
     /// The constructor
@@ -33,12 +43,15 @@ class TLSContext {
     /// The destructor
     ~TLSContext();
 
+    /// Is the trust store available
+    [[nodiscard]] bool hasTrustStore() const { return _trustStore; }
+
     /// Caches the SSL session
-    bool cacheSession(int fd, SSL* ssl);
+    bool cacheSession(const std::string& hostname, uint32_t port, bool verifyPeer, SSL* ssl);
     /// Drops the SSL session
-    bool dropSession(int fd);
+    bool dropSession(const std::string& hostname, uint32_t port);
     /// Reuses a SSL session
-    bool reuseSession(int fd, SSL* ssl);
+    bool reuseSession(const std::string& hostname, uint32_t port, bool verifyPeer, SSL* ssl);
 
     /// Init the OpenSSL algos and errors
     static void initOpenSSL();

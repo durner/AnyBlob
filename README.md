@@ -35,6 +35,9 @@ Please find a simple example that does only download a single object from AWS, a
 There, you can also find information on how to easily integrate the building process into existing CMake projects for an automated compilation and static linkage of AnyBlob.
 The anyblob.cmake should be used in your project to integrate this repository as external project.
 
+TLS connections verify the peer certificate against the trust store of the system (`SSL_CERT_FILE` and `SSL_CERT_DIR` override its location).
+Only `minio://` is unverified by default; use `provider->setVerifyPeer(true|false)` per endpoint.
+
 ## Contribution
 
 If you have bug fixes or improvement, please do not hesitate to open a new merge request.

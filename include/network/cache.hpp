@@ -75,7 +75,7 @@ class Cache {
     static constexpr size_t failedEntriesMax = 16;
 
     /// Returns a matching cached socket entry or nullptr
-    std::unique_ptr<SocketEntry> findSocketEntry(const std::string& hostname, unsigned port, bool tls);
+    std::unique_ptr<SocketEntry> findSocketEntry(const std::string& hostname, unsigned port, bool tls, bool verifyPeer);
     /// Resolves a fresh socket entry avoiding recently failed ones
     std::unique_ptr<SocketEntry> forceResolve(const std::string& hostname, unsigned port);
     /// Remember a failed remote address
@@ -85,7 +85,7 @@ class Cache {
 
     public:
     /// The address resolving
-    virtual std::unique_ptr<SocketEntry> resolve(const std::string& hostname, unsigned port, bool tls);
+    virtual std::unique_ptr<SocketEntry> resolve(const std::string& hostname, unsigned port, bool tls, bool verifyPeer);
     /// Start the timing and advance to the next cache bucket
     virtual void startSocket(int /*fd*/) {}
     /// Stops the socket and either closes the connection or cashes it
