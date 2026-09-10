@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <string_view>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -19,6 +20,8 @@ namespace anyblob::utils {
 //---------------------------------------------------------------------------
 /// Encode url special characters in %HEX
 std::string encodeUrlParameters(const std::string& encode);
+/// Decode url special characters from %HEX
+std::string decodeUrlParameters(std::string_view decode);
 /// Encode url path keeping the segment separators
 std::string encodeUrlPath(const std::string& encode);
 /// Encode everything from binary representation to hex

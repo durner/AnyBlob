@@ -24,4 +24,17 @@ TEST_CASE("utils") {
     REQUIRE(!plain.compare(res));
 }
 //---------------------------------------------------------------------------
+TEST_CASE("url_parameters") {
+    // The encoding of a query parameter has to be reversible
+    string key = "dir/sub/file.parquet";
+    REQUIRE(utils::encodeUrlParameters(key) == "dir%2Fsub%2Ffile.parquet");
+    REQUIRE(utils::decodeUrlParameters(utils::encodeUrlParameters(key)) == key);
+    string token = "1ueGcxLPRx1Tr/XYExHnhbYLgveDs2J/wm36Hy4vbOwM=";
+    REQUIRE(utils::decodeUrlParameters(utils::encodeUrlParameters(token)) == token);
+    REQUIRE(utils::decodeUrlParameters("plain") == "plain");
+    // An incomplete escape stays untouched
+    REQUIRE(utils::decodeUrlParameters("%2") == "%2");
+    REQUIRE(utils::decodeUrlParameters("100%") == "100%");
+}
+//---------------------------------------------------------------------------
 } // namespace anyblob::utils::test
