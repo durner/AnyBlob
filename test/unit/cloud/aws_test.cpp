@@ -134,6 +134,16 @@ class AWSTester {
         REQUIRE(keys.empty());
         REQUIRE(continuationToken.empty());
 
+        // The last bytes of an object are read without knowing its size
+        dv = aws.getSuffixRequest("a/b/c.d", 64);
+        rangedRequest = string(reinterpret_cast<char*>(dv->data()), dv->size());
+        REQUIRE(rangedRequest.find("Range: bytes=-64") != string::npos);
+        dvResigned = aws.resignRequest(*dv.get());
+        REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == rangedRequest);
+
+        // An empty suffix addresses nothing
+        REQUIRE(!aws.getSuffixRequest("a/b/c.d", 0));
+
         // A public bucket is asked without a signature and without asking it to charge anyone
         auto anonymousProvider = Provider::makeAnonymousProvider("s3://test:test/a/b/c.d");
         AWS& anonymous = *static_cast<AWS*>(anonymousProvider.get());

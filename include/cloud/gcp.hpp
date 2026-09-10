@@ -81,6 +81,10 @@ class GCP : public Provider {
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> listRequest(const std::string& prefix, std::string_view continuationToken, uint32_t maxKeys) const override;
     /// Get the object keys of a list objects and the continuation token
     [[nodiscard]] std::vector<std::string> getListObjectKeys(std::string_view body, std::string& continuationToken) const override;
+    /// Builds the http request for downloading the last bytes of a blob
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getSuffixRequest(const std::string& filePath, uint64_t length) const override;
+    /// Builds the http request for downloading a blob with a range header
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> buildGetRequest(const std::string& filePath, const std::string& range) const;
     /// Builds the http request for putting objects without the object data itself
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequestGeneric(const std::string& filePath, std::string_view object, uint16_t part, std::string_view uploadId) const override;
     /// Builds the http request for putting objects without the object data itself

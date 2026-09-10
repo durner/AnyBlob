@@ -186,6 +186,21 @@ TEST_CASE("MinIO Sync Integration") {
         group.getTCPSettings().timeout = storedTimeout;
     }
     {
+        // The footer of an object is read without asking for its size first
+        anyblob::network::Transaction suffixTxn(provider.get());
+        auto suffixRequest = [&suffixTxn, &fileName]() {
+            return suffixTxn.getObjectSuffixRequest(fileName[1], 64);
+        };
+        suffixTxn.verifyKeyRequest(sendReceiverHandle, move(suffixRequest));
+        suffixTxn.processSync(sendReceiverHandle);
+        for (const auto& it : suffixTxn) {
+            REQUIRE(it.success());
+            REQUIRE(it.getSize() == 64);
+            REQUIRE(it.getObjectSize() == content[1].size());
+            REQUIRE(!it.getResult().compare(string_view(content[1]).substr(content[1].size() - 64)));
+        }
+    }
+    {
         // List what the bucket holds under a prefix
         string listPrefix = "list/";
         string listNames[]{listPrefix + "a.parquet", listPrefix + "b.parquet"};

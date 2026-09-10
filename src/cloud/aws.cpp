@@ -423,8 +423,8 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(network::HttpRequest& r
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
-// Builds the http request for downloading a blob
+unique_ptr<utils::DataVector<uint8_t>> AWS::buildGetRequest(const string& filePath, const string& range) const
+// Builds the http request for downloading a blob with a range header
 {
     if (!validKeys() || (_settings.zonal && !validSession()))
         return nullptr;
@@ -439,14 +439,33 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
     else
         request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
+    if (!range.empty())
+        request.headers.emplace("Range", range);
+
+    return buildRequest(request);
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
+// Builds the http request for downloading a blob
+{
+    string rangeHeader;
     if (range.first != range.second) {
         assert(range.second > range.first);
         stringstream rangeString;
         rangeString << "bytes=" << range.first << "-" << (range.second - 1);
-        request.headers.emplace("Range", rangeString.str());
+        rangeHeader = rangeString.str();
     }
-
-    return buildRequest(request);
+    return buildGetRequest(filePath, rangeHeader);
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::getSuffixRequest(const string& filePath, uint64_t length) const
+// Builds the http request for downloading the last bytes of a blob
+{
+    if (!length)
+        return nullptr;
+    stringstream rangeString;
+    rangeString << "bytes=-" << length;
+    return buildGetRequest(filePath, rangeString.str());
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::listRequest(const string& prefix, string_view continuationToken, uint32_t maxKeys) const

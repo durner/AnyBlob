@@ -194,6 +194,12 @@ vector<string> Provider::getListObjectKeys(string_view /*body*/, string& /*conti
     return {};
 }
 //---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Provider::getSuffixRequest(const string& /*filePath*/, uint64_t /*length*/) const
+// Builds the http request for downloading the last bytes of a blob
+{
+    return nullptr;
+}
+//---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Provider::putRequestGeneric(const string& /*filePath*/, string_view /*object*/, uint16_t /*part*/, string_view /*uploadId*/) const
 // Builds the http request for putting multipart objects without the object data itself
 {

@@ -145,6 +145,32 @@ class Transaction {
         return true;
     }
 
+    /// Build a new get request for the last bytes of an object for synchronous calls
+    /// Note that a provider which cannot serve a suffix range reports a failed request creation
+    inline bool getObjectSuffixRequest(const std::string& remotePath, uint64_t length, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(_provider);
+        _provider->getSecret();
+        auto message = _provider->getSuffixRequest(remotePath, length);
+        if (!message)
+            return false;
+        _messages.push_back(std::make_unique<network::OriginalMessage>(std::move(message), *_provider, result, capacity, traceId));
+        return true;
+    }
+
+    /// Build a new get request for the last bytes of an object with callback
+    /// Note that a provider which cannot serve a suffix range reports a failed request creation
+    template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
+    inline bool getObjectSuffixRequest(Callback&& callback, const std::string& remotePath, uint64_t length, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(_provider);
+        _provider->getSecret();
+        auto message = _provider->getSuffixRequest(remotePath, length);
+        if (!message)
+            return false;
+        _messages.push_back(makeCallbackMessage(std::forward<Callback>(callback), std::move(message), *_provider, result, capacity, traceId));
+        return true;
+    }
+
     /// Build a new list objects request for synchronous calls
     /// Note that a truncated result has to be requested again with the returned continuation token
     inline bool listObjectsRequest(const std::string& prefix, std::string_view continuationToken = {}, uint32_t maxKeys = 0, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
