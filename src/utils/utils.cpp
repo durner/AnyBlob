@@ -1,5 +1,6 @@
 #include "utils/utils.hpp"
 #include <cassert>
+#include <charconv>
 #include <stdexcept>
 #include <utility>
 #include <openssl/aes.h>
@@ -80,6 +81,22 @@ string encodeUrlParameters(const string& encode)
         else {
             result += "%";
             result += hexEncode(reinterpret_cast<uint8_t*>(&c), 1, true);
+        }
+    }
+    return result;
+}
+//---------------------------------------------------------------------------
+string decodeUrlParameters(string_view decode)
+// Decodes a string from url
+{
+    string result;
+    for (auto i = 0ull; i < decode.size(); i++) {
+        uint32_t value;
+        if (decode[i] == '%' && i + 2 < decode.size() && from_chars(decode.data() + i + 1, decode.data() + i + 3, value, 16).ec == errc()) {
+            result += static_cast<char>(value);
+            i += 2;
+        } else {
+            result += decode[i];
         }
     }
     return result;

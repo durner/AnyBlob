@@ -19,6 +19,8 @@ TEST_CASE("http_request") {
     request.path = "/test";
     request.type = network::HttpRequest::Type::HTTP_1_1;
     request.queries.emplace("key", "value");
+    request.queries.emplace("prefix", "dir/sub/");
+    request.queries.emplace("continuation-token", "1ueGcxLPRx1Tr/XYExHnhbYLgveDs2J/wm36Hy4vbOwM=");
     request.queries.emplace("key2", "value2");
     request.headers.emplace("Authorization", "test");
     request.headers.emplace("Timestamp", "2024-02-18 00:00:00");
