@@ -98,6 +98,8 @@ class MessageResult {
     [[nodiscard]] std::unique_ptr<uint8_t[]> moveData();
     /// Get the size
     [[nodiscard]] uint64_t getSize() const;
+    /// Get the size of the object
+    [[nodiscard]] uint64_t getObjectSize() const;
     /// Get the offset
     [[nodiscard]] uint64_t getOffset() const;
     /// Get the state

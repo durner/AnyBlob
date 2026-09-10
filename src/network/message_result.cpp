@@ -69,6 +69,16 @@ uint64_t MessageResult::getSize() const
     return response->length;
 }
 //---------------------------------------------------------------------------
+uint64_t MessageResult::getObjectSize() const
+// Get the size of the object
+{
+    if (originError)
+        return originError->getObjectSize();
+    else if (response)
+        return response->response.getObjectSize();
+    return 0;
+}
+//---------------------------------------------------------------------------
 uint64_t MessageResult::getOffset() const
 // Get the offset
 {
