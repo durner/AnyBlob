@@ -63,6 +63,8 @@ class Provider {
         std::string endpoint = "";
         /// The port
         uint32_t port = 80;
+        /// The object key within the request path
+        std::string key = "";
         /// Is zonal endpoint?
         bool zonal = false;
     };
@@ -132,6 +134,8 @@ class Provider {
     [[nodiscard]] static std::string getRemoteParentDirectory(std::string fileName) noexcept;
     /// Get a region and bucket name
     [[nodiscard]] static Provider::RemoteInfo getRemoteInfo(const std::string& fileName);
+    /// Get the object key path
+    [[nodiscard]] static std::string getObjectKey(const std::string& fileName);
     /// Get the key from a keyFile
     [[nodiscard]] static std::string getKey(const std::string& keyFile);
     /// Get the etag from the upload header

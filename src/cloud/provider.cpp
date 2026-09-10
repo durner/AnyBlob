@@ -74,6 +74,10 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
                 sub = sub.substr(pos + 1);
             }
             auto pos = sub.find('/');
+            if (!remoteFile[i].compare("http://") || !remoteFile[i].compare("https://"))
+                info.key = sub;
+            else if (pos != string::npos)
+                info.key = sub.substr(pos + 1);
             auto bucketRegion = sub.substr(0, pos);
             if (auto colonPos = bucketRegion.find(':'); colonPos != string::npos) {
                 info.bucket = bucketRegion.substr(0, colonPos);
@@ -92,6 +96,12 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
         }
     }
     return info;
+}
+//---------------------------------------------------------------------------
+string Provider::getObjectKey(const string& fileName)
+// Get the object key path
+{
+    return getRemoteInfo(fileName).key;
 }
 //---------------------------------------------------------------------------
 string Provider::getKey(const string& keyFile)
