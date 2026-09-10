@@ -44,17 +44,12 @@ void ThroughputCache::stopSocket(std::unique_ptr<SocketEntry> socketEntry, uint6
         _throughputTree.erase(del);
         _throughputTree.insert(throughput);
         auto maxElem = _throughputIterator < _maxHistory ? _throughputIterator : _maxHistory;
-        bool possible = true;
         if (maxElem > 3) {
-            auto percentile = _throughputTree.find_by_order(maxElem / 3);
-            if (percentile.m_p_nd->m_value <= throughput)
+            auto median = _throughputTree.find_by_order(maxElem / 2).m_p_nd->m_value;
+            // Keep a connection that carries its share and reward one above the median
+            if (throughput >= retentionBand * median)
                 socketEntry->dns->cachePriority += 1;
-            else
-                possible = false;
-        }
-        if (possible && maxElem > 6) {
-            auto percentile = _throughputTree.find_by_order(maxElem / 6);
-            if (percentile.m_p_nd->m_value <= throughput)
+            if (throughput >= median)
                 socketEntry->dns->cachePriority += 2;
         }
     }
