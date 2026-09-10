@@ -22,6 +22,25 @@ TEST_CASE("provider") {
     REQUIRE(info.region == "");
 }
 //---------------------------------------------------------------------------
+TEST_CASE("provider_anonymous") {
+    // A public bucket is reachable without credentials
+    REQUIRE(Provider::makeAnonymousProvider("s3://bucket:region/dir/file.parquet"));
+    REQUIRE(Provider::makeAnonymousProvider("minio://127.0.0.1:9000/bucket:region/dir/file.parquet"));
+    REQUIRE(Provider::makeAnonymousProvider("https://host/dir/file.parquet"));
+
+    // These providers sign every request their own way
+    REQUIRE_THROWS(Provider::makeAnonymousProvider("azure://container/file.parquet"));
+    REQUIRE_THROWS(Provider::makeAnonymousProvider("gs://bucket/file.parquet"));
+    REQUIRE_THROWS(Provider::makeAnonymousProvider("oci://bucket:region/file.parquet"));
+    REQUIRE_THROWS(Provider::makeAnonymousProvider("ibm://bucket:region/file.parquet"));
+
+    // An s3 express bucket serves nothing without a session
+    REQUIRE_THROWS(Provider::makeAnonymousProvider("s3://bucket--x-s3:region/file.parquet"));
+
+    // A virtual hosted bucket has no address without its region
+    REQUIRE_THROWS(Provider::makeAnonymousProvider("s3://bucket/file.parquet"));
+}
+//---------------------------------------------------------------------------
 TEST_CASE("provider_object_key") {
     // The bucket addresses the host, so only the remainder is the key
     REQUIRE(Provider::getObjectKey("s3://bucket/dir/file.parquet") == "dir/file.parquet");

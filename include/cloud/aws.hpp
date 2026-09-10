@@ -42,6 +42,8 @@ class AWS : public Provider {
         uint32_t port = 80;
         /// Is zonal request required?
         bool zonal = false;
+        /// Is the request unsigned for a public bucket?
+        bool anonymous = false;
     };
 
     /// The secret
@@ -99,6 +101,10 @@ class AWS : public Provider {
         assert(info.provider == Provider::CloudService::AWS || (!info.endpoint.empty() || !info.region.empty()));
 
         _type = info.provider;
+    }
+    /// The anonymous constructor for public buckets
+    AWS(const RemoteInfo& info, bool anonymous) : AWS(info) {
+        _settings.anonymous = anonymous;
     }
     /// The custom endpoint constructor
     AWS(const RemoteInfo& info, const std::string& keyId, const std::string& key) : AWS(info) {
