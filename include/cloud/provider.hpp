@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -90,6 +91,8 @@ class Provider {
     virtual void initSecret(network::TaskedSendReceiverHandle& /*sendReceiverHandle*/) {}
     /// Get a local copy of the global secret
     virtual void getSecret() {}
+    /// Get the value of the next xml tag with that name and advance the position behind it
+    [[nodiscard]] static std::optional<std::string_view> getXMLTagValue(std::string_view body, std::string_view tag, uint64_t& pos);
 
     public:
     /// Builds the http request for downloading a blob
@@ -100,6 +103,8 @@ class Provider {
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const = 0;
     /// Builds the http request for listing the objects
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> listRequest(const std::string& /*prefix*/, std::string_view /*continuationToken*/, uint32_t /*maxKeys*/) const;
+    /// Get the object keys of a list objects and the continuation token
+    [[nodiscard]] virtual std::vector<std::string> getListObjectKeys(std::string_view /*body*/, std::string& /*continuationToken*/) const;
     /// Get the address of the server
     [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
@@ -144,8 +149,6 @@ class Provider {
     [[nodiscard]] static std::string getETag(std::string_view header);
     /// Get the upload id from the multipart request body
     [[nodiscard]] static std::string getUploadId(std::string_view body);
-    /// Get the object keys of a list objects and the continuation token
-    [[nodiscard]] static std::vector<std::string> getListObjectKeys(std::string_view body, std::string& continuationToken);
     /// Parse a row from csv file
     [[nodiscard]] static std::vector<std::string> parseCSVRow(std::string_view body);
 

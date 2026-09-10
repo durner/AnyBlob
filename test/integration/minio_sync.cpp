@@ -210,7 +210,7 @@ TEST_CASE("MinIO Sync Integration") {
         string continuationToken = "unset";
         for (const auto& it : listTxn) {
             REQUIRE(it.success());
-            auto keys = cloud::Provider::getListObjectKeys(it.getResult(), continuationToken);
+            auto keys = provider->getListObjectKeys(it.getResult(), continuationToken);
             REQUIRE(keys.size() == 2);
             REQUIRE(keys[0] == listNames[0]);
             REQUIRE(keys[1] == listNames[1]);
@@ -229,7 +229,7 @@ TEST_CASE("MinIO Sync Integration") {
             pageTxn.processSync(sendReceiverHandle);
             for (const auto& it : pageTxn) {
                 REQUIRE(it.success());
-                auto keys = cloud::Provider::getListObjectKeys(it.getResult(), continuationToken);
+                auto keys = provider->getListObjectKeys(it.getResult(), continuationToken);
                 REQUIRE(keys.size() == 1);
                 pagedKeys.push_back(keys[0]);
             }

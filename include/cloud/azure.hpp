@@ -74,8 +74,12 @@ class Azure : public Provider {
     /// Get the settings
     [[nodiscard]] inline Settings getSettings() { return _settings; }
 
-    /// Builds the http request for downloading a blob or listing the directory
+    /// Builds the http request for downloading a blob
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
+    /// Builds the http request for listing the blobs of the container
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> listRequest(const std::string& prefix, std::string_view continuationToken, uint32_t maxKeys) const override;
+    /// Get the object keys of a list objects and the continuation token
+    [[nodiscard]] std::vector<std::string> getListObjectKeys(std::string_view body, std::string& continuationToken) const override;
     /// Builds the http request for putting objects without the object data itself
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, std::string_view object) const override;
     // Builds the http request for deleting an objects
