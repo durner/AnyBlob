@@ -86,8 +86,8 @@ string GCP::getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiverHan
     return string(region);
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
-// Builds the http request for downloading a blob
+unique_ptr<utils::DataVector<uint8_t>> GCP::buildGetRequest(const string& filePath, const string& range) const
+// Builds the http request for downloading a blob with a range header
 {
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::GET;
@@ -96,12 +96,8 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, c
     request.queries.emplace("X-Goog-Date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
 
     request.headers.emplace("Host", getAddress());
-    if (range.first != range.second) {
-        assert(range.second > range.first);
-        stringstream rangeString;
-        rangeString << "bytes=" << range.first << "-" << (range.second - 1);
-        request.headers.emplace("Range", rangeString.str());
-    }
+    if (!range.empty())
+        request.headers.emplace("Range", range);
     request.headers.emplace("Content-Length", "0");
 
     GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
@@ -116,6 +112,29 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, c
     httpHeader += "\r\n";
 
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
+// Builds the http request for downloading a blob
+{
+    string rangeHeader;
+    if (range.first != range.second) {
+        assert(range.second > range.first);
+        stringstream rangeString;
+        rangeString << "bytes=" << range.first << "-" << (range.second - 1);
+        rangeHeader = rangeString.str();
+    }
+    return buildGetRequest(filePath, rangeHeader);
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> GCP::getSuffixRequest(const string& filePath, uint64_t length) const
+// Builds the http request for downloading the last bytes of a blob
+{
+    if (!length)
+        return nullptr;
+    stringstream rangeString;
+    rangeString << "bytes=-" << length;
+    return buildGetRequest(filePath, rangeString.str());
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> GCP::listRequest(const string& prefix, string_view continuationToken, uint32_t maxKeys) const
