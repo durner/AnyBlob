@@ -142,6 +142,8 @@ TEST_CASE("MinIO Sync Integration") {
             REQUIRE(!it.getResult().compare(content[i]));
             // Check the size
             REQUIRE(it.getSize() == content[i].size());
+            // A whole object reports its size as well
+            REQUIRE(it.getObjectSize() == content[i].size());
 
             // Advanced raw interface
             // Note that the data lies in the data buffer but after the offset to skip the HTTP header
@@ -150,6 +152,21 @@ TEST_CASE("MinIO Sync Integration") {
             REQUIRE(!content[i].compare(rawDataString));
             REQUIRE(!rawDataString.compare(it.getResult()));
             REQUIRE(!rawDataString.compare(content[i++]));
+        }
+    }
+    {
+        // A ranged get reports the size of the whole object
+        anyblob::network::Transaction rangeTxn(provider.get());
+        auto rangeRequest = [&rangeTxn, &fileName]() {
+            return rangeTxn.getObjectRequest(fileName[1], pair<uint64_t, uint64_t>(8, 24));
+        };
+        rangeTxn.verifyKeyRequest(sendReceiverHandle, move(rangeRequest));
+        rangeTxn.processSync(sendReceiverHandle);
+        for (const auto& it : rangeTxn) {
+            REQUIRE(it.success());
+            REQUIRE(it.getSize() == 16);
+            REQUIRE(it.getObjectSize() == content[1].size());
+            REQUIRE(!it.getResult().compare(string_view(content[1]).substr(8, 16)));
         }
     }
     {
