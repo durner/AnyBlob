@@ -4,6 +4,7 @@
 #include "network/original_message.hpp"
 #include <atomic>
 #include <cassert>
+#include <concepts>
 #include <memory>
 #include <string>
 #include <vector>
@@ -132,6 +133,7 @@ class Transaction {
     /// Build a new get request with callback
     /// Note that the range is [start, end[, [0, 0[ gets the whole object
     template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
     inline bool getObjectRequest(Callback&& callback, const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
@@ -159,6 +161,7 @@ class Transaction {
 
     /// Build a new put request with callback
     template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
     inline bool putObjectRequest(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
@@ -186,6 +189,7 @@ class Transaction {
 
     /// Build a new delete request with callback
     template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
     inline bool deleteObjectRequest(Callback&& callback, const std::string& remotePath, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
@@ -205,6 +209,7 @@ class Transaction {
 
     /// Build a new put request with callback
     template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
     inline bool putObjectRequestMultiPart(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         auto splitSize = _provider->multipartUploadSize();
