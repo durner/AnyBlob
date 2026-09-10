@@ -147,6 +147,8 @@ class Provider {
 
     /// Create a provider (keyId is access email for GCP/Azure)
     [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = false, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiverHandle* sendReceiverHandle = nullptr);
+    /// Create a provider for a public endpoint without credentials
+    [[nodiscard]] static std::unique_ptr<Provider> makeAnonymousProvider(const std::string& filepath, bool https = false);
 
     /// Init the cache for specific provider
     virtual void initCache(network::TaskedSendReceiverHandle& /*sendReceiverHandle*/) {}

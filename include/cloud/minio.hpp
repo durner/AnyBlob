@@ -24,6 +24,10 @@ class MinIO : public AWS {
         assert(info.provider == Provider::CloudService::MinIO);
         _verifyPeer = false;
     }
+    /// The anonymous constructor for public buckets
+    MinIO(const RemoteInfo& info, bool anonymous) : AWS(info, anonymous) {
+        _verifyPeer = false;
+    }
     /// The custom endpoint constructor
     MinIO(const RemoteInfo& info, const std::string& keyId, const std::string& key) : AWS(info, keyId, key) {
         _verifyPeer = false;

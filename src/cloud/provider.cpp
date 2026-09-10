@@ -262,4 +262,31 @@ unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, 
     }
 }
 //---------------------------------------------------------------------------
+unique_ptr<Provider> Provider::makeAnonymousProvider(const string& filepath, bool https)
+// Create a provider for a public endpoint without credentials
+{
+    auto info = anyblob::cloud::Provider::getRemoteInfo(filepath);
+    if (https && info.port == 80)
+        info.port = 443;
+    switch (info.provider) {
+        case anyblob::cloud::Provider::CloudService::AWS: {
+            if (info.zonal)
+                throw runtime_error("An s3 express bucket cannot be reached without credentials!");
+            if (info.endpoint.empty() && info.region.empty())
+                throw runtime_error("An anonymous bucket needs its region, as in s3://bucket:region/key!");
+            return make_unique<anyblob::cloud::AWS>(info, true);
+        }
+        case anyblob::cloud::Provider::CloudService::MinIO: {
+            return make_unique<anyblob::cloud::MinIO>(info, true);
+        }
+        case anyblob::cloud::Provider::CloudService::HTTP: // fallthrough
+        case anyblob::cloud::Provider::CloudService::HTTPS: {
+            return make_unique<anyblob::cloud::HTTP>(info);
+        }
+        default: {
+            throw runtime_error("This provider cannot be reached without credentials!");
+        }
+    }
+}
+//---------------------------------------------------------------------------
 } // namespace anyblob::cloud

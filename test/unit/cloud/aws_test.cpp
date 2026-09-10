@@ -90,6 +90,23 @@ class AWSTester {
         dv = aws.getRequest("a/b/c.d", range);
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()).find("Range: bytes=0-0") != string_view::npos);
 
+        // A public bucket is asked without a signature and without asking it to charge anyone
+        auto anonymousProvider = Provider::makeAnonymousProvider("s3://test:test/a/b/c.d");
+        AWS& anonymous = *static_cast<AWS*>(anonymousProvider.get());
+        dv = anonymous.getRequest("a/b/c.d", p);
+        resultString = "GET /a/b/c.d? HTTP/1.1\r\nHost: test.s3.test.amazonaws.com\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+        dvResigned = anonymous.resignRequest(*dv.get());
+        REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
+
+        // The range of a public bucket survives the resign as well
+        dv = anonymous.getRequest("a/b/c.d", range);
+        rangedRequest = string(reinterpret_cast<char*>(dv->data()), dv->size());
+        REQUIRE(rangedRequest.find("Range: bytes=0-0") != string::npos);
+        REQUIRE(rangedRequest.find("Authorization") == string::npos);
+        dvResigned = anonymous.resignRequest(*dv.get());
+        REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == rangedRequest);
+
         Provider::testEnviornment = false;
     }
 };

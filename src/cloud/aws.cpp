@@ -283,6 +283,8 @@ bool AWS::updateSessionToken(string_view content)
 bool AWS::validKeys(uint32_t offset) const
 // Checks whether keys need to be refresehd
 {
+    if (_settings.anonymous)
+        return true;
     if (!_secret || _validInstance != this || ((!_secret->token.empty() && _secret->expiration - offset < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _secret->secret.empty()))
         return false;
     return true;
@@ -390,23 +392,31 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(network::HttpRequest& r
     shared_ptr<Secret> secret = _secret;
     if (initHeaders) {
         request.headers.emplace("Host", getAddress());
-        request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
-        if (!_settings.zonal) {
-            request.headers.emplace("x-amz-request-payer", "requester");
-            secret = _secret;
-            if (!secret->token.empty())
-                request.headers.emplace("x-amz-security-token", secret->token);
-        } else {
-            secret = _sessionSecret;
-            request.headers.emplace("x-amz-s3session-token", secret->token);
+        if (!_settings.anonymous) {
+            request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
+            if (!_settings.zonal) {
+                request.headers.emplace("x-amz-request-payer", "requester");
+                secret = _secret;
+                if (!secret->token.empty())
+                    request.headers.emplace("x-amz-security-token", secret->token);
+            } else {
+                secret = _sessionSecret;
+                request.headers.emplace("x-amz-s3session-token", secret->token);
+            }
         }
     }
 
-    AWSSigner::StringToSign stringToSign = {.request = request, .region = _settings.region, .service = "s3", .requestSHA = "", .signedHeaders = "", .payloadHash = ""};
-    AWSSigner::encodeCanonicalRequest(request, stringToSign, bodyData, bodyLength);
+    string target;
+    if (_settings.anonymous) {
+        target = AWSSigner::createRequestTarget(request);
+    } else {
+        AWSSigner::StringToSign stringToSign = {.request = request, .region = _settings.region, .service = "s3", .requestSHA = "", .signedHeaders = "", .payloadHash = ""};
+        AWSSigner::encodeCanonicalRequest(request, stringToSign, bodyData, bodyLength);
+        target = AWSSigner::createSignedRequest(secret->keyId, secret->secret, stringToSign);
+    }
     string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " ";
-    httpHeader += AWSSigner::createSignedRequest(secret->keyId, secret->secret, stringToSign) + " " + network::HttpRequest::getRequestType(request.type) + "\r\n";
+    httpHeader += target + " " + network::HttpRequest::getRequestType(request.type) + "\r\n";
     for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";

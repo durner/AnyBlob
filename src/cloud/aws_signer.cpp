@@ -140,16 +140,22 @@ string AWSSigner::createSignedRequest(const string& keyId, const string& secret,
 
     stringToSign.request.headers.emplace("Authorization", authorization.str());
 
+    return createRequestTarget(stringToSign.request);
+}
+//---------------------------------------------------------------------------
+string AWSSigner::createRequestTarget(const network::HttpRequest& request)
+// Builds the target of the request from the path and the queries
+{
     stringstream queryStream;
-    if (stringToSign.request.queries.size()) {
-        auto it = stringToSign.request.queries.begin();
-        while (it != stringToSign.request.queries.end()) {
+    if (request.queries.size()) {
+        auto it = request.queries.begin();
+        while (it != request.queries.end()) {
             queryStream << utils::encodeUrlParameters(it->first) << "=" << utils::encodeUrlParameters(it->second);
-            if (++it != stringToSign.request.queries.end())
+            if (++it != request.queries.end())
                 queryStream << "&";
         }
     }
-    return (stringToSign.request.path.empty() ? "/" : stringToSign.request.path) + "?" + queryStream.str();
+    return (request.path.empty() ? "/" : request.path) + "?" + queryStream.str();
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::cloud
