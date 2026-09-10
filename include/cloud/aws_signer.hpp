@@ -34,6 +34,8 @@ class AWSSigner {
     static void encodeCanonicalRequest(network::HttpRequest& request, StringToSign& stringToSign, const uint8_t* bodyData = nullptr, uint64_t bodyLength = 0);
     /// Calculates the signature
     [[nodiscard]] static std::string createSignedRequest(const std::string& keyId, const std::string& secret, const StringToSign& stringToSign);
+    /// Builds the target of the request from the path and the queries
+    [[nodiscard]] static std::string createRequestTarget(const network::HttpRequest& request);
 
     private:
     /// Creates the string to sogn
