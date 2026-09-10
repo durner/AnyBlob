@@ -22,6 +22,33 @@ TEST_CASE("provider") {
     REQUIRE(info.region == "");
 }
 //---------------------------------------------------------------------------
+TEST_CASE("provider_list_objects") {
+    std::string body = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+    body += "<ListBucketResult><Name>bucket</Name><Prefix>dir/</Prefix><KeyCount>2</KeyCount><MaxKeys>1000</MaxKeys><IsTruncated>false</IsTruncated>";
+    body += "<Contents><Key>dir/a.parquet</Key><Size>12</Size></Contents>";
+    body += "<Contents><Key>dir/b.parquet</Key><Size>24</Size></Contents>";
+    body += "</ListBucketResult>";
+
+    std::string continuationToken = "unset";
+    auto keys = Provider::getListObjectKeys(body, continuationToken);
+    REQUIRE(keys.size() == 2);
+    REQUIRE(keys[0] == "dir/a.parquet");
+    REQUIRE(keys[1] == "dir/b.parquet");
+    // A complete result has no token to continue with
+    REQUIRE(continuationToken.empty());
+
+    std::string truncated = "<ListBucketResult><IsTruncated>true</IsTruncated><Contents><Key>dir/a.parquet</Key></Contents>";
+    truncated += "<NextContinuationToken>1ueGcxLPRx1Tr/XYExHnhbYLgveDs2J/wm36Hy4vbOwM=</NextContinuationToken></ListBucketResult>";
+    keys = Provider::getListObjectKeys(truncated, continuationToken);
+    REQUIRE(keys.size() == 1);
+    REQUIRE(continuationToken == "1ueGcxLPRx1Tr/XYExHnhbYLgveDs2J/wm36Hy4vbOwM=");
+
+    // An empty bucket
+    keys = Provider::getListObjectKeys("<ListBucketResult><KeyCount>0</KeyCount></ListBucketResult>", continuationToken);
+    REQUIRE(keys.empty());
+    REQUIRE(continuationToken.empty());
+}
+//---------------------------------------------------------------------------
 TEST_CASE("provider_anonymous") {
     // A public bucket is reachable without credentials
     REQUIRE(Provider::makeAnonymousProvider("s3://bucket:region/dir/file.parquet"));
