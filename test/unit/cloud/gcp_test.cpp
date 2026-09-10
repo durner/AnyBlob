@@ -122,6 +122,15 @@ class GCPTester {
         REQUIRE(keys.empty());
         REQUIRE(continuationToken.empty());
 
+        // The last bytes of an object are read without knowing its size
+        dv = gcp.getSuffixRequest("a/b/c.d", 64);
+        auto suffixRequest = string(reinterpret_cast<char*>(dv->data()), dv->size());
+        REQUIRE(suffixRequest.find("Range: bytes=-64") != string::npos);
+        REQUIRE(suffixRequest.find("X-Goog-SignedHeaders=content-length%3Bhost%3Brange") != string::npos);
+
+        // An empty suffix addresses nothing
+        REQUIRE(!gcp.getSuffixRequest("a/b/c.d", 0));
+
         ignore = GCPInstance::getInstanceDetails();
 
         Provider::testEnviornment = false;

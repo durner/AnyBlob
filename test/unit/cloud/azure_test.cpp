@@ -92,6 +92,9 @@ class AzureTester {
         resultString += "\r\nx-ms-version: 2015-02-21\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
+        // Azure serves no suffix range
+        REQUIRE(!provider->getSuffixRequest("a/b/c.d", 64));
+
         Provider::testEnviornment = false;
     }
 };

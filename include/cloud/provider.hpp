@@ -105,6 +105,8 @@ class Provider {
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> listRequest(const std::string& /*prefix*/, std::string_view /*continuationToken*/, uint32_t /*maxKeys*/) const;
     /// Get the object keys of a list objects and the continuation token
     [[nodiscard]] virtual std::vector<std::string> getListObjectKeys(std::string_view /*body*/, std::string& /*continuationToken*/) const;
+    /// Builds the http request for downloading the last bytes of a blob, empty if unsupported
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> getSuffixRequest(const std::string& /*filePath*/, uint64_t /*length*/) const;
     /// Get the address of the server
     [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
