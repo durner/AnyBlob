@@ -135,31 +135,20 @@ string Provider::getUploadId(string_view body)
     return string(body.substr(pos, end - pos));
 }
 //---------------------------------------------------------------------------
-vector<string> Provider::getListObjectKeys(string_view body, string& continuationToken)
-// Get the object keys of a list objects and the continuation token
+optional<string_view> Provider::getXMLTagValue(string_view body, string_view tag, uint64_t& pos)
+// Get the value of the next xml tag with that name and advance the position behind it
 {
-    vector<string> keys;
-    string needle = "<Key>";
-    auto pos = body.find(needle);
-    while (pos != body.npos) {
-        pos += needle.length();
-        auto end = body.find("</Key>", pos);
-        if (end == body.npos)
-            break;
-        keys.emplace_back(body.substr(pos, end - pos));
-        pos = body.find(needle, end);
-    }
-
-    continuationToken = "";
-    needle = "<NextContinuationToken>";
-    pos = body.find(needle);
-    if (pos != body.npos) {
-        pos += needle.length();
-        auto end = body.find("</NextContinuationToken>", pos);
-        if (end != body.npos)
-            continuationToken = body.substr(pos, end - pos);
-    }
-    return keys;
+    auto open = "<" + string(tag) + ">";
+    auto close = "</" + string(tag) + ">";
+    auto start = body.find(open, pos);
+    if (start == body.npos)
+        return {};
+    start += open.length();
+    auto end = body.find(close, start);
+    if (end == body.npos)
+        return {};
+    pos = end + close.length();
+    return body.substr(start, end - start);
 }
 //---------------------------------------------------------------------------
 vector<string> Provider::parseCSVRow(string_view body)
@@ -197,6 +186,12 @@ unique_ptr<utils::DataVector<uint8_t>> Provider::listRequest(const string& /*pre
 // Builds the http request for listing the objects
 {
     return nullptr;
+}
+//---------------------------------------------------------------------------
+vector<string> Provider::getListObjectKeys(string_view /*body*/, string& /*continuationToken*/) const
+// Get the object keys of a list objects and the continuation token
+{
+    return {};
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Provider::putRequestGeneric(const string& /*filePath*/, string_view /*object*/, uint16_t /*part*/, string_view /*uploadId*/) const

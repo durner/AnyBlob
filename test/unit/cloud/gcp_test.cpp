@@ -86,6 +86,42 @@ class GCPTester {
         resultString = "DELETE /a/b/c.d?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=test%40test.com%2F21000101%2Ftest%2Fstorage%2Fgoog4_request&X-Goog-Date=21000101T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=content-length%3Bhost&x-goog-signature=593ae6ef0a7b54a2934dba440397a223032536b4ffdfbbdcbf467b67b291abe0a2fca2a4e4ee24840d84e0621d5c055cec772b004a6a3c29bdc053d4a51a80a37115db02932ec6def88714131a5d7d5f9594801ff817ddd1ce76d5a1c6f205376bb5d69ee431608d008d153072177fce80b8f41f40306b8d3fc81a7bdc2f7eaa8828876795264a84707aec5d0fec96944c45a9c5a730554d3f6127b902a9b89fe85c4e037f8a0c4878fb240a5994895b8cc578c07e53042cb3ac45a83136b5e3c67ed301009949947776757cab1f64b106fc07f9c63616b7802d1102f7464ca89d0a5fdf523c7172815961c5a842621608c59d6b2099443f8d7a8a38cf3eff897f9ce15cbd564adb29a60c8b90e58633250a55aff3b688d6c21b7ca9ab4f9c6fcba91096636d5b4b79e0fc04713a68a248f063a8eebc3c92b140849ad733b56cb06fd7775d8ff436d8c16ac88a945889c0c997c73210868ecc4150e5faded57fc885c28303b26ce81d782be9fa4e37844feae1b45d84455e19339109834e32a8 HTTP/1.1\r\nContent-Length: 0\r\nHost: test.storage.googleapis.com\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
+        // A list request signs its query, so the whole target is part of the signature
+        dv = gcp.listRequest("dir/", "", 0);
+        resultString = "GET /?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=test%40test.com%2F21000101%2Ftest%2Fstorage%2Fgoog4_request&X-Goog-Date=21000101T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=content-length%3Bhost&list-type=2&prefix=dir%2F&x-goog-signature=b27f435ecad85dc5d4d1f1ad8e62bcd18e3447a00851e8df9b9edbe2b2d750896a91effdd7c2a0c01759b11dd80e844d1fbefb0f793b670f780868a9045da6cf6ee48217b9b6bab686208d2562b3a989bc9b7d8e48183b4e1cb89a1521a2db6db7c22ed61cda4a57fbea8ef35826b26360b8771f91f174c80bfc94941f6101700304345366d8363e43adb3a4e4b3ad42d9915e9cfa7a8345e26ad3370e0b866a8ec57a21964628d15a381cfdc485da71eacb00c14e8ffd5987ccad1dd42806555f35dfd7a3f6de580fd5908871742c070c5dd308a00b59c3909ff25e9d6b9b1fd6ebf4742788894ec9cf8719999deb31521cf58530ffb1bfe46e3669caa128c3f5a3368fc73e66992bc315e742b48f18d68c802a24b41e8d8a8bfa360c3c98ba0826d428c7b08aee9efb434bb3ab8e96b359b5976ac6aa729078371427c513b5cee274268dc3b0467f0f6545cab9f5299f0d149e1a4607f03ffb8206b55cab2fbf984c341de96fa466d67f8d2ba1266018edd75ab5f4009e60cf47fe4b921be3 HTTP/1.1\r\nContent-Length: 0\r\nHost: test.storage.googleapis.com\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+
+        // A truncated result is continued with the token it came back with
+        dv = gcp.listRequest("dir/", "CgtzaGliYS0yLmpwZw==", 1);
+        resultString = "GET /?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=test%40test.com%2F21000101%2Ftest%2Fstorage%2Fgoog4_request&X-Goog-Date=21000101T000000Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=content-length%3Bhost&continuation-token=CgtzaGliYS0yLmpwZw%3D%3D&list-type=2&max-keys=1&prefix=dir%2F&x-goog-signature=6952a2000d1433925bb53eb87f6cf5912a1d348a0f86a1bab89c6fd2ae0c37ccb000ae5fcd6cd81d6a98af128584cdd793b305a84105adcb6cd675ced2509d7a6131a10043c68e7bda6befd826f7cbc1f4c9e877320038101d8b4933279ba7cbfd9a2cefafcd94d6aa17eb12f44e653a7d975f4c55e92d4cb5103dac76f3591b07549a7689c4ae9918b19b1d96d1451733b1e953ff39f06ef2ce53df85c65e2e33c8b7cfd76f510e6705650e2929b3c276641840143a93d785fbaea412d85eb6cd8b3b002494fad1b53f2639b364a121ad0cef4b76daef40d8fea57fafaae6d2412eaca5e45ec80ca98a9c68b02eece7ab1ae53640c4d483e8c7a9be1fe798bb12ddf5c6bcd0e9d9e58d251113269a7839adcf4d0ad02bc330cfbb161a277a24b17d26a67bc31abcf91cfd71c1b94ab1bf3296010f5860aa097eee6f76f8bdc264c93a44562b5ba4fa2e642ee19b77c447cafd4d9ba21a8f2c6874028a7a99ee512a8acd7b3d89ee3373ccec8e40d6611599e81d43be4cba32a1972a458382a4 HTTP/1.1\r\nContent-Length: 0\r\nHost: test.storage.googleapis.com\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+
+        // The list result names the keys of the bucket
+        string listBody = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        listBody += "<ListBucketResult><Name>test</Name><Prefix>dir/</Prefix><KeyCount>2</KeyCount><MaxKeys>1000</MaxKeys><IsTruncated>false</IsTruncated>";
+        listBody += "<Contents><Key>dir/a.parquet</Key><Size>12</Size></Contents>";
+        listBody += "<Contents><Key>dir/b.parquet</Key><Size>24</Size></Contents>";
+        listBody += "</ListBucketResult>";
+        string continuationToken = "unset";
+        auto keys = gcp.getListObjectKeys(listBody, continuationToken);
+        REQUIRE(keys.size() == 2);
+        REQUIRE(keys[0] == "dir/a.parquet");
+        REQUIRE(keys[1] == "dir/b.parquet");
+        // A complete result has no token to continue with
+        REQUIRE(continuationToken.empty());
+
+        string truncatedBody = "<ListBucketResult><IsTruncated>true</IsTruncated><Contents><Key>dir/a.parquet</Key></Contents>";
+        truncatedBody += "<NextContinuationToken>CgtzaGliYS0yLmpwZw==</NextContinuationToken></ListBucketResult>";
+        keys = gcp.getListObjectKeys(truncatedBody, continuationToken);
+        REQUIRE(keys.size() == 1);
+        REQUIRE(keys[0] == "dir/a.parquet");
+        REQUIRE(continuationToken == "CgtzaGliYS0yLmpwZw==");
+
+        // An empty bucket
+        keys = gcp.getListObjectKeys("<ListBucketResult><KeyCount>0</KeyCount></ListBucketResult>", continuationToken);
+        REQUIRE(keys.empty());
+        REQUIRE(continuationToken.empty());
+
         ignore = GCPInstance::getInstanceDetails();
 
         Provider::testEnviornment = false;

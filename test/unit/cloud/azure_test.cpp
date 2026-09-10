@@ -46,6 +46,46 @@ class AzureTester {
         resultString += "\r\nx-ms-version: 2015-02-21\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
+        // A list request signs its query as part of the canonicalized resource
+        dv = azure.listRequest("dir/", "", 0);
+        resultString = "GET /test?comp=list&prefix=dir%2F&restype=container HTTP/1.1\r\nAuthorization: SharedKey test:g3JBIJIqZZmimX2WzCY6PXhAkA6LaVRJGHqqrSrmT1w=\r\nHost: test.blob.core.windows.net\r\nx-ms-date: ";
+        resultString += azure.fakeXMSTimestamp;
+        resultString += "\r\nx-ms-version: 2015-02-21\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+
+        // A truncated result is continued with the marker it came back with
+        dv = azure.listRequest("dir/", "2!68!MDAwMDI4IWRpci9iLnBhcnF1ZXQh", 1);
+        resultString = "GET /test?comp=list&marker=2%2168%21MDAwMDI4IWRpci9iLnBhcnF1ZXQh&maxresults=1&prefix=dir%2F&restype=container HTTP/1.1\r\nAuthorization: SharedKey test:ayl0W6P7oTJqJO5JLD/KX0vj1d0df+G7z2c+hlnYzVo=\r\nHost: test.blob.core.windows.net\r\nx-ms-date: ";
+        resultString += azure.fakeXMSTimestamp;
+        resultString += "\r\nx-ms-version: 2015-02-21\r\n\r\n";
+        REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
+
+        // The list result names the blobs of the container
+        string listBody = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        listBody += "<EnumerationResults ContainerName=\"https://test.blob.core.windows.net/test\"><Prefix>dir/</Prefix><MaxResults>1000</MaxResults><Blobs>";
+        listBody += "<Blob><Name>dir/a.parquet</Name><Properties><Content-Length>12</Content-Length></Properties></Blob>";
+        listBody += "<Blob><Name>dir/b.parquet</Name><Properties><Content-Length>24</Content-Length></Properties></Blob>";
+        listBody += "</Blobs><NextMarker /></EnumerationResults>";
+        string continuationToken = "unset";
+        auto keys = azure.getListObjectKeys(listBody, continuationToken);
+        REQUIRE(keys.size() == 2);
+        REQUIRE(keys[0] == "dir/a.parquet");
+        REQUIRE(keys[1] == "dir/b.parquet");
+        // A complete result has no marker to continue with
+        REQUIRE(continuationToken.empty());
+
+        string truncatedBody = "<EnumerationResults><Blobs><Blob><Name>dir/a.parquet</Name></Blob></Blobs>";
+        truncatedBody += "<NextMarker>2!68!MDAwMDI4IWRpci9iLnBhcnF1ZXQh</NextMarker></EnumerationResults>";
+        keys = azure.getListObjectKeys(truncatedBody, continuationToken);
+        REQUIRE(keys.size() == 1);
+        REQUIRE(keys[0] == "dir/a.parquet");
+        REQUIRE(continuationToken == "2!68!MDAwMDI4IWRpci9iLnBhcnF1ZXQh");
+
+        // An empty container
+        keys = azure.getListObjectKeys("<EnumerationResults><Blobs /><NextMarker /></EnumerationResults>", continuationToken);
+        REQUIRE(keys.empty());
+        REQUIRE(continuationToken.empty());
+
         dv = azure.deleteRequest("a/b/c.d");
         resultString = "DELETE /test/a/b/c.d HTTP/1.1\r\nAuthorization: SharedKey test:nuGDW7QRI5/DB5Xt9vET/YEmipJ4UGjn64h4A+BFaL0=\r\nHost: test.blob.core.windows.net\r\nx-ms-date: ";
         resultString += azure.fakeXMSTimestamp;

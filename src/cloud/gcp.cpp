@@ -118,6 +118,54 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::getRequest(const string& filePath, c
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> GCP::listRequest(const string& prefix, string_view continuationToken, uint32_t maxKeys) const
+// Builds the http request for listing the objects
+{
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::GET;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
+    request.path = "/";
+
+    request.queries.emplace("list-type", "2");
+    if (!prefix.empty())
+        request.queries.emplace("prefix", prefix);
+    if (!continuationToken.empty())
+        request.queries.emplace("continuation-token", continuationToken);
+    if (maxKeys)
+        request.queries.emplace("max-keys", to_string(maxKeys));
+    request.queries.emplace("X-Goog-Date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
+
+    request.headers.emplace("Host", getAddress());
+    request.headers.emplace("Content-Length", "0");
+
+    GCPSigner::StringToSign stringToSign = {.region = _settings.region, .service = "storage", .signedHeaders = ""};
+    request.path = GCPSigner::createSignedRequest(_secret->serviceAccountEmail, _secret->privateKey, request, stringToSign);
+
+    string httpHeader = network::HttpRequest::getRequestMethod(request.method);
+    httpHeader += " " + request.path + " ";
+    httpHeader += network::HttpRequest::getRequestType(request.type);
+    httpHeader += "\r\n";
+    for (const auto& h : request.headers)
+        httpHeader += h.first + ": " + h.second + "\r\n";
+    httpHeader += "\r\n";
+
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+vector<string> GCP::getListObjectKeys(string_view body, string& continuationToken) const
+// Get the object keys of a list objects and the continuation token
+{
+    vector<string> keys;
+    uint64_t pos = 0;
+    while (auto key = getXMLTagValue(body, "Key", pos))
+        keys.emplace_back(*key);
+
+    pos = 0;
+    auto token = getXMLTagValue(body, "NextContinuationToken", pos);
+    continuationToken = token ? string(*token) : "";
+    return keys;
+}
+//---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& filePath, string_view object, uint16_t part, string_view uploadId) const
 // Builds the http request for putting objects without the object data itself
 {

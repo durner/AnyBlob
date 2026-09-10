@@ -108,6 +108,32 @@ class AWSTester {
         dvResigned = aws.resignRequest(*dv.get());
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
 
+        // The list result names the keys of the bucket
+        string listBody = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+        listBody += "<ListBucketResult><Name>test</Name><Prefix>dir/</Prefix><KeyCount>2</KeyCount><MaxKeys>1000</MaxKeys><IsTruncated>false</IsTruncated>";
+        listBody += "<Contents><Key>dir/a.parquet</Key><Size>12</Size></Contents>";
+        listBody += "<Contents><Key>dir/b.parquet</Key><Size>24</Size></Contents>";
+        listBody += "</ListBucketResult>";
+        string continuationToken = "unset";
+        auto keys = aws.getListObjectKeys(listBody, continuationToken);
+        REQUIRE(keys.size() == 2);
+        REQUIRE(keys[0] == "dir/a.parquet");
+        REQUIRE(keys[1] == "dir/b.parquet");
+        // A complete result has no token to continue with
+        REQUIRE(continuationToken.empty());
+
+        string truncatedBody = "<ListBucketResult><IsTruncated>true</IsTruncated><Contents><Key>dir/a.parquet</Key></Contents>";
+        truncatedBody += "<NextContinuationToken>1ueGcxLPRx1Tr/XYExHnhbYLgveDs2J/wm36Hy4vbOwM=</NextContinuationToken></ListBucketResult>";
+        keys = aws.getListObjectKeys(truncatedBody, continuationToken);
+        REQUIRE(keys.size() == 1);
+        REQUIRE(keys[0] == "dir/a.parquet");
+        REQUIRE(continuationToken == "1ueGcxLPRx1Tr/XYExHnhbYLgveDs2J/wm36Hy4vbOwM=");
+
+        // An empty bucket
+        keys = aws.getListObjectKeys("<ListBucketResult><KeyCount>0</KeyCount></ListBucketResult>", continuationToken);
+        REQUIRE(keys.empty());
+        REQUIRE(continuationToken.empty());
+
         // A public bucket is asked without a signature and without asking it to charge anyone
         auto anonymousProvider = Provider::makeAnonymousProvider("s3://test:test/a/b/c.d");
         AWS& anonymous = *static_cast<AWS*>(anonymousProvider.get());

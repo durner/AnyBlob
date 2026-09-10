@@ -476,6 +476,20 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::listRequest(const string& prefix, st
     return buildRequest(request);
 }
 //---------------------------------------------------------------------------
+vector<string> AWS::getListObjectKeys(string_view body, string& continuationToken) const
+// Get the object keys of a list objects and the continuation token
+{
+    vector<string> keys;
+    uint64_t pos = 0;
+    while (auto key = getXMLTagValue(body, "Key", pos))
+        keys.emplace_back(*key);
+
+    pos = 0;
+    auto token = getXMLTagValue(body, "NextContinuationToken", pos);
+    continuationToken = token ? string(*token) : "";
+    return keys;
+}
+//---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& filePath, string_view object, uint16_t part, string_view uploadId) const
 // Builds the http request for putting objects without the object data itself
 {
