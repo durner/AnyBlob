@@ -22,6 +22,26 @@ TEST_CASE("provider") {
     REQUIRE(info.region == "");
 }
 //---------------------------------------------------------------------------
+TEST_CASE("provider_object_key") {
+    // The bucket addresses the host, so only the remainder is the key
+    REQUIRE(Provider::getObjectKey("s3://bucket/dir/file.parquet") == "dir/file.parquet");
+    REQUIRE(Provider::getObjectKey("s3://bucket:region/dir/sub/file.parquet") == "dir/sub/file.parquet");
+    REQUIRE(Provider::getObjectKey("gs://bucket/dir/file.parquet") == "dir/file.parquet");
+    REQUIRE(Provider::getObjectKey("azure://container/file.parquet") == "file.parquet");
+
+    // Path-style endpoints keep the bucket out of the key as well
+    REQUIRE(Provider::getObjectKey("minio://127.0.0.1:9000/bucket:region/dir/file.parquet") == "dir/file.parquet");
+
+    // A plain http endpoint knows no bucket, so the whole path is the key
+    REQUIRE(Provider::getObjectKey("http://127.0.0.1:9000/bucket/dir/file.parquet") == "bucket/dir/file.parquet");
+    REQUIRE(Provider::getObjectKey("https://host/dir/file.parquet") == "dir/file.parquet");
+
+    // An address without a key
+    REQUIRE(Provider::getObjectKey("s3://bucket:region/") == "");
+    REQUIRE(Provider::getObjectKey("s3://bucket:region") == "");
+    REQUIRE(Provider::getObjectKey("minio://127.0.0.1:9000/bucket:region/") == "");
+}
+//---------------------------------------------------------------------------
 TEST_CASE("provider_verify_peer") {
     auto aws = Provider::makeProvider("s3://bucket:region/file", true, "key", "secret");
     REQUIRE(aws->verifyPeer());
