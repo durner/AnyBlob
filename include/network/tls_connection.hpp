@@ -115,6 +115,10 @@ class TLSConnection {
     [[nodiscard]] inline TLSContext& getContext() const { return _context; }
     /// Is the peer certificate verified
     [[nodiscard]] inline bool verifiesPeer() const { return _verifyPeer; }
+    /// Get the hostname
+    [[nodiscard]] inline const std::string& getHostname() const { return _hostname; }
+    /// Get the port
+    [[nodiscard]] inline uint32_t getPort() const { return _port; }
 
     /// Recv a TLS encrypted message
     [[nodiscard]] Progress recv(ConnectionManager& connectionManager, char* buffer, int64_t bufferLength, int64_t& resultLength);

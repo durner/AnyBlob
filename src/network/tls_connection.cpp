@@ -48,6 +48,7 @@ bool TLSConnection::init(HTTPSMessage* message)
             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
             return false;
         }
+        SSL_set_ex_data(_ssl, TLSContext::connectionSlot(), this);
         SSL_set_connect_state(_ssl);
         BIO_new_bio_pair(&_internalBio, _message->chunkSize, &_networkBio, _message->chunkSize);
         SSL_set_bio(_ssl, _internalBio, _internalBio);
@@ -194,9 +195,7 @@ TLSConnection::Progress TLSConnection::shutdown(ConnectionManager& connectionMan
         return SSL_shutdown(ssl);
     };
     auto status = operationHelper(connectionManager, sslShutdown, unused);
-    if (status == Progress::Finished) {
-        _context.cacheSession(_hostname, _port, _verifyPeer, ssl);
-    } else if (status == Progress::Aborted) {
+    if (status == Progress::Aborted) {
         if (!failedOnce) [[likely]] {
             return shutdown(connectionManager, true);
         } else {

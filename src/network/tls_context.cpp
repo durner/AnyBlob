@@ -1,4 +1,5 @@
 #include "network/tls_context.hpp"
+#include "network/tls_connection.hpp"
 #include <openssl/crypto.h>
 #include <openssl/ssl.h>
 //---------------------------------------------------------------------------
@@ -13,6 +14,15 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
+static int newSession(SSL* ssl, SSL_SESSION* session)
+// Keeps a session the server just issued, tls 1.3 sends its ticket after the handshake
+{
+    auto connection = static_cast<TLSConnection*>(SSL_get_ex_data(ssl, TLSContext::connectionSlot()));
+    if (!connection)
+        return 0;
+    return connection->getContext().cacheSession(connection->getHostname(), connection->getPort(), connection->verifiesPeer(), session);
+}
+//---------------------------------------------------------------------------
 TLSContext::TLSContext() : _trustStore(false), _sessionCache()
 // Construct the TLS Context
 {
@@ -25,6 +35,7 @@ TLSContext::TLSContext() : _trustStore(false), _sessionCache()
     if (_ctx) {
         // Enable session cache
         SSL_CTX_set_session_cache_mode(_ctx, SSL_SESS_CACHE_CLIENT);
+        SSL_CTX_sess_set_new_cb(_ctx, newSession);
 
         // Load the trust store
         _trustStore = SSL_CTX_set_default_verify_paths(_ctx) == 1;
@@ -36,7 +47,8 @@ TLSContext::~TLSContext()
 {
     // Remove all sessions
     for (auto& entry : _sessionCache) {
-        SSL_SESSION_free(entry.second.session);
+        for (auto* session : entry.second.sessions)
+            SSL_SESSION_free(session);
     }
 
     // Destroy context
@@ -52,31 +64,42 @@ void TLSContext::initOpenSSL()
     SSL_load_error_strings();
 }
 //---------------------------------------------------------------------------
-bool TLSContext::cacheSession(const string& hostname, uint32_t port, bool verifyPeer, SSL* ssl)
-// Caches the SSL session
+int TLSContext::connectionSlot()
+// The ssl slot that points back to the connection
 {
-    // Is the session already cached?
-    if (SSL_session_reused(ssl))
-        return false;
-
-    auto session = SSL_get1_session(ssl);
+    static int slot = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    return slot;
+}
+//---------------------------------------------------------------------------
+bool TLSContext::cacheSession(const string& hostname, uint32_t port, bool verifyPeer, SSL_SESSION* session)
+// Caches the SSL session, takes ownership of the session when it is kept
+{
     if (!session)
         return false;
 
     auto& entry = _sessionCache[hostname];
-    if (entry.session)
-        SSL_SESSION_free(entry.session);
-    entry = SessionEntry{session, port, verifyPeer};
+    // The endpoint moved or changed its verification, its tickets are worthless
+    if (entry.port != port || entry.verifyPeer != verifyPeer) {
+        for (auto* cached : entry.sessions)
+            SSL_SESSION_free(cached);
+        entry.sessions.clear();
+        entry.port = port;
+        entry.verifyPeer = verifyPeer;
+    }
+    if (entry.sessions.size() >= maxSessionsPerEndpoint)
+        return false;
+    entry.sessions.push_back(session);
     return true;
 }
 //---------------------------------------------------------------------------
 bool TLSContext::dropSession(const string& hostname, uint32_t port)
-// Drop the SSL session from cache
+// Drops the SSL sessions of the endpoint
 {
     auto it = _sessionCache.find(hostname);
     if (it == _sessionCache.end() || it->second.port != port)
         return false;
-    SSL_SESSION_free(it->second.session);
+    for (auto* session : it->second.sessions)
+        SSL_SESSION_free(session);
     _sessionCache.erase(it);
     return true;
 }
@@ -85,9 +108,13 @@ bool TLSContext::reuseSession(const string& hostname, uint32_t port, bool verify
 // Reuses the SSL session
 {
     auto it = _sessionCache.find(hostname);
-    if (it == _sessionCache.end() || it->second.port != port || it->second.verifyPeer != verifyPeer)
+    if (it == _sessionCache.end() || it->second.port != port || it->second.verifyPeer != verifyPeer || it->second.sessions.empty())
         return false;
-    return SSL_set_session(ssl, it->second.session) == 1;
+    auto session = it->second.sessions.back();
+    it->second.sessions.pop_back();
+    auto reused = SSL_set_session(ssl, session) == 1;
+    SSL_SESSION_free(session);
+    return reused;
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::network
