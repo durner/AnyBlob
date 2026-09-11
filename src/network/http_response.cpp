@@ -1,5 +1,6 @@
 #include "network/http_response.hpp"
 #include "utils/data_vector.hpp"
+#include <charconv>
 #include <map>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -12,6 +13,21 @@
 namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
+//---------------------------------------------------------------------------
+uint64_t HttpResponse::getObjectSize() const
+// Get the size of the object
+{
+    uint64_t size = 0;
+    // A ranged response reports the total size behind the slash
+    if (auto it = headers.find("Content-Range"); it != headers.end()) {
+        if (auto pos = it->second.find_last_of('/'); pos != string::npos)
+            from_chars(it->second.data() + pos + 1, it->second.data() + it->second.size(), size);
+        return size;
+    }
+    if (auto it = headers.find("Content-Length"); it != headers.end())
+        from_chars(it->second.data(), it->second.data() + it->second.size(), size);
+    return size;
+}
 //---------------------------------------------------------------------------
 HttpResponse HttpResponse::deserialize(string_view data)
 // Deserialize the http header

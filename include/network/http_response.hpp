@@ -115,6 +115,8 @@ struct HttpResponse {
     static constexpr auto checkRetryable(const Code& code) {
         return (code == Code::TOO_MANY_REQUESTS_429 || code == Code::INTERNAL_SERVER_ERROR_500 || code == Code::SERVICE_UNAVAILABLE_503 || code == Code::SLOW_DOWN_503);
     }
+    /// Get the size of the object
+    [[nodiscard]] uint64_t getObjectSize() const;
     /// Deserialize the response
     [[nodiscard]] static HttpResponse deserialize(std::string_view data);
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -63,6 +64,8 @@ class Provider {
         std::string endpoint = "";
         /// The port
         uint32_t port = 80;
+        /// The object key within the request path
+        std::string key = "";
         /// Is zonal endpoint?
         bool zonal = false;
     };
@@ -88,14 +91,22 @@ class Provider {
     virtual void initSecret(network::TaskedSendReceiverHandle& /*sendReceiverHandle*/) {}
     /// Get a local copy of the global secret
     virtual void getSecret() {}
+    /// Get the value of the next xml tag with that name and advance the position behind it
+    [[nodiscard]] static std::optional<std::string_view> getXMLTagValue(std::string_view body, std::string_view tag, uint64_t& pos);
 
     public:
-    /// Builds the http request for downloading a blob or listing a directory
+    /// Builds the http request for downloading a blob
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const = 0;
     /// Builds the http request for putting an object without the actual data (header only according to the data and length provided)
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> putRequest(const std::string& filePath, std::string_view object) const = 0;
     /// Builds the http request for deleting an object
     [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const = 0;
+    /// Builds the http request for listing the objects
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> listRequest(const std::string& /*prefix*/, std::string_view /*continuationToken*/, uint32_t /*maxKeys*/) const;
+    /// Get the object keys of a list objects and the continuation token
+    [[nodiscard]] virtual std::vector<std::string> getListObjectKeys(std::string_view /*body*/, std::string& /*continuationToken*/) const;
+    /// Builds the http request for downloading the last bytes of a blob, empty if unsupported
+    [[nodiscard]] virtual std::unique_ptr<utils::DataVector<uint8_t>> getSuffixRequest(const std::string& /*filePath*/, uint64_t /*length*/) const;
     /// Get the address of the server
     [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
@@ -132,6 +143,8 @@ class Provider {
     [[nodiscard]] static std::string getRemoteParentDirectory(std::string fileName) noexcept;
     /// Get a region and bucket name
     [[nodiscard]] static Provider::RemoteInfo getRemoteInfo(const std::string& fileName);
+    /// Get the object key path
+    [[nodiscard]] static std::string getObjectKey(const std::string& fileName);
     /// Get the key from a keyFile
     [[nodiscard]] static std::string getKey(const std::string& keyFile);
     /// Get the etag from the upload header
@@ -143,6 +156,8 @@ class Provider {
 
     /// Create a provider (keyId is access email for GCP/Azure)
     [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = false, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiverHandle* sendReceiverHandle = nullptr);
+    /// Create a provider for a public endpoint without credentials
+    [[nodiscard]] static std::unique_ptr<Provider> makeAnonymousProvider(const std::string& filepath, bool https = false);
 
     /// Init the cache for specific provider
     virtual void initCache(network::TaskedSendReceiverHandle& /*sendReceiverHandle*/) {}

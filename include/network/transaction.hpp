@@ -4,8 +4,10 @@
 #include "network/original_message.hpp"
 #include <atomic>
 #include <cassert>
+#include <concepts>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -132,6 +134,7 @@ class Transaction {
     /// Build a new get request with callback
     /// Note that the range is [start, end[, [0, 0[ gets the whole object
     template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
     inline bool getObjectRequest(Callback&& callback, const std::string& remotePath, std::pair<uint64_t, uint64_t> range = {0, 0}, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
@@ -139,6 +142,58 @@ class Transaction {
         if (!originalMsg)
             return false;
         _messages.push_back(std::move(originalMsg));
+        return true;
+    }
+
+    /// Build a new get request for the last bytes of an object for synchronous calls
+    /// Note that a provider which cannot serve a suffix range reports a failed request creation
+    inline bool getObjectSuffixRequest(const std::string& remotePath, uint64_t length, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(_provider);
+        _provider->getSecret();
+        auto message = _provider->getSuffixRequest(remotePath, length);
+        if (!message)
+            return false;
+        _messages.push_back(std::make_unique<network::OriginalMessage>(std::move(message), *_provider, result, capacity, traceId));
+        return true;
+    }
+
+    /// Build a new get request for the last bytes of an object with callback
+    /// Note that a provider which cannot serve a suffix range reports a failed request creation
+    template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
+    inline bool getObjectSuffixRequest(Callback&& callback, const std::string& remotePath, uint64_t length, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(_provider);
+        _provider->getSecret();
+        auto message = _provider->getSuffixRequest(remotePath, length);
+        if (!message)
+            return false;
+        _messages.push_back(makeCallbackMessage(std::forward<Callback>(callback), std::move(message), *_provider, result, capacity, traceId));
+        return true;
+    }
+
+    /// Build a new list objects request for synchronous calls
+    /// Note that a truncated result has to be requested again with the returned continuation token
+    inline bool listObjectsRequest(const std::string& prefix, std::string_view continuationToken = {}, uint32_t maxKeys = 0, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(_provider);
+        _provider->getSecret();
+        auto message = _provider->listRequest(prefix, continuationToken, maxKeys);
+        if (!message)
+            return false;
+        _messages.push_back(std::make_unique<network::OriginalMessage>(std::move(message), *_provider, result, capacity, traceId));
+        return true;
+    }
+
+    /// Build a new list objects request with callback
+    /// Note that a truncated result has to be requested again with the returned continuation token
+    template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
+    inline bool listObjectsRequest(Callback&& callback, const std::string& prefix, std::string_view continuationToken = {}, uint32_t maxKeys = 0, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
+        assert(_provider);
+        _provider->getSecret();
+        auto message = _provider->listRequest(prefix, continuationToken, maxKeys);
+        if (!message)
+            return false;
+        _messages.push_back(makeCallbackMessage(std::forward<Callback>(callback), std::move(message), *_provider, result, capacity, traceId));
         return true;
     }
 
@@ -159,6 +214,7 @@ class Transaction {
 
     /// Build a new put request with callback
     template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
     inline bool putObjectRequest(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
@@ -186,6 +242,7 @@ class Transaction {
 
     /// Build a new delete request with callback
     template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
     inline bool deleteObjectRequest(Callback&& callback, const std::string& remotePath, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         _provider->getSecret();
@@ -205,6 +262,7 @@ class Transaction {
 
     /// Build a new put request with callback
     template <typename Callback>
+    requires std::invocable<Callback&, network::MessageResult&>
     inline bool putObjectRequestMultiPart(Callback&& callback, const std::string& remotePath, const char* data, uint64_t size, uint8_t* result = nullptr, uint64_t capacity = 0, uint64_t traceId = 0) {
         assert(_provider);
         auto splitSize = _provider->multipartUploadSize();

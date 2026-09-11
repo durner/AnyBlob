@@ -118,7 +118,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
         auto it = request.queries.begin();
         while (it != request.queries.end()) {
             requestStream << it->first << ":" << it->second;
-            query << utils::encodeUrlParameters(it->first) << "&" << utils::encodeUrlParameters(it->second);
+            query << utils::encodeUrlParameters(it->first) << "=" << utils::encodeUrlParameters(it->second);
             if (++it != request.queries.end()) {
                 requestStream << "\n";
                 query << "&";

@@ -74,6 +74,10 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
                 sub = sub.substr(pos + 1);
             }
             auto pos = sub.find('/');
+            if (!remoteFile[i].compare("http://") || !remoteFile[i].compare("https://"))
+                info.key = sub;
+            else if (pos != string::npos)
+                info.key = sub.substr(pos + 1);
             auto bucketRegion = sub.substr(0, pos);
             if (auto colonPos = bucketRegion.find(':'); colonPos != string::npos) {
                 info.bucket = bucketRegion.substr(0, colonPos);
@@ -92,6 +96,12 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
         }
     }
     return info;
+}
+//---------------------------------------------------------------------------
+string Provider::getObjectKey(const string& fileName)
+// Get the object key path
+{
+    return getRemoteInfo(fileName).key;
 }
 //---------------------------------------------------------------------------
 string Provider::getKey(const string& keyFile)
@@ -125,6 +135,22 @@ string Provider::getUploadId(string_view body)
     return string(body.substr(pos, end - pos));
 }
 //---------------------------------------------------------------------------
+optional<string_view> Provider::getXMLTagValue(string_view body, string_view tag, uint64_t& pos)
+// Get the value of the next xml tag with that name and advance the position behind it
+{
+    auto open = "<" + string(tag) + ">";
+    auto close = "</" + string(tag) + ">";
+    auto start = body.find(open, pos);
+    if (start == body.npos)
+        return {};
+    start += open.length();
+    auto end = body.find(close, start);
+    if (end == body.npos)
+        return {};
+    pos = end + close.length();
+    return body.substr(start, end - start);
+}
+//---------------------------------------------------------------------------
 vector<string> Provider::parseCSVRow(string_view body)
 // Read a csv row (simplified, no quotes in quotes and no new lines)
 {
@@ -154,6 +180,24 @@ vector<string> Provider::parseCSVRow(string_view body)
         }
     }
     return row;
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Provider::listRequest(const string& /*prefix*/, string_view /*continuationToken*/, uint32_t /*maxKeys*/) const
+// Builds the http request for listing the objects
+{
+    return nullptr;
+}
+//---------------------------------------------------------------------------
+vector<string> Provider::getListObjectKeys(string_view /*body*/, string& /*continuationToken*/) const
+// Get the object keys of a list objects and the continuation token
+{
+    return {};
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> Provider::getSuffixRequest(const string& /*filePath*/, uint64_t /*length*/) const
+// Builds the http request for downloading the last bytes of a blob
+{
+    return nullptr;
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> Provider::putRequestGeneric(const string& /*filePath*/, string_view /*object*/, uint16_t /*part*/, string_view /*uploadId*/) const
@@ -248,6 +292,33 @@ unique_ptr<Provider> Provider::makeProvider(const string& filepath, bool https, 
         }
         default: {
             throw runtime_error("Local requests are still unsupported!");
+        }
+    }
+}
+//---------------------------------------------------------------------------
+unique_ptr<Provider> Provider::makeAnonymousProvider(const string& filepath, bool https)
+// Create a provider for a public endpoint without credentials
+{
+    auto info = anyblob::cloud::Provider::getRemoteInfo(filepath);
+    if (https && info.port == 80)
+        info.port = 443;
+    switch (info.provider) {
+        case anyblob::cloud::Provider::CloudService::AWS: {
+            if (info.zonal)
+                throw runtime_error("An s3 express bucket cannot be reached without credentials!");
+            if (info.endpoint.empty() && info.region.empty())
+                throw runtime_error("An anonymous bucket needs its region, as in s3://bucket:region/key!");
+            return make_unique<anyblob::cloud::AWS>(info, true);
+        }
+        case anyblob::cloud::Provider::CloudService::MinIO: {
+            return make_unique<anyblob::cloud::MinIO>(info, true);
+        }
+        case anyblob::cloud::Provider::CloudService::HTTP: // fallthrough
+        case anyblob::cloud::Provider::CloudService::HTTPS: {
+            return make_unique<anyblob::cloud::HTTP>(info);
+        }
+        default: {
+            throw runtime_error("This provider cannot be reached without credentials!");
         }
     }
 }

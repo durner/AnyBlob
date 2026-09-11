@@ -51,6 +51,11 @@ class HTTP : public Provider {
     // Builds the http request for deleting an objects
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> deleteRequest(const std::string& filePath) const override;
 
+    /// Builds the http request for downloading the last bytes of a blob
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getSuffixRequest(const std::string& filePath, uint64_t length) const override;
+    /// Builds the http request for downloading a blob with a range header
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> buildGetRequest(const std::string& filePath, const std::string& range) const;
+
     /// Get the address of the server
     [[nodiscard]] std::string getAddress() const override;
     /// Get the port of the server

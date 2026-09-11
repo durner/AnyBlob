@@ -16,8 +16,8 @@ namespace anyblob::cloud {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> HTTP::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
-// Builds the http request for downloading a blob
+unique_ptr<utils::DataVector<uint8_t>> HTTP::buildGetRequest(const string& filePath, const string& range) const
+// Builds the http request for downloading a blob with a range header
 {
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::GET;
@@ -25,12 +25,8 @@ unique_ptr<utils::DataVector<uint8_t>> HTTP::getRequest(const string& filePath, 
     request.path = "/" + filePath;
 
     request.headers.emplace("Host", getAddress());
-    if (range.first != range.second) {
-        assert(range.second > range.first);
-        stringstream rangeString;
-        rangeString << "bytes=" << range.first << "-" << (range.second - 1);
-        request.headers.emplace("Range", rangeString.str());
-    }
+    if (!range.empty())
+        request.headers.emplace("Range", range);
 
     string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " " + request.path + " ";
@@ -41,6 +37,29 @@ unique_ptr<utils::DataVector<uint8_t>> HTTP::getRequest(const string& filePath, 
     httpHeader += "\r\n";
 
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> HTTP::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
+// Builds the http request for downloading a blob
+{
+    string rangeHeader;
+    if (range.first != range.second) {
+        assert(range.second > range.first);
+        stringstream rangeString;
+        rangeString << "bytes=" << range.first << "-" << (range.second - 1);
+        rangeHeader = rangeString.str();
+    }
+    return buildGetRequest(filePath, rangeHeader);
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> HTTP::getSuffixRequest(const string& filePath, uint64_t length) const
+// Builds the http request for downloading the last bytes of a blob
+{
+    if (!length)
+        return nullptr;
+    stringstream rangeString;
+    rangeString << "bytes=-" << length;
+    return buildGetRequest(filePath, rangeString.str());
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> HTTP::putRequest(const string& filePath, string_view object) const

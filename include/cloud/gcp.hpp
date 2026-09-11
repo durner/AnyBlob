@@ -75,8 +75,16 @@ class GCP : public Provider {
     /// Allows multipart upload if size > 0
     [[nodiscard]] uint64_t multipartUploadSize() const override { return 128ull << 20; }
 
-    /// Builds the http request for downloading a blob or listing the directory
+    /// Builds the http request for downloading a blob
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
+    /// Builds the http request for listing the objects
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> listRequest(const std::string& prefix, std::string_view continuationToken, uint32_t maxKeys) const override;
+    /// Get the object keys of a list objects and the continuation token
+    [[nodiscard]] std::vector<std::string> getListObjectKeys(std::string_view body, std::string& continuationToken) const override;
+    /// Builds the http request for downloading the last bytes of a blob
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getSuffixRequest(const std::string& filePath, uint64_t length) const override;
+    /// Builds the http request for downloading a blob with a range header
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> buildGetRequest(const std::string& filePath, const std::string& range) const;
     /// Builds the http request for putting objects without the object data itself
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> putRequestGeneric(const std::string& filePath, std::string_view object, uint16_t part, std::string_view uploadId) const override;
     /// Builds the http request for putting objects without the object data itself

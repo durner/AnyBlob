@@ -283,6 +283,8 @@ bool AWS::updateSessionToken(string_view content)
 bool AWS::validKeys(uint32_t offset) const
 // Checks whether keys need to be refresehd
 {
+    if (_settings.anonymous)
+        return true;
     if (!_secret || _validInstance != this || ((!_secret->token.empty() && _secret->expiration - offset < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _secret->secret.empty()))
         return false;
     return true;
@@ -390,31 +392,39 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(network::HttpRequest& r
     shared_ptr<Secret> secret = _secret;
     if (initHeaders) {
         request.headers.emplace("Host", getAddress());
-        request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
-        if (!_settings.zonal) {
-            request.headers.emplace("x-amz-request-payer", "requester");
-            secret = _secret;
-            if (!secret->token.empty())
-                request.headers.emplace("x-amz-security-token", secret->token);
-        } else {
-            secret = _sessionSecret;
-            request.headers.emplace("x-amz-s3session-token", secret->token);
+        if (!_settings.anonymous) {
+            request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
+            if (!_settings.zonal) {
+                request.headers.emplace("x-amz-request-payer", "requester");
+                secret = _secret;
+                if (!secret->token.empty())
+                    request.headers.emplace("x-amz-security-token", secret->token);
+            } else {
+                secret = _sessionSecret;
+                request.headers.emplace("x-amz-s3session-token", secret->token);
+            }
         }
     }
 
-    AWSSigner::StringToSign stringToSign = {.request = request, .region = _settings.region, .service = "s3", .requestSHA = "", .signedHeaders = "", .payloadHash = ""};
-    AWSSigner::encodeCanonicalRequest(request, stringToSign, bodyData, bodyLength);
+    string target;
+    if (_settings.anonymous) {
+        target = AWSSigner::createRequestTarget(request);
+    } else {
+        AWSSigner::StringToSign stringToSign = {.request = request, .region = _settings.region, .service = "s3", .requestSHA = "", .signedHeaders = "", .payloadHash = ""};
+        AWSSigner::encodeCanonicalRequest(request, stringToSign, bodyData, bodyLength);
+        target = AWSSigner::createSignedRequest(secret->keyId, secret->secret, stringToSign);
+    }
     string httpHeader = network::HttpRequest::getRequestMethod(request.method);
     httpHeader += " ";
-    httpHeader += AWSSigner::createSignedRequest(secret->keyId, secret->secret, stringToSign) + " " + network::HttpRequest::getRequestType(request.type) + "\r\n";
+    httpHeader += target + " " + network::HttpRequest::getRequestType(request.type) + "\r\n";
     for (const auto& h : request.headers)
         httpHeader += h.first + ": " + h.second + "\r\n";
     httpHeader += "\r\n";
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
-// Builds the http request for downloading a blob
+unique_ptr<utils::DataVector<uint8_t>> AWS::buildGetRequest(const string& filePath, const string& range) const
+// Builds the http request for downloading a blob with a range header
 {
     if (!validKeys() || (_settings.zonal && !validSession()))
         return nullptr;
@@ -429,14 +439,74 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
     else
         request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
+    if (!range.empty())
+        request.headers.emplace("Range", range);
+
+    return buildRequest(request);
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, const pair<uint64_t, uint64_t>& range) const
+// Builds the http request for downloading a blob
+{
+    string rangeHeader;
     if (range.first != range.second) {
         assert(range.second > range.first);
         stringstream rangeString;
         rangeString << "bytes=" << range.first << "-" << (range.second - 1);
-        request.headers.emplace("Range", rangeString.str());
+        rangeHeader = rangeString.str();
     }
+    return buildGetRequest(filePath, rangeHeader);
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::getSuffixRequest(const string& filePath, uint64_t length) const
+// Builds the http request for downloading the last bytes of a blob
+{
+    if (!length)
+        return nullptr;
+    stringstream rangeString;
+    rangeString << "bytes=-" << length;
+    return buildGetRequest(filePath, rangeString.str());
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::listRequest(const string& prefix, string_view continuationToken, uint32_t maxKeys) const
+// Builds the http request for listing the objects
+{
+    if (!validKeys() || (_settings.zonal && !validSession()))
+        return nullptr;
+
+    network::HttpRequest request;
+    request.method = network::HttpRequest::Method::GET;
+    request.type = network::HttpRequest::Type::HTTP_1_1;
+
+    // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
+    if (_settings.endpoint.empty())
+        request.path = "/";
+    else
+        request.path = "/" + _settings.bucket;
+
+    request.queries.emplace("list-type", "2");
+    if (!prefix.empty())
+        request.queries.emplace("prefix", prefix);
+    if (!continuationToken.empty())
+        request.queries.emplace("continuation-token", continuationToken);
+    if (maxKeys)
+        request.queries.emplace("max-keys", to_string(maxKeys));
 
     return buildRequest(request);
+}
+//---------------------------------------------------------------------------
+vector<string> AWS::getListObjectKeys(string_view body, string& continuationToken) const
+// Get the object keys of a list objects and the continuation token
+{
+    vector<string> keys;
+    uint64_t pos = 0;
+    while (auto key = getXMLTagValue(body, "Key", pos))
+        keys.emplace_back(*key);
+
+    pos = 0;
+    auto token = getXMLTagValue(body, "NextContinuationToken", pos);
+    continuationToken = token ? string(*token) : "";
+    return keys;
 }
 //---------------------------------------------------------------------------
 unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& filePath, string_view object, uint16_t part, string_view uploadId) const

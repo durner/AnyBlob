@@ -142,6 +142,8 @@ TEST_CASE("MinIO Sync Integration") {
             REQUIRE(!it.getResult().compare(content[i]));
             // Check the size
             REQUIRE(it.getSize() == content[i].size());
+            // A whole object reports its size as well
+            REQUIRE(it.getObjectSize() == content[i].size());
 
             // Advanced raw interface
             // Note that the data lies in the data buffer but after the offset to skip the HTTP header
@@ -150,6 +152,21 @@ TEST_CASE("MinIO Sync Integration") {
             REQUIRE(!content[i].compare(rawDataString));
             REQUIRE(!rawDataString.compare(it.getResult()));
             REQUIRE(!rawDataString.compare(content[i++]));
+        }
+    }
+    {
+        // A ranged get reports the size of the whole object
+        anyblob::network::Transaction rangeTxn(provider.get());
+        auto rangeRequest = [&rangeTxn, &fileName]() {
+            return rangeTxn.getObjectRequest(fileName[1], {8, 24});
+        };
+        rangeTxn.verifyKeyRequest(sendReceiverHandle, move(rangeRequest));
+        rangeTxn.processSync(sendReceiverHandle);
+        for (const auto& it : rangeTxn) {
+            REQUIRE(it.success());
+            REQUIRE(it.getSize() == 16);
+            REQUIRE(it.getObjectSize() == content[1].size());
+            REQUIRE(!it.getResult().compare(string_view(content[1]).substr(8, 16)));
         }
     }
     {
@@ -167,6 +184,86 @@ TEST_CASE("MinIO Sync Integration") {
             REQUIRE(it.getSize() == content[1].size());
         }
         group.getTCPSettings().timeout = storedTimeout;
+    }
+    {
+        // The footer of an object is read without asking for its size first
+        anyblob::network::Transaction suffixTxn(provider.get());
+        auto suffixRequest = [&suffixTxn, &fileName]() {
+            return suffixTxn.getObjectSuffixRequest(fileName[1], 64);
+        };
+        suffixTxn.verifyKeyRequest(sendReceiverHandle, move(suffixRequest));
+        suffixTxn.processSync(sendReceiverHandle);
+        for (const auto& it : suffixTxn) {
+            REQUIRE(it.success());
+            REQUIRE(it.getSize() == 64);
+            REQUIRE(it.getObjectSize() == content[1].size());
+            REQUIRE(!it.getResult().compare(string_view(content[1]).substr(content[1].size() - 64)));
+        }
+    }
+    {
+        // List what the bucket holds under a prefix
+        string listPrefix = "list/";
+        string listNames[]{listPrefix + "a.parquet", listPrefix + "b.parquet"};
+        anyblob::network::Transaction listPutTxn(provider.get());
+        for (auto i = 0u; i < 2; i++) {
+            auto& currentFileName = listNames[i];
+            auto putObjectRequest = [&listPutTxn, &currentFileName, &content]() {
+                return listPutTxn.putObjectRequest(currentFileName, content[0].data(), content[0].size());
+            };
+            listPutTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
+        }
+        listPutTxn.processSync(sendReceiverHandle);
+        for (const auto& it : listPutTxn)
+            REQUIRE(it.success());
+
+        anyblob::network::Transaction listTxn(provider.get());
+        auto listObjectsRequest = [&listTxn, &listPrefix]() {
+            return listTxn.listObjectsRequest(listPrefix);
+        };
+        listTxn.verifyKeyRequest(sendReceiverHandle, move(listObjectsRequest));
+        listTxn.processSync(sendReceiverHandle);
+        string continuationToken = "unset";
+        for (const auto& it : listTxn) {
+            REQUIRE(it.success());
+            auto keys = provider->getListObjectKeys(it.getResult(), continuationToken);
+            REQUIRE(keys.size() == 2);
+            REQUIRE(keys[0] == listNames[0]);
+            REQUIRE(keys[1] == listNames[1]);
+            REQUIRE(continuationToken.empty());
+        }
+
+        // A truncated result is continued with the token it came back with
+        vector<string> pagedKeys;
+        auto pages = 0u;
+        do {
+            anyblob::network::Transaction pageTxn(provider.get());
+            auto pageRequest = [&pageTxn, &listPrefix, &continuationToken]() {
+                return pageTxn.listObjectsRequest(listPrefix, continuationToken, 1);
+            };
+            pageTxn.verifyKeyRequest(sendReceiverHandle, move(pageRequest));
+            pageTxn.processSync(sendReceiverHandle);
+            for (const auto& it : pageTxn) {
+                REQUIRE(it.success());
+                auto keys = provider->getListObjectKeys(it.getResult(), continuationToken);
+                REQUIRE(keys.size() == 1);
+                pagedKeys.push_back(keys[0]);
+            }
+        } while (!continuationToken.empty() && ++pages < 8);
+        REQUIRE(pagedKeys.size() == 2);
+        REQUIRE(pagedKeys[0] == listNames[0]);
+        REQUIRE(pagedKeys[1] == listNames[1]);
+
+        anyblob::network::Transaction listDeleteTxn(provider.get());
+        for (auto i = 0u; i < 2; i++) {
+            auto& currentFileName = listNames[i];
+            auto deleteObjectRequest = [&listDeleteTxn, &currentFileName]() {
+                return listDeleteTxn.deleteObjectRequest(currentFileName);
+            };
+            listDeleteTxn.verifyKeyRequest(sendReceiverHandle, move(deleteObjectRequest));
+        }
+        listDeleteTxn.processSync(sendReceiverHandle);
+        for (const auto& it : listDeleteTxn)
+            REQUIRE(it.success());
     }
     {
         // Create the delete request
