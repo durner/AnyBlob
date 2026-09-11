@@ -173,8 +173,9 @@ AdaptiveController::Recommendation AdaptiveController::measure(const Sample& sam
             // Keep moving while the step pays
             _previous = applied;
             _since = probeInterval;
+        } else {
+            _plateauThroughput = _plateauThroughput > 0 ? _plateauThroughput + (throughput - _plateauThroughput) / smoothing : throughput;
         }
-        _plateauThroughput = _plateauThroughput > 0 ? _plateauThroughput + (throughput - _plateauThroughput) / smoothing : throughput;
         _current = applied;
         auto due = _since++ >= probeInterval && (settled || !raisesConcurrency(_next));
         if (due && !stepSwitch())
