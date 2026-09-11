@@ -4,7 +4,9 @@
 #include "network/message_task.hpp"
 #include "network/socket.hpp"
 #include "utils/ring_buffer.hpp"
+#include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
@@ -55,7 +57,11 @@ class TaskedSendReceiverGroup {
     /// The recv chunk size
     uint64_t _chunkSize;
     /// The queue maximum for each TaskedSendReceiver
-    unsigned _concurrentRequests;
+    std::atomic<unsigned> _concurrentRequests;
+    /// The bounded concurrent requests by the uring
+    unsigned _maxConcurrentRequests;
+    /// Bytes transferred by finished messages
+    std::atomic<uint64_t> _transferredBytes;
     /// Number of messages currently in flight
     std::atomic<uint64_t> _inflightMessages;
     /// The TCP settings
@@ -68,7 +74,7 @@ class TaskedSendReceiverGroup {
 
     public:
     /// Initializes the global submissions and completions
-    explicit TaskedSendReceiverGroup(unsigned chunkSize = 64u * 1024, uint64_t submissions = std::thread::hardware_concurrency() * submissionPerCore, uint64_t reuse = 0);
+    explicit TaskedSendReceiverGroup(unsigned chunkSize = 64u * 1024, uint64_t submissions = std::thread::hardware_concurrency() * submissionPerCore, uint64_t reuse = 0, unsigned maxConcurrentRequests = 32);
     /// Destructor
     ~TaskedSendReceiverGroup();
 
@@ -83,17 +89,28 @@ class TaskedSendReceiverGroup {
 
     /// Update the concurrent requests via config
     void setConfig(const network::Config& config) {
-        if (_concurrentRequests != config.coreRequests())
-            _concurrentRequests = config.coreRequests();
+        setConcurrentRequests(config.coreRequests());
     }
     /// Update the concurrent requests
     void setConcurrentRequests(unsigned concurrentRequests) {
-        if (_concurrentRequests != concurrentRequests)
-            _concurrentRequests = concurrentRequests;
+        assert(concurrentRequests <= _maxConcurrentRequests);
+        _concurrentRequests.store(std::min(concurrentRequests, _maxConcurrentRequests), std::memory_order_release);
     }
     /// Get the concurrent requests
     unsigned getConcurrentRequests() const {
-        return _concurrentRequests;
+        return _concurrentRequests.load(std::memory_order_acquire);
+    }
+    /// Get the maximum concurrent requests
+    unsigned maxConcurrentRequests() const {
+        return _maxConcurrentRequests;
+    }
+    /// Get the transferred bytes
+    uint64_t getTransferredBytes() const {
+        return _transferredBytes.load(std::memory_order_acquire);
+    }
+    /// Get the queued submissions
+    uint64_t getQueuedMessages() const {
+        return _submissions.size();
     }
     /// Get the in-flight messages
     uint64_t getInflightMessages() const {
@@ -161,7 +178,7 @@ class TaskedSendReceiver {
 
     /// Adds a message to the submission queue
     void sendSync(OriginalMessage* msg);
-    /// Stops the deamon
+    /// Stops the deamon, also before it starts
     void stop() { _stopDeamon = true; }
     /// Submits queue and waits for result
     void sendReceive(bool local = false, bool oneQueueInvocation = true);
@@ -208,7 +225,7 @@ class TaskedSendReceiverHandle {
     inline bool processSync(bool oneQueueInvocation = true) { return sendReceive(true, oneQueueInvocation); }
     /// Adds a message to the submission queue
     bool sendSync(OriginalMessage* msg);
-    /// Stops the handle thread if deamon
+    /// Stops the handle thread if deamon, also before it starts
     void stop();
     /// Returns the underlying TaskedSendReceiver
     TaskedSendReceiver* get() { return _sendReceiver; }
