@@ -1,8 +1,7 @@
 #include "network/tls_context.hpp"
-#include <netinet/in.h>
+#include "network/tls_connection.hpp"
 #include <openssl/crypto.h>
 #include <openssl/ssl.h>
-#include <sys/socket.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023
@@ -15,7 +14,16 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TLSContext::TLSContext() : _sessionCache()
+static int newSession(SSL* ssl, SSL_SESSION* session)
+// Keeps a session the server just issued, tls 1.3 sends its ticket after the handshake
+{
+    auto connection = static_cast<TLSConnection*>(SSL_get_ex_data(ssl, TLSContext::connectionSlot()));
+    if (!connection)
+        return 0;
+    return connection->getContext().cacheSession(connection->getHostname(), connection->getPort(), connection->verifiesPeer(), session);
+}
+//---------------------------------------------------------------------------
+TLSContext::TLSContext() : _trustStore(false), _sessionCache()
 // Construct the TLS Context
 {
     // Set to TLS
@@ -24,18 +32,23 @@ TLSContext::TLSContext() : _sessionCache()
     // Set up the context
     _ctx = SSL_CTX_new(method);
 
-    // Enable session cache
-    SSL_CTX_set_session_cache_mode(_ctx, SSL_SESS_CACHE_CLIENT);
+    if (_ctx) {
+        // Enable session cache
+        SSL_CTX_set_session_cache_mode(_ctx, SSL_SESS_CACHE_CLIENT);
+        SSL_CTX_sess_set_new_cb(_ctx, newSession);
+
+        // Load the trust store
+        _trustStore = SSL_CTX_set_default_verify_paths(_ctx) == 1;
+    }
 }
 //---------------------------------------------------------------------------
 TLSContext::~TLSContext()
 // The desturctor
 {
     // Remove all sessions
-    for (uint64_t i = 0ull; i < (1ull << cachePower); i++) {
-        if (_sessionCache[i].first && _sessionCache[i].second) {
-            SSL_SESSION_free(_sessionCache[i].second);
-        }
+    for (auto& entry : _sessionCache) {
+        for (auto* session : entry.second.sessions)
+            SSL_SESSION_free(session);
     }
 
     // Destroy context
@@ -51,55 +64,57 @@ void TLSContext::initOpenSSL()
     SSL_load_error_strings();
 }
 //---------------------------------------------------------------------------
-bool TLSContext::cacheSession(int fd, SSL* ssl)
-// Caches the SSL session
+int TLSContext::connectionSlot()
+// The ssl slot that points back to the connection
 {
-    // Is the session already cached?
-    if (SSL_session_reused(ssl))
+    static int slot = SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+    return slot;
+}
+//---------------------------------------------------------------------------
+bool TLSContext::cacheSession(const string& hostname, uint32_t port, bool verifyPeer, SSL_SESSION* session)
+// Caches the SSL session, takes ownership of the session when it is kept
+{
+    if (!session)
         return false;
 
-    // Get the IP address for caching
-    struct sockaddr_in addr;
-    socklen_t addrLen = sizeof(struct sockaddr_in);
-    if (!getpeername(fd, reinterpret_cast<struct sockaddr*>(&addr), &addrLen)) {
-        if (_sessionCache[addr.sin_addr.s_addr & cacheMask].first) {
-            SSL_SESSION_free(_sessionCache[addr.sin_addr.s_addr & cacheMask].second);
-        }
-        _sessionCache[addr.sin_addr.s_addr & cacheMask] = pair<uint64_t, SSL_SESSION*>(addr.sin_addr.s_addr, SSL_get1_session(ssl));
-        return true;
+    auto& entry = _sessionCache[hostname];
+    // The endpoint moved or changed its verification, its tickets are worthless
+    if (entry.port != port || entry.verifyPeer != verifyPeer) {
+        for (auto* cached : entry.sessions)
+            SSL_SESSION_free(cached);
+        entry.sessions.clear();
+        entry.port = port;
+        entry.verifyPeer = verifyPeer;
     }
-    return false;
+    if (entry.sessions.size() >= maxSessionsPerEndpoint)
+        return false;
+    entry.sessions.push_back(session);
+    return true;
 }
 //---------------------------------------------------------------------------
-bool TLSContext::dropSession(int fd)
-// Drop the SSL session from cache
+bool TLSContext::dropSession(const string& hostname, uint32_t port)
+// Drops the SSL sessions of the endpoint
 {
-    struct sockaddr_in addr;
-    socklen_t addrLen = sizeof(struct sockaddr_in);
-    if (!getpeername(fd, reinterpret_cast<struct sockaddr*>(&addr), &addrLen)) {
-        if (_sessionCache[addr.sin_addr.s_addr & cacheMask].first) {
-            auto session = _sessionCache[addr.sin_addr.s_addr & cacheMask].second;
-            _sessionCache[addr.sin_addr.s_addr & cacheMask].first = 0;
-            SSL_SESSION_free(session);
-        }
-        return true;
-    }
-    return false;
+    auto it = _sessionCache.find(hostname);
+    if (it == _sessionCache.end() || it->second.port != port)
+        return false;
+    for (auto* session : it->second.sessions)
+        SSL_SESSION_free(session);
+    _sessionCache.erase(it);
+    return true;
 }
 //---------------------------------------------------------------------------
-bool TLSContext::reuseSession(int fd, SSL* ssl)
+bool TLSContext::reuseSession(const string& hostname, uint32_t port, bool verifyPeer, SSL* ssl)
 // Reuses the SSL session
 {
-    struct sockaddr_in addr;
-    socklen_t addrLen = sizeof(struct sockaddr_in);
-    if (!getpeername(fd, reinterpret_cast<struct sockaddr*>(&addr), &addrLen)) {
-        auto& pair = _sessionCache[addr.sin_addr.s_addr & cacheMask];
-        if (pair.first == addr.sin_addr.s_addr) {
-            SSL_set_session(ssl, pair.second);
-            return true;
-        }
-    }
-    return false;
+    auto it = _sessionCache.find(hostname);
+    if (it == _sessionCache.end() || it->second.port != port || it->second.verifyPeer != verifyPeer || it->second.sessions.empty())
+        return false;
+    auto session = it->second.sessions.back();
+    it->second.sessions.pop_back();
+    auto reused = SSL_set_session(ssl, session) == 1;
+    SSL_SESSION_free(session);
+    return reused;
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::network

@@ -51,6 +51,8 @@ class ConnectionManager {
         int linger = 1;
         /// The timeout
         std::chrono::milliseconds timeout = std::chrono::milliseconds(500);
+        /// Base request deadline; zero disables
+        std::chrono::milliseconds requestDeadline = std::chrono::seconds(30);
         /// Reuse sockets
         int reuse = 1;
     };
@@ -64,6 +66,8 @@ class ConnectionManager {
     std::unordered_map<std::string, std::unique_ptr<Cache>> _cache;
     /// The tls context
     std::unique_ptr<network::TLSContext> _context;
+    /// Per-request throughput estimate in bytes/s
+    double _healthyRate = 0;
 
     /// The counter of current connection managers
     static std::atomic<unsigned> _activeConnectionManagers;
@@ -76,13 +80,17 @@ class ConnectionManager {
     /// The destructor
     ~ConnectionManager();
 
-    /// Creates a new socket connection
-    [[nodiscard]] int32_t connect(const std::string& hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit = 0);
+    /// Connect using settings.timeout unless timeoutOverride is nonzero
+    [[nodiscard]] int32_t connect(const std::string& hostname, uint32_t port, bool tls, bool verifyPeer, const TCPSettings& tcpSettings, int retryLimit = 0, std::chrono::milliseconds timeoutOverride = std::chrono::milliseconds::zero());
     /// Disconnects the socket
     void disconnect(int32_t fd, const TCPSettings* tcpSettings = nullptr, uint64_t bytes = 0, bool forceShutdown = false);
 
     /// Add domain-specific cache
     void addCache(const std::string& hostname, std::unique_ptr<Cache> cache);
+    /// Learn the current throughput
+    void recordThroughput(uint64_t bytes, std::chrono::nanoseconds elapsed);
+    /// Estimated bytes/s
+    [[nodiscard]] double healthyRate() const { return _healthyRate; }
     /// Checks for a timeout
     bool checkTimeout(int fd, const TCPSettings& settings);
 

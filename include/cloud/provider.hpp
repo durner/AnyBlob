@@ -18,6 +18,7 @@ class TaskedSendReceiver;
 class TaskedSendReceiverHandle;
 class Transaction;
 struct Config;
+struct HTTPMessage;
 struct OriginalMessage;
 } // namespace network
 namespace utils {
@@ -81,6 +82,8 @@ class Provider {
     protected:
     /// The type
     CloudService _type;
+    /// Verify the peer certificate
+    bool _verifyPeer = true;
     /// Initialize secret
     virtual void initSecret(network::TaskedSendReceiverHandle& /*sendReceiverHandle*/) {}
     /// Get a local copy of the global secret
@@ -97,6 +100,12 @@ class Provider {
     [[nodiscard]] virtual std::string getAddress() const = 0;
     /// Get the port of the server
     [[nodiscard]] virtual uint32_t getPort() const = 0;
+    /// Does the endpoint expect a tls encrypted connection
+    [[nodiscard]] virtual bool useTls() const { return getPort() == 443; }
+    /// Is the peer certificate verified
+    [[nodiscard]] bool verifyPeer() const { return _verifyPeer; }
+    /// Set the peer verification
+    void setVerifyPeer(bool verifyPeer) { _verifyPeer = verifyPeer; }
 
     /// Is multipart upload supported, if size > 0?
     [[nodiscard]] virtual uint64_t multipartUploadSize() const { return 0; }
@@ -143,6 +152,7 @@ class Provider {
     [[nodiscard]] virtual network::Config getConfig(network::TaskedSendReceiverHandle& sendReceiverHandle);
 
     friend network::Transaction;
+    friend struct network::HTTPMessage;
 };
 //---------------------------------------------------------------------------
 } // namespace cloud

@@ -5,6 +5,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <arpa/inet.h>
+#include <poll.h>
 #include <sys/types.h>
 #include <unistd.h>
 //---------------------------------------------------------------------------
@@ -41,9 +42,10 @@ void Cache::shutdownSocket(unique_ptr<Cache::SocketEntry> socketEntry, unsigned 
 // Shutdown the socket and dns cache
 {
     // delete all occurences of the cached ips in the cache map
-    if (socketEntry->hostname.length() > 0) {
+    if (socketEntry->hostname.length() > 0 && socketEntry->dns && socketEntry->dns->selected) {
+        markFailed(*socketEntry->dns->selected);
         for (auto it = _cache.find(socketEntry->hostname); it != _cache.end();) {
-            if (!strncmp(socketEntry->dns->addr->ai_addr->sa_data, it->second->dns->addr->ai_addr->sa_data, 14)) {
+            if (it->second->dns && it->second->dns->selected && !strncmp(socketEntry->dns->selected->ai_addr->sa_data, it->second->dns->selected->ai_addr->sa_data, 14)) {
                 it->second->dns->cachePriority = 0;
                 _fifo.erase(it->second->timestamp);
                 stopSocket(move(it->second), 0, cacheEntries, false);
@@ -54,6 +56,36 @@ void Cache::shutdownSocket(unique_ptr<Cache::SocketEntry> socketEntry, unsigned 
         }
     }
     stopSocket(move(socketEntry), 0, cacheEntries, false);
+}
+//---------------------------------------------------------------------------
+void Cache::markFailed(const addrinfo& addr)
+// Remember a failed remote address
+{
+    auto now = chrono::steady_clock::now();
+    erase_if(_failedAddresses, [now](const FailedAddress& f) { return f.second <= now; });
+    FailedAddress entry;
+    memcpy(entry.first.data(), addr.ai_addr->sa_data, entry.first.size());
+    entry.second = now + failedEntryLifetime;
+    if (_failedAddresses.size() >= failedEntriesMax)
+        _failedAddresses.erase(_failedAddresses.begin());
+    _failedAddresses.push_back(move(entry));
+}
+//---------------------------------------------------------------------------
+addrinfo* Cache::selectAddress(addrinfo* head, const vector<FailedAddress>& failed, chrono::steady_clock::time_point now)
+// Select the first usable address, falling back to head
+{
+    for (auto* candidate = head; candidate; candidate = candidate->ai_next) {
+        auto isFailed = false;
+        for (const auto& f : failed) {
+            if (f.second > now && !memcmp(f.first.data(), candidate->ai_addr->sa_data, f.first.size())) {
+                isFailed = true;
+                break;
+            }
+        }
+        if (!isFailed)
+            return candidate;
+    }
+    return head;
 }
 //---------------------------------------------------------------------------
 void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*bytes*/, unsigned cacheEntries, bool reuseSocket)
@@ -86,8 +118,8 @@ void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*by
     }
 }
 //---------------------------------------------------------------------------
-unique_ptr<Cache::SocketEntry> Cache::resolve(const string& hostname, unsigned port, bool tls)
-// Resolve the request
+unique_ptr<Cache::SocketEntry> Cache::findSocketEntry(const string& hostname, unsigned port, bool tls, bool verifyPeer)
+// Returns a matching cached socket entry
 {
     for (auto it = _cache.find(hostname); it != _cache.end();) {
         // loosely clean up the multimap cache
@@ -96,15 +128,33 @@ unique_ptr<Cache::SocketEntry> Cache::resolve(const string& hostname, unsigned p
             it = _cache.erase(it);
             continue;
         }
-        if (it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
+        if (it->first == hostname && it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
+            if (tls && it->second->fd >= 0 && it->second->tls->verifiesPeer() != verifyPeer) {
+                it++;
+                continue;
+            }
             auto socketEntry = move(it->second);
             socketEntry->dns->cachePriority--;
             _fifo.erase(socketEntry->timestamp);
             _cache.erase(it);
+            if (socketEntry->fd >= 0) {
+                pollfd event = {.fd = socketEntry->fd, .events = POLLRDHUP, .revents = 0};
+                if (poll(&event, 1, 0) > 0 && event.revents & (POLLRDHUP | POLLHUP | POLLERR)) {
+                    socketEntry->tls.reset();
+                    close(socketEntry->fd);
+                    socketEntry->fd = -1;
+                }
+            }
             return socketEntry;
         }
         it++;
     }
+    return nullptr;
+}
+//---------------------------------------------------------------------------
+unique_ptr<Cache::SocketEntry> Cache::forceResolve(const string& hostname, unsigned port)
+// Resolves a fresh socket entry avoiding recently failed ones
+{
     struct addrinfo hints = {};
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
@@ -119,7 +169,16 @@ unique_ptr<Cache::SocketEntry> Cache::resolve(const string& hostname, unsigned p
     }
     auto socketEntry = make_unique<Cache::SocketEntry>(hostname, port);
     socketEntry->dns = make_unique<DnsEntry>(unique_ptr<addrinfo, decltype(&freeaddrinfo)>(temp, &freeaddrinfo), _defaultPriority);
+    socketEntry->dns->selected = selectAddress(socketEntry->dns->addr.get(), _failedAddresses, chrono::steady_clock::now());
     return socketEntry;
+}
+//---------------------------------------------------------------------------
+unique_ptr<Cache::SocketEntry> Cache::resolve(const string& hostname, unsigned port, bool tls, bool verifyPeer)
+// Resolve the request
+{
+    if (auto socketEntry = findSocketEntry(hostname, port, tls, verifyPeer))
+        return socketEntry;
+    return forceResolve(hostname, port);
 }
 //---------------------------------------------------------------------------
 Cache::~Cache()

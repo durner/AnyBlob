@@ -22,7 +22,7 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _sendReceiverCache(submissions), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _tcpSettings(make_unique<ConnectionManager::TCPSettings>()), _cv(), _mutex()
+TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t submissions, uint64_t reuse) : _submissions(submissions), _reuse(!reuse ? submissions : reuse), _sendReceivers(), _resizeMutex(), _sendReceiverCache(submissions), _chunkSize(chunkSize), _concurrentRequests(network::Config::defaultCoreConcurrency), _inflightMessages(0), _tcpSettings(make_unique<ConnectionManager::TCPSettings>()), _cv(), _mutex()
 // Initializes the global submissions and completions
 {
     TLSContext::initOpenSSL();
@@ -94,13 +94,15 @@ TaskedSendReceiverHandle& TaskedSendReceiverHandle::operator=(TaskedSendReceiver
 TaskedSendReceiverHandle::~TaskedSendReceiverHandle()
 // The destructor
 {
-    if (!_sendReceiver || !_sendReceiver->_connectionManager.get())
+    if (!_sendReceiver)
         return;
-    _sendReceiver->reset();
     auto ptr = _sendReceiver;
-    if (_group->_sendReceiverCache.insert(ptr) == ~0ull) {
+    auto reusable = ptr->_connectionManager && ptr->_messageTasks.empty();
+    ptr->reset();
+    if (!reusable || _group->_sendReceiverCache.insert(ptr) == ~0ull) {
         lock_guard<mutex> lg(_group->_resizeMutex);
-        _group->_sendReceivers.erase(remove_if(_group->_sendReceivers.begin(), _group->_sendReceivers.end(), [this](auto& val) { return val.get() == _sendReceiver; }));
+        auto& receivers = _group->_sendReceivers;
+        receivers.erase(remove_if(receivers.begin(), receivers.end(), [ptr](auto& val) { return val.get() == ptr; }), receivers.end());
     }
     _sendReceiver = nullptr;
 }
@@ -125,7 +127,7 @@ void TaskedSendReceiverHandle::stop()
 bool TaskedSendReceiverHandle::sendReceive(bool local, bool oneQueueInvocation)
 // Calls the underlying TaskedSendReceiver's sendReceive
 {
-    if (!_sendReceiver)
+    if (!_sendReceiver || !_sendReceiver->_connectionManager)
         return false;
     _sendReceiver->sendReceive(local, oneQueueInvocation);
     return true;
@@ -211,6 +213,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             }
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
+            _group._inflightMessages.fetch_add(1, memory_order_acq_rel);
 
             if (_messageTasks.size() >= _group._concurrentRequests)
                 break;
@@ -248,6 +251,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
             }
             // Insert into the task vector
             _messageTasks.emplace_back(move(messageTask));
+            _group._inflightMessages.fetch_add(1, memory_order_acq_rel);
 
             if (_messageTasks.size() >= _group._concurrentRequests)
                 break;
@@ -279,6 +283,11 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 auto status = task->execute(*_connectionManager);
                 // check if finished
                 if (status == MessageState::Finished || status == MessageState::Aborted) {
+                    if (status == MessageState::Finished) {
+                        auto size = task->originalMessage->result.getSize();
+                        if (size >= _group._chunkSize)
+                            _connectionManager->recordThroughput(size, chrono::steady_clock::now() - task->startTime);
+                    }
                     for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
                         if (it->get() == task) {
                             // Remove the second param with the real data
@@ -290,6 +299,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                             if (task->originalMessage->requiresFinish())
                                 task->originalMessage->finish();
                             _messageTasks.erase(it);
+                            _group._inflightMessages.fetch_sub(1, memory_order_acq_rel);
                             _group._cv.notify_all();
                             break;
                         }
@@ -325,6 +335,7 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
     // Rethrow the first caught exception (if any)
     if (firstException) {
         _connectionManager.reset();
+        reset();
         rethrow_exception(firstException);
     }
 }
@@ -340,6 +351,13 @@ void TaskedSendReceiver::reset()
 {
     while (!_submissions.empty())
         _submissions.pop();
+    for (auto& task : _messageTasks) {
+        try {
+            task->abort();
+        } catch (...) {
+        }
+    }
+    _group._inflightMessages.fetch_sub(_messageTasks.size(), memory_order_acq_rel);
     _messageTasks.clear();
     if (_timings)
         _timings->clear();

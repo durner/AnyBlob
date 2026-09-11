@@ -6,11 +6,17 @@
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
 #include "utils/utils.hpp"
+#include <cassert>
+#include <cerrno>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <arpa/inet.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <unistd.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -46,31 +52,102 @@ static int64_t convertIAMTimestamp(string awsTimestamp)
     return mktime(&t);
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::downloadInstanceInfo(const string& info)
+static void appendIMDSToken(string& httpHeader, string_view token)
+// Authenticates the request when the instance requires IMDSv2
+{
+    if (!token.empty()) {
+        httpHeader += "\r\nX-aws-ec2-metadata-token: ";
+        httpHeader += token;
+    }
+    httpHeader += "\r\n\r\n";
+}
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> AWS::downloadInstanceInfo(const string& info, string_view token)
 // Builds the info http request
 {
     string httpHeader = "GET /latest/meta-data/" + info + " HTTP/1.1\r\nHost: ";
     httpHeader += getIAMAddress();
-    httpHeader += "\r\n\r\n";
+    appendIMDSToken(httpHeader, token);
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
+//---------------------------------------------------------------------------
+namespace {
+//---------------------------------------------------------------------------
+/// Milliseconds the metadata reachability probe waits for the connection
+constexpr int imdsProbeTimeout = 100;
+//---------------------------------------------------------------------------
+unique_ptr<utils::DataVector<uint8_t>> downloadIMDSToken(string_view address)
+// Builds the IMDSv2 token request
+{
+    string httpHeader = "PUT /latest/api/token HTTP/1.1\r\nHost: ";
+    httpHeader += address;
+    httpHeader += "\r\nX-aws-ec2-metadata-token-ttl-seconds: 21600\r\nContent-Length: 0\r\n\r\n";
+    return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
+}
+//---------------------------------------------------------------------------
+bool imdsReachable(string_view address, uint32_t port)
+// Probe once to avoid repeated deadlines when metadata is unreachable
+{
+    static const bool reachable = [address, port] {
+        auto fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+        if (fd < 0)
+            return false;
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(static_cast<uint16_t>(port));
+        inet_pton(AF_INET, string(address).c_str(), &addr.sin_addr);
+        auto connected = !connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+        if (!connected && errno == EINPROGRESS) {
+            pollfd poller = {.fd = fd, .events = POLLOUT, .revents = 0};
+            if (poll(&poller, 1, imdsProbeTimeout) == 1) {
+                auto err = 0;
+                socklen_t len = sizeof(err);
+                connected = !getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) && !err;
+            }
+        }
+        close(fd);
+        return connected;
+    }();
+    return reachable;
+}
+//---------------------------------------------------------------------------
+string imdsFetch(network::TaskedSendReceiverHandle& sendReceiverHandle, unique_ptr<utils::DataVector<uint8_t>> message, string_view address, uint32_t port)
+// Runs one synchronous request against the metadata service
+{
+    if (!message || !imdsReachable(address, port))
+        return {};
+    Provider::RemoteInfo info;
+    info.endpoint = address;
+    info.port = port;
+    info.provider = Provider::CloudService::HTTP;
+    HTTP http(info);
+    auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
+    if (!sendReceiverHandle.sendSync(originalMsg.get()) || !sendReceiverHandle.processSync() || !originalMsg->result.success())
+        return {};
+    auto& content = originalMsg->result.getDataVector();
+    unique_ptr<network::HttpHelper::Info> infoPtr;
+    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+    if (infoPtr && !network::HttpResponse::checkSuccess(infoPtr->response.code))
+        return {};
+    return string(s);
+}
+//---------------------------------------------------------------------------
+string imdsToken(network::TaskedSendReceiverHandle& sendReceiverHandle, string_view address, uint32_t port)
+// Fetch an IMDSv2 token
+{
+    return imdsFetch(sendReceiverHandle, downloadIMDSToken(address), address, port);
+}
+//---------------------------------------------------------------------------
+/// Credential retry limit
+constexpr unsigned secretAttempts = 8;
+//---------------------------------------------------------------------------
+} // namespace
 //---------------------------------------------------------------------------
 Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to get instance details
 {
     if (_type == Provider::CloudService::AWS) {
-        auto message = downloadInstanceInfo();
-        RemoteInfo info;
-        info.endpoint = getIAMAddress();
-        info.port = getIAMPort();
-        info.provider = CloudService::HTTP;
-        HTTP http(info);
-        auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-        verify(sendReceiverHandle.sendSync(originalMsg.get()));
-        verify(sendReceiverHandle.processSync());
-        auto& content = originalMsg->result.getDataVector();
-        unique_ptr<network::HttpHelper::Info> infoPtr;
-        auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+        auto s = imdsFetch(sendReceiverHandle, downloadInstanceInfo("instance-type", imdsToken(sendReceiverHandle, getIAMAddress(), getIAMPort())), getIAMAddress(), getIAMPort());
 
         for (auto& instance : AWSInstance::getInstanceDetails())
             if (!instance.type.compare(s))
@@ -84,31 +161,19 @@ Provider::Instance AWS::getInstanceDetails(network::TaskedSendReceiverHandle& se
 string AWS::getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to get the region
 {
-    auto message = downloadInstanceInfo("placement/region");
-    RemoteInfo info;
-    info.endpoint = getIAMAddress();
-    info.port = getIAMPort();
-    info.provider = CloudService::HTTP;
-    HTTP http(info);
-    auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-    verify(sendReceiverHandle.sendSync(originalMsg.get()));
-    verify(sendReceiverHandle.processSync());
-    auto& content = originalMsg->result.getDataVector();
-    unique_ptr<network::HttpHelper::Info> infoPtr;
-    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
-    return string(s);
+    return imdsFetch(sendReceiverHandle, downloadInstanceInfo("placement/region", imdsToken(sendReceiverHandle, getIAMAddress(), getIAMPort())), getIAMAddress(), getIAMPort());
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::downloadIAMUser() const
+unique_ptr<utils::DataVector<uint8_t>> AWS::downloadIAMUser(string_view token) const
 // Builds the secret http request
 {
     string httpHeader = "GET /latest/meta-data/iam/security-credentials HTTP/1.1\r\nHost: ";
     httpHeader += getIAMAddress();
-    httpHeader += "\r\n\r\n";
+    appendIMDSToken(httpHeader, token);
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content, string& iamUser)
+unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content, string& iamUser, string_view token)
 // Builds the secret http request
 {
     auto pos = content.find('\n');
@@ -118,7 +183,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content, 
     httpHeader += content.substr(0, pos);
     httpHeader += " HTTP/1.1\r\nHost: ";
     httpHeader += getIAMAddress();
-    httpHeader += "\r\n\r\n";
+    appendIMDSToken(httpHeader, token);
 
     iamUser = content.substr(0, pos);
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
@@ -235,68 +300,47 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
 // Uses the send receiver to initialize the secret
 {
     if (_type == Provider::CloudService::AWS && !validKeys(180)) {
-        while (true) {
-            if (_mutex.try_lock()) {
-                _secret = _globalSecret;
-                _validInstance = this;
-                if (validKeys(180)) {
-                    _mutex.unlock();
-                    return;
-                }
-                auto message = downloadIAMUser();
-                RemoteInfo info;
-                info.endpoint = getIAMAddress();
-                info.port = getIAMPort();
-                info.provider = CloudService::HTTP;
-                HTTP http(info);
-                auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                verify(sendReceiverHandle.sendSync(originalMsg.get()));
-                verify(sendReceiverHandle.processSync());
-                auto& content = originalMsg->result.getDataVector();
-                unique_ptr<network::HttpHelper::Info> infoPtr;
-                auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
-                string iamUser;
-                message = downloadSecret(s, iamUser);
-                originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                verify(sendReceiverHandle.sendSync(originalMsg.get()));
-                verify(sendReceiverHandle.processSync());
-                auto& secretContent = originalMsg->result.getDataVector();
-                infoPtr.reset();
-                s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
-                updateSecret(s, iamUser);
-                _mutex.unlock();
-            }
+        unique_lock lock(_mutex);
+        _secret = _globalSecret;
+        _validInstance = this;
+        // Bound retries when metadata cannot supply credentials
+        for (auto attempt = 0u; !validKeys(180) && attempt < secretAttempts; attempt++) {
+            auto token = imdsToken(sendReceiverHandle, getIAMAddress(), getIAMPort());
+            auto s = imdsFetch(sendReceiverHandle, downloadIAMUser(token), getIAMAddress(), getIAMPort());
+            string iamUser;
+            s = imdsFetch(sendReceiverHandle, downloadSecret(s, iamUser, token), getIAMAddress(), getIAMPort());
+            updateSecret(s, iamUser);
             if (validKeys(60))
-                return;
+                break;
         }
+        if (!validKeys(60))
+            throw runtime_error("AWS IAM credential initialization exhausted its retry budget");
     }
     if (_type == Provider::CloudService::AWS && _settings.zonal && !validSession(180)) {
-        while (true) {
-            if (_mutex.try_lock()) {
-                _sessionSecret = _globalSessionSecret;
-                _validInstance = this;
-                if (validKeys(180)) {
-                    _mutex.unlock();
-                    return;
-                }
-                auto message = getSessionToken();
-                RemoteInfo info;
-                info.endpoint = _settings.bucket + ".s3.amazonaws.com";
-                info.port = getPort();
-                info.provider = CloudService::HTTP;
-                HTTP http(info);
-                auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
-                verify(sendReceiverHandle.sendSync(originalMsg.get()));
-                verify(sendReceiverHandle.processSync());
+        unique_lock lock(_mutex);
+        _sessionSecret = _globalSessionSecret;
+        _validInstance = this;
+        for (auto attempt = 0u; !validSession(180) && attempt < secretAttempts; attempt++) {
+            auto message = getSessionToken();
+            if (!message)
+                break;
+            RemoteInfo info;
+            info.endpoint = _settings.bucket + ".s3.amazonaws.com";
+            info.port = getPort();
+            info.provider = CloudService::HTTP;
+            HTTP http(info);
+            auto originalMsg = make_unique<network::OriginalMessage>(move(message), http);
+            if (sendReceiverHandle.sendSync(originalMsg.get()) && sendReceiverHandle.processSync() && originalMsg->result.success()) {
                 auto& secretContent = originalMsg->result.getDataVector();
                 unique_ptr<network::HttpHelper::Info> infoPtr;
                 auto s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
                 updateSessionToken(s);
-                _mutex.unlock();
             }
             if (validSession(60))
-                return;
+                break;
         }
+        if (!validSession(60))
+            throw runtime_error("AWS zonal session initialization exhausted its retry budget");
     }
 }
 //---------------------------------------------------------------------------
@@ -343,7 +387,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::resignRequest(const utils::DataVecto
 unique_ptr<utils::DataVector<uint8_t>> AWS::buildRequest(network::HttpRequest& request, const uint8_t* bodyData, uint64_t bodyLength, bool initHeaders) const
 // Creates and signs the request
 {
-    shared_ptr<Secret> secret;
+    shared_ptr<Secret> secret = _secret;
     if (initHeaders) {
         request.headers.emplace("Host", getAddress());
         request.headers.emplace("x-amz-date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
@@ -381,13 +425,14 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::getRequest(const string& filePath, c
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
     if (range.first != range.second) {
+        assert(range.second > range.first);
         stringstream rangeString;
-        rangeString << "bytes=" << range.first << "-" << range.second;
+        rangeString << "bytes=" << range.first << "-" << (range.second - 1);
         request.headers.emplace("Range", rangeString.str());
     }
 
@@ -407,9 +452,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::putRequestGeneric(const string& file
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
     // Is it a multipart upload?
     if (part) {
@@ -435,9 +480,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::deleteRequestGeneric(const string& f
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
     // Is it a multipart upload?
     if (!uploadId.empty()) {
@@ -459,9 +504,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::createMultiPartRequest(const string&
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
     request.queries.emplace("uploads", "");
 
     return buildRequest(request);
@@ -489,9 +534,9 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const strin
 
     // If an endpoint is defined, we use the path-style request. The default is the usage of virtual hosted-style requests.
     if (_settings.endpoint.empty())
-        request.path = "/" + filePath;
+        request.path = "/" + utils::encodeUrlPath(filePath);
     else
-        request.path = "/" + _settings.bucket + "/" + filePath;
+        request.path = "/" + _settings.bucket + "/" + utils::encodeUrlPath(filePath);
 
     request.queries.emplace("uploadId", uploadId);
     auto bodyData = reinterpret_cast<const uint8_t*>(content.data());

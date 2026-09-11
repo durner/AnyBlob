@@ -5,7 +5,6 @@
 #include <cassert>
 #include <cstring>
 #include <stdexcept>
-#include <sys/eventfd.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -32,11 +31,6 @@ IOUringSocket::IOUringSocket(uint32_t entries, int32_t /*flags*/)
     if (!(params.features & IORING_FEAT_FAST_POLL)) {
         throw runtime_error("Uring init error - IORING_FEAT_FAST_POLL not available in the kernel!");
     }
-
-    _eventId = eventfd(0, 0);
-    if (_eventId < 0)
-        throw runtime_error("Event FD creation error!");
-    io_uring_register_eventfd(&_uring, _eventId);
 }
 //---------------------------------------------------------------------------
 io_uring_sqe* IOUringSocket::send_prep(const Request& req, int32_t msg_flags, uint8_t flags)
@@ -44,7 +38,7 @@ io_uring_sqe* IOUringSocket::send_prep(const Request& req, int32_t msg_flags, ui
 {
     assert(req.length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags);
+    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags | MSG_NOSIGNAL);
     sqe->flags |= flags;
     sqe->user_data = reinterpret_cast<uintptr_t>(&req);
     return sqe;
@@ -66,7 +60,7 @@ io_uring_sqe* IOUringSocket::send_prep_to(const Request& req, int32_t msg_flags,
 {
     assert(req.length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags);
+    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags | MSG_NOSIGNAL);
     sqe->flags |= flags | IOSQE_IO_LINK;
     sqe->user_data = reinterpret_cast<uintptr_t>(&req);
     auto timeoutSqe = io_uring_get_sqe(&_uring);
@@ -169,20 +163,10 @@ int32_t IOUringSocket::submit()
     return io_uring_submit(&_uring);
 }
 //---------------------------------------------------------------------------
-void IOUringSocket::wait()
-// Waits for an cqe event in the uring
-{
-    eventfd_t v;
-    int ret = eventfd_read(_eventId, &v);
-    if (ret < 0)
-        throw runtime_error("Wait error!");
-}
-//---------------------------------------------------------------------------
 IOUringSocket::~IOUringSocket() noexcept
 // The destructor
 {
     io_uring_queue_exit(&_uring);
-    close(_eventId);
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::network

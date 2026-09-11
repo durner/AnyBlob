@@ -22,6 +22,7 @@ class DataVector;
 namespace network {
 //---------------------------------------------------------------------------
 struct OriginalMessage;
+struct MessageTask;
 struct HTTPMessage;
 struct HTTPSMessage;
 class TLSConnection;
@@ -56,7 +57,11 @@ enum class MessageFailureCode : uint16_t {
     /// HTTP header error
     HTTP = 1 << 5,
     /// TLS error
-    TLS = 1 << 6
+    TLS = 1 << 6,
+    /// Resigning the request failed
+    Resign = 1 << 7,
+    /// Peer verification failed
+    Certificate = 1 << 8
 };
 //---------------------------------------------------------------------------
 /// The result class
@@ -116,6 +121,7 @@ class MessageResult {
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> moveDataVector();
 
     /// Define the friend message and message tasks
+    friend MessageTask;
     friend HTTPMessage;
     friend HTTPSMessage;
     friend OriginalMessage;

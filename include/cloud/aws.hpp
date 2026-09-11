@@ -115,9 +115,9 @@ class AWS : public Provider {
     /// Get a local copy of the global secret
     void getSecret() override;
     /// Builds the secret http request
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> downloadIAMUser() const;
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> downloadIAMUser(std::string_view token = {}) const;
     /// Builds the secret http request
-    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> downloadSecret(std::string_view content, std::string& iamUser);
+    [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> downloadSecret(std::string_view content, std::string& iamUser, std::string_view token = {});
     /// Update secret
     bool updateSecret(std::string_view content, std::string_view iamUser);
     /// Update session token
@@ -135,6 +135,8 @@ class AWS : public Provider {
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> buildRequest(network::HttpRequest& request, const uint8_t* bodyData = nullptr, uint64_t bodyLength = 0, bool initHeaders = true) const;
     /// Reigns header
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> resignRequest(const utils::DataVector<uint8_t>& data, const uint8_t* bodyData = nullptr, uint64_t bodyLength = 0) const override;
+    /// Supports resigning the request
+    [[nodiscard]] bool supportsResigning() const override { return true; }
     /// Builds the http request for downloading a blob or listing the directory
     [[nodiscard]] std::unique_ptr<utils::DataVector<uint8_t>> getRequest(const std::string& filePath, const std::pair<uint64_t, uint64_t>& range) const override;
     /// Builds the http request for putting objects without the object data itself
@@ -161,7 +163,7 @@ class AWS : public Provider {
     [[nodiscard]] uint32_t getPort() const override;
 
     /// Builds the info http request
-    [[nodiscard]] static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "instance-type");
+    [[nodiscard]] static std::unique_ptr<utils::DataVector<uint8_t>> downloadInstanceInfo(const std::string& info = "instance-type", std::string_view token = {});
     /// Get the IAM address
     [[nodiscard]] static constexpr std::string_view getIAMAddress() { return "169.254.169.254"; }
     /// Get the port of the IAM server

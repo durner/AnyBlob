@@ -56,6 +56,8 @@ class TaskedSendReceiverGroup {
     uint64_t _chunkSize;
     /// The queue maximum for each TaskedSendReceiver
     unsigned _concurrentRequests;
+    /// Number of messages currently in flight
+    std::atomic<uint64_t> _inflightMessages;
     /// The TCP settings
     std::unique_ptr<ConnectionManager::TCPSettings> _tcpSettings;
 
@@ -92,6 +94,14 @@ class TaskedSendReceiverGroup {
     /// Get the concurrent requests
     unsigned getConcurrentRequests() const {
         return _concurrentRequests;
+    }
+    /// Get the in-flight messages
+    uint64_t getInflightMessages() const {
+        return _inflightMessages.load(std::memory_order_acquire);
+    }
+    /// Get the TCP settings
+    ConnectionManager::TCPSettings& getTCPSettings() {
+        return *_tcpSettings;
     }
 
     friend TaskedSendReceiver;

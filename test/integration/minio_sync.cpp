@@ -153,6 +153,22 @@ TEST_CASE("MinIO Sync Integration") {
         }
     }
     {
+        // Exercise transfers with a short timeout
+        auto storedTimeout = group.getTCPSettings().timeout;
+        group.getTCPSettings().timeout = std::chrono::milliseconds(20);
+        anyblob::network::Transaction stormTxn(provider.get());
+        auto stormRequest = [&stormTxn, &fileName]() {
+            return stormTxn.getObjectRequest(fileName[1]);
+        };
+        stormTxn.verifyKeyRequest(sendReceiverHandle, move(stormRequest));
+        stormTxn.processSync(sendReceiverHandle);
+        for (const auto& it : stormTxn) {
+            REQUIRE(it.success());
+            REQUIRE(it.getSize() == content[1].size());
+        }
+        group.getTCPSettings().timeout = storedTimeout;
+    }
+    {
         // Create the delete request
         anyblob::network::Transaction deleteTxn(provider.get());
         for (auto i = 0u; i < 2; i++) {

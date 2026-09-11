@@ -1,6 +1,7 @@
 #include "cloud/http.hpp"
 #include "network/http_request.hpp"
 #include "utils/data_vector.hpp"
+#include <cassert>
 #include <sstream>
 #include <string>
 //---------------------------------------------------------------------------
@@ -25,8 +26,9 @@ unique_ptr<utils::DataVector<uint8_t>> HTTP::getRequest(const string& filePath, 
 
     request.headers.emplace("Host", getAddress());
     if (range.first != range.second) {
+        assert(range.second > range.first);
         stringstream rangeString;
-        rangeString << "bytes=" << range.first << "-" << range.second;
+        rangeString << "bytes=" << range.first << "-" << (range.second - 1);
         request.headers.emplace("Range", rangeString.str());
     }
 

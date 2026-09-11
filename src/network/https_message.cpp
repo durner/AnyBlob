@@ -32,21 +32,28 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
 // executes the task
 {
     auto& state = originalMessage->result.state;
+    // A rejected certificate cannot be retried
+    auto rejectedCertificate = [this]() { return (originalMessage->result.failureCode & static_cast<uint16_t>(MessageFailureCode::Certificate)) != 0; };
+    if (expired(connectionManager)) {
+        originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
+        reset(connectionManager, true);
+        return state;
+    }
     switch (state) {
         case MessageState::Init: {
             try {
-                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), true, tcpSettings);
+                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), true, originalMessage->provider.verifyPeer(), tcpSettings);
             } catch (exception& /*e*/) {
                 if (request)
                     request->fd = -1;
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
-                reset(connectionManager, failures++ > connectionFailuresMax);
+                reset(connectionManager, exhausted(connectionFailuresMax));
                 return execute(connectionManager);
             }
             tlsLayer = connectionManager.getTLSConnection(fd);
             if (!tlsLayer->init(this)) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
-                reset(connectionManager, failures++ > connectionFailuresMax);
+                reset(connectionManager, rejectedCertificate() || exhausted(connectionFailuresMax));
                 return execute(connectionManager);
             }
             state = MessageState::TLSHandshake;
@@ -59,7 +66,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                 state = MessageState::InitSending;
             } else if (status == TLSConnection::Progress::Aborted) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
-                reset(connectionManager, failures++ > failuresMax);
+                reset(connectionManager, rejectedCertificate() || exhausted(failuresMax));
                 return execute(connectionManager);
             } else {
                 return state;
@@ -79,6 +86,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
             auto status = tlsLayer->send(connectionManager, reinterpret_cast<const char*>(ptr), length, result);
             if (status == TLSConnection::Progress::Finished) {
                 sendBufferOffset += result;
+                progressed();
                 if (sendBufferOffset >= static_cast<int64_t>(originalMessage->message->size() + originalMessage->putLength)) {
                     state = MessageState::InitReceiving;
                     receiveBufferOffset = 0;
@@ -87,7 +95,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                 }
                 return execute(connectionManager);
             } else if (status == TLSConnection::Progress::Aborted) {
-                reset(connectionManager, failures++ > failuresMax);
+                reset(connectionManager, exhausted(failuresMax));
                 return execute(connectionManager);
             }
             return state;
@@ -102,14 +110,16 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
             if (status == TLSConnection::Progress::Finished) {
                 receive.resize(receive.size() - (chunkSize - static_cast<uint64_t>(result)));
                 receiveBufferOffset += result;
+                progressed();
                 try {
                     if (HttpHelper::finished(receive.data(), static_cast<uint64_t>(receiveBufferOffset), info)) {
                         originalMessage->result.response = move(info);
-                        if (HttpResponse::checkSuccess(originalMessage->result.response->response.code)) {
+                        auto code = originalMessage->result.response->response.code;
+                        if (HttpResponse::checkSuccess(code)) {
                             state = MessageState::TLSShutdown;
                         } else {
                             originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
-                            reset(connectionManager, true);
+                            reset(connectionManager, !HttpResponse::checkRetryable(code) || exhausted(failuresMax));
                             return execute(connectionManager);
                         }
                         // Decide if to cache the session
@@ -131,11 +141,11 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                     }
                 } catch (exception&) {
                     originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
-                    reset(connectionManager, failures++ > failuresMax);
+                    reset(connectionManager, exhausted(failuresMax));
                     return execute(connectionManager);
                 }
             } else if (status == TLSConnection::Progress::Aborted) {
-                reset(connectionManager, failures++ > failuresMax);
+                reset(connectionManager, exhausted(failuresMax));
                 return execute(connectionManager);
             }
             return state;

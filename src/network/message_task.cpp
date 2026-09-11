@@ -11,7 +11,7 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-MessageTask::MessageTask(OriginalMessage* message, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunkSize) : originalMessage(message), tcpSettings(tcpSettings), sendBufferOffset(0), receiveBufferOffset(0), chunkSize(chunkSize), failures(0)
+MessageTask::MessageTask(OriginalMessage* message, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunkSize) : originalMessage(message), tcpSettings(tcpSettings), sendBufferOffset(0), receiveBufferOffset(0), chunkSize(chunkSize), failures(0), stalls(0), startTime(std::chrono::steady_clock::now())
 // The constructor
 {
 }

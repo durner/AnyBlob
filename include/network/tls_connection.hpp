@@ -1,5 +1,7 @@
 #pragma once
+#include <cstdint>
 #include <memory>
+#include <string>
 #include <openssl/types.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -91,6 +93,12 @@ class TLSConnection {
     State _state;
     /// Already conencted
     bool _connected;
+    /// The hostname
+    std::string _hostname;
+    /// The port
+    uint32_t _port;
+    /// Verify the peer certificate
+    bool _verifyPeer;
 
     public:
     /// The constructor
@@ -105,6 +113,12 @@ class TLSConnection {
     void destroy();
     /// Get the SSL/TLS context
     [[nodiscard]] inline TLSContext& getContext() const { return _context; }
+    /// Is the peer certificate verified
+    [[nodiscard]] inline bool verifiesPeer() const { return _verifyPeer; }
+    /// Get the hostname
+    [[nodiscard]] inline const std::string& getHostname() const { return _hostname; }
+    /// Get the port
+    [[nodiscard]] inline uint32_t getPort() const { return _port; }
 
     /// Recv a TLS encrypted message
     [[nodiscard]] Progress recv(ConnectionManager& connectionManager, char* buffer, int64_t bufferLength, int64_t& resultLength);
@@ -121,6 +135,8 @@ class TLSConnection {
     Progress operationHelper(ConnectionManager& connectionManager, F&& func, int64_t& result);
     /// The processing of the shadow tls layer
     Progress process(ConnectionManager& connectionManager);
+    /// Abort on a rejected peer certificate
+    Progress verifyCertificate(Progress status);
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::network

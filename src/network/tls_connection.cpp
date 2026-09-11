@@ -1,13 +1,16 @@
 #include "network/tls_connection.hpp"
+#include "cloud/provider.hpp"
 #include "network/https_message.hpp"
 #include "network/tls_context.hpp"
 #include <cassert>
 #include <memory>
 #include <utility>
+#include <arpa/inet.h>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/x509v3.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023
@@ -20,7 +23,7 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
 //---------------------------------------------------------------------------
-TLSConnection::TLSConnection(TLSContext& context) : _message(nullptr), _context(context), _ssl(nullptr), _state(), _connected(false)
+TLSConnection::TLSConnection(TLSContext& context) : _message(nullptr), _context(context), _ssl(nullptr), _state(), _connected(false), _hostname(), _port(0), _verifyPeer(false)
 // The consturctor
 {
 }
@@ -45,10 +48,36 @@ bool TLSConnection::init(HTTPSMessage* message)
             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
             return false;
         }
+        SSL_set_ex_data(_ssl, TLSContext::connectionSlot(), this);
         SSL_set_connect_state(_ssl);
         BIO_new_bio_pair(&_internalBio, _message->chunkSize, &_networkBio, _message->chunkSize);
         SSL_set_bio(_ssl, _internalBio, _internalBio);
-        _context.reuseSession(_message->fd, _ssl);
+        auto& provider = _message->originalMessage->provider;
+        _hostname = provider.getAddress();
+        _port = provider.getPort();
+        _verifyPeer = provider.verifyPeer();
+        // The sni must not be an ip
+        sockaddr_in6 numeric;
+        auto named = inet_pton(AF_INET, _hostname.c_str(), &numeric) != 1 && inet_pton(AF_INET6, _hostname.c_str(), &numeric) != 1;
+        if (named && !SSL_ctrl(_ssl, SSL_CTRL_SET_TLSEXT_HOSTNAME, TLSEXT_NAMETYPE_host_name, const_cast<char*>(_hostname.c_str()))) {
+            _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+            return false;
+        }
+        if (_verifyPeer) {
+            if (!_context.hasTrustStore()) {
+                _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+                _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Certificate);
+                return false;
+            }
+            SSL_set_verify(_ssl, SSL_VERIFY_PEER, nullptr);
+            SSL_set_hostflags(_ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+            auto checked = named ? SSL_set1_host(_ssl, _hostname.c_str()) : X509_VERIFY_PARAM_set1_ip_asc(SSL_get0_param(_ssl), _hostname.c_str());
+            if (checked != 1) {
+                _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
+                return false;
+            }
+        }
+        _context.reuseSession(_hostname, _port, _verifyPeer, _ssl);
     } else {
         _message = message;
         BIO_free(_networkBio);
@@ -77,6 +106,7 @@ TLSConnection::Progress TLSConnection::operationHelper(ConnectionManager& connec
 // Helper function that handles the SSL_op calls
 {
     if (_state.progress == Progress::Finished || _state.progress == Progress::Init) {
+        ERR_clear_error();
         auto status = func();
         auto error = SSL_get_error(_ssl, status);
         switch (error) {
@@ -137,9 +167,23 @@ TLSConnection::Progress TLSConnection::connect(ConnectionManager& connectionMana
         auto sslConnect = [ssl]() {
             return SSL_connect(ssl);
         };
-        return operationHelper(connectionManager, sslConnect, unused);
+        auto status = operationHelper(connectionManager, sslConnect, unused);
+        if (status == Progress::Finished || status == Progress::Aborted)
+            return verifyCertificate(status);
+        return status;
     }
     return _state.progress;
+}
+//---------------------------------------------------------------------------
+TLSConnection::Progress TLSConnection::verifyCertificate(Progress status)
+// Abort on a rejected peer certificate
+{
+    if (!_verifyPeer || SSL_get_verify_result(_ssl) == X509_V_OK)
+        return status;
+    _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Certificate);
+    _context.dropSession(_hostname, _port);
+    _state.progress = Progress::Aborted;
+    return Progress::Aborted;
 }
 //---------------------------------------------------------------------------
 TLSConnection::Progress TLSConnection::shutdown(ConnectionManager& connectionManager, bool failedOnce)
@@ -151,13 +195,11 @@ TLSConnection::Progress TLSConnection::shutdown(ConnectionManager& connectionMan
         return SSL_shutdown(ssl);
     };
     auto status = operationHelper(connectionManager, sslShutdown, unused);
-    if (status == Progress::Finished) {
-        _context.cacheSession(_message->fd, ssl);
-    } else if (status == Progress::Aborted) {
+    if (status == Progress::Aborted) {
         if (!failedOnce) [[likely]] {
             return shutdown(connectionManager, true);
         } else {
-            _context.dropSession(_message->fd);
+            _context.dropSession(_hostname, _port);
         }
     }
     return status;
@@ -185,13 +227,14 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     if (_message->request->length > 0) {
                         _state.socketWrite += static_cast<uint64_t>(_message->request->length);
                     } else if (_message->request->length != -EINPROGRESS && _message->request->length != -EAGAIN) {
-                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR) {
+                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR || _message->request->length == -ETIMEDOUT) {
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
                             _state.progress = Progress::Aborted;
                             return _state.progress;
                         } else {
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Send);
-                            _state.progress = Progress::ReceivingInit;
+                            _state.progress = Progress::Aborted;
+                            return _state.progress;
                         }
                     }
                 }
@@ -202,7 +245,7 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     const uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketWrite;
                     _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = static_cast<int64_t>(writeSize), .fd = _message->fd, .event = Socket::EventType::write, .messageTask = _message});
                     if (writeSize <= _message->chunkSize)
-                        connectionManager.getSocketConnection().send_to(*_message->request, _message->tcpSettings.timeout);
+                        connectionManager.getSocketConnection().send_to(*_message->request, _message->attemptTimeout());
                     else
                         connectionManager.getSocketConnection().send(*_message->request);
                     return _state.progress;
@@ -232,7 +275,7 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                         _state.socketRead += static_cast<size_t>(_message->request->length);
                         assert(_state.networkBioWrite >= 0 && static_cast<size_t>(_state.networkBioWrite) == _state.socketRead);
                     } else if (_message->request->length != -EINPROGRESS && _message->request->length != -EAGAIN) {
-                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR)
+                        if (_message->request->length == -ECANCELED || _message->request->length == -EINTR || _message->request->length == -ETIMEDOUT)
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
                         else
                             _message->originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Recv);
@@ -246,7 +289,7 @@ TLSConnection::Progress TLSConnection::process(ConnectionManager& connectionMana
                     uint8_t* ptr = reinterpret_cast<uint8_t*>(_buffer.get()) + _state.socketRead;
                     assert(in_range<int64_t>(readSize));
                     _message->request = std::make_unique<Socket::Request>(Socket::Request{.data = {.data = ptr}, .length = static_cast<int64_t>(readSize), .fd = _message->fd, .event = Socket::EventType::read, .messageTask = _message});
-                    connectionManager.getSocketConnection().recv_to(*_message->request, _message->tcpSettings.timeout, _message->tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+                    connectionManager.getSocketConnection().recv_to(*_message->request, _message->attemptTimeout(), _message->tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
                     return _state.progress;
                 } else {
                     _state.progress = Progress::Finished;

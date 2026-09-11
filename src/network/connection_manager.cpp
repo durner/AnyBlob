@@ -59,9 +59,21 @@ ConnectionManager::ConnectionManager([[maybe_unused]] unsigned uringEntries) : _
 #endif
 }
 //---------------------------------------------------------------------------
-int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool tls, const TCPSettings& tcpSettings, int retryLimit)
+void ConnectionManager::recordThroughput(uint64_t bytes, chrono::nanoseconds elapsed)
+// Learn the current throughput
+{
+    auto seconds = chrono::duration<double>(elapsed).count();
+    if (seconds <= 0)
+        return;
+    auto rate = static_cast<double>(bytes) / seconds;
+    // Do a weighted average
+    _healthyRate = _healthyRate > 0 ? (7 * _healthyRate + rate) / 8 : rate;
+}
+//---------------------------------------------------------------------------
+int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool tls, bool verifyPeer, const TCPSettings& tcpSettings, int retryLimit, chrono::milliseconds timeoutOverride)
 // Creates a new socket connection
 {
+    auto connectTimeout = timeoutOverride.count() ? timeoutOverride : tcpSettings.timeout;
     Cache* resCache;
     auto tldName = string(Cache::tld(hostname));
     auto it = _cache.find(tldName);
@@ -72,7 +84,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
     }
 
     // Did we use
-    auto socketEntry = resCache->resolve(hostname, port, tls);
+    auto socketEntry = resCache->resolve(hostname, port, tls, verifyPeer);
 
     auto fd = socketEntry->fd;
     if (fd >= 0) {
@@ -81,7 +93,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
     }
 
     // Build socket
-    socketEntry->fd = socket(socketEntry->dns->addr->ai_family, socketEntry->dns->addr->ai_socktype, socketEntry->dns->addr->ai_protocol);
+    socketEntry->fd = socket(socketEntry->dns->selected->ai_family, socketEntry->dns->selected->ai_socktype, socketEntry->dns->selected->ai_protocol);
     if (socketEntry->fd == -1) {
         throw runtime_error("Socket creation error!" + string(strerror(errno)));
     }
@@ -198,9 +210,9 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
     }
 #endif
 
-    auto setTimeOut = [&resCache, &socketEntry, maxCacheEntries](int fd, const TCPSettings& tcpSettings) {
+    auto setTimeOut = [&resCache, &socketEntry, maxCacheEntries, connectTimeout](int fd) {
         // Set timeout
-        int64_t timeoutInMs = tcpSettings.timeout.count();
+        int64_t timeoutInMs = connectTimeout.count();
         if (timeoutInMs > 0) {
             struct timeval tv;
             tv.tv_sec = timeoutInMs / 1000;
@@ -221,11 +233,11 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
     };
 
     // Connect to remote
-    auto connectRes = ::connect(socketEntry->fd, socketEntry->dns->addr->ai_addr, socketEntry->dns->addr->ai_addrlen);
+    auto connectRes = ::connect(socketEntry->fd, socketEntry->dns->selected->ai_addr, socketEntry->dns->selected->ai_addrlen);
     if (connectRes < 0 && errno != EINPROGRESS) {
         resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
         if (retryLimit > 0) {
-            return connect(hostname, port, tls, tcpSettings, retryLimit - 1);
+            return connect(hostname, port, tls, verifyPeer, tcpSettings, retryLimit - 1, timeoutOverride);
         } else {
             throw runtime_error("Socket creation error! " + string(strerror(errno)));
         }
@@ -248,7 +260,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
         pollEvent.events = POLLIN | POLLOUT;
 
         // connection check
-        auto t = poll(&pollEvent, 1, static_cast<int>(tcpSettings.timeout.count()));
+        auto t = poll(&pollEvent, 1, static_cast<int>(connectTimeout.count()));
         if (t == 1) {
             int socketError;
             socklen_t socketErrorLen = sizeof(socketError);
@@ -259,7 +271,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
 
             if (!socketError) {
                 // sucessful
-                setTimeOut(socketEntry->fd, tcpSettings);
+                setTimeOut(socketEntry->fd);
                 return emplaceSocket();
             } else {
                 resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
@@ -269,13 +281,13 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
             // Reached timeout
             resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             if (retryLimit > 0) {
-                return connect(hostname, port, tls, tcpSettings, retryLimit - 1);
+                return connect(hostname, port, tls, verifyPeer, tcpSettings, retryLimit - 1);
             } else {
                 throw runtime_error("Socket creation error! Timeout reached");
             }
         }
     }
-    setTimeOut(socketEntry->fd, tcpSettings);
+    setTimeOut(socketEntry->fd);
     return emplaceSocket();
 }
 //---------------------------------------------------------------------------

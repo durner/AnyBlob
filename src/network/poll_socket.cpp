@@ -35,7 +35,8 @@ bool PollSocket::send_to(Request& req, std::chrono::milliseconds timeout, int32_
 // Prepare a submission send with timeout
 {
     if (req.event != EventType::write) return false;
-    enqueue(req.fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(&req), .timeout = chrono::steady_clock::now() + timeout, .flags = msg_flags});
+    auto deadline = timeout.count() ? chrono::steady_clock::now() + timeout : chrono::time_point<chrono::steady_clock>::max();
+    enqueue(req.fd, POLLOUT, RequestInfo{.request = const_cast<Request*>(&req), .timeout = deadline, .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------
@@ -43,7 +44,8 @@ bool PollSocket::recv_to(Request& req, std::chrono::milliseconds timeout, int32_
 // Prepare a submission recv with timeout
 {
     if (req.event != EventType::read) return false;
-    enqueue(req.fd, POLLIN, RequestInfo{.request = &req, .timeout = chrono::steady_clock::now() + timeout, .flags = msg_flags});
+    auto deadline = timeout.count() ? chrono::steady_clock::now() + timeout : chrono::time_point<chrono::steady_clock>::max();
+    enqueue(req.fd, POLLIN, RequestInfo{.request = &req, .timeout = deadline, .flags = msg_flags});
     return true;
 }
 //---------------------------------------------------------------------------
@@ -52,12 +54,10 @@ PollSocket::Request* PollSocket::complete()
 {
     while (ready.empty()) {
         // Activly poll here as well to match io_uring because we have to check for new arrivals
-        if (readyFds <= 0) {
-            // Poll wait up to 1ms
+        // Poll wait up to 1ms
+        if (readyFds <= 0)
             readyFds = ::poll(pollfds.data(), pollfds.size(), 1);
-            // No events ready
-            if (readyFds <= 0) continue;
-        }
+        readyFds = 0;
 
         // Check for completed events
         auto currentTime = chrono::steady_clock::now();
@@ -69,7 +69,7 @@ PollSocket::Request* PollSocket::complete()
                     if (req.request->event == EventType::read) {
                         req.request->length = ::recv(it->first, req.request->data.data, static_cast<size_t>(req.request->length), req.flags | MSG_DONTWAIT);
                     } else if (req.request->event == EventType::write) {
-                        req.request->length = ::send(it->first, req.request->data.cdata, static_cast<size_t>(req.request->length), req.flags | MSG_DONTWAIT);
+                        req.request->length = ::send(it->first, req.request->data.cdata, static_cast<size_t>(req.request->length), req.flags | MSG_DONTWAIT | MSG_NOSIGNAL);
                     }
 
                     // Simulate io uring by returning -errno

@@ -24,6 +24,8 @@ struct HTTPMessage : public MessageTask {
     MessageState execute(ConnectionManager& connectionManager) override;
     /// Reset for restart
     void reset(ConnectionManager& connectionManager, bool aborted);
+    /// Check the deadline, scaled by response size and estimated throughput
+    [[nodiscard]] bool expired(const ConnectionManager& connectionManager) const;
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::network

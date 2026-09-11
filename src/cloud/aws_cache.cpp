@@ -24,42 +24,15 @@ AWSCache::AWSCache() : Cache(), _mtuCache()
 {
 }
 //---------------------------------------------------------------------------
-unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(const string& hostname, unsigned port, bool tls)
+unique_ptr<network::Cache::SocketEntry> AWSCache::resolve(const string& hostname, unsigned port, bool tls, bool verifyPeer)
 // Resolve the request
 {
-    for (auto it = _cache.find(hostname); it != _cache.end();) {
-        // loosely clean up the multimap cache
-        if (!it->second->dns) {
-            _fifo.erase(it->second->timestamp);
-            it = _cache.erase(it);
-            continue;
-        }
-        if (it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
-            auto socketEntry = move(it->second);
-            socketEntry->dns->cachePriority--;
-            _fifo.erase(socketEntry->timestamp);
-            _cache.erase(it);
-            return socketEntry;
-        }
-        it++;
-    }
-    struct addrinfo hints = {};
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-
-    addrinfo* temp;
-    array<char, 16> port_str{};
-    to_chars(port_str.data(), port_str.data() + port_str.size(), port);
-    if (getaddrinfo(hostname.c_str(), port_str.data(), &hints, &temp) != 0) {
-        throw runtime_error("hostname getaddrinfo error");
-    }
-    auto socketEntry = make_unique<Cache::SocketEntry>(hostname, port);
-    socketEntry->dns = make_unique<DnsEntry>(unique_ptr<addrinfo, decltype(&freeaddrinfo)>(temp, &freeaddrinfo), _defaultPriority);
+    if (auto socketEntry = findSocketEntry(hostname, port, tls, verifyPeer))
+        return socketEntry;
+    auto socketEntry = forceResolve(hostname, port);
 
     if (!Cache::tld(hostname).compare("amazonaws.com")) {
-        auto* p = reinterpret_cast<sockaddr_in*>(socketEntry->dns->addr->ai_addr);
+        auto* p = reinterpret_cast<sockaddr_in*>(socketEntry->dns->selected->ai_addr);
         auto ipAsInt = p->sin_addr.s_addr;
         auto it = _mtuCache.find(ipAsInt);
         if (it != _mtuCache.end()) {

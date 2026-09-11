@@ -1,9 +1,12 @@
 #pragma once
 #include "network/tls_connection.hpp"
+#include <array>
+#include <chrono>
 #include <map>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 #include <netdb.h>
 #include <netinet/tcp.h>
 //---------------------------------------------------------------------------
@@ -25,10 +28,15 @@ class Cache {
         std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> addr;
         /// The cache priority
         int cachePriority = 0;
+        /// The selected address within the owned addr chain
+        addrinfo* selected = nullptr;
 
         /// The constructor
-        DnsEntry(std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> address, int cachePriority = 0) : addr(move(address)), cachePriority(cachePriority) {}
+        DnsEntry(std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> address, int cachePriority = 0) : addr(move(address)), cachePriority(cachePriority), selected(addr.get()) {}
     };
+
+    /// A failed remote address and its expiration
+    using FailedAddress = std::pair<std::array<char, 14>, std::chrono::steady_clock::time_point>;
 
     /// The fd socket entry
     struct SocketEntry {
@@ -54,14 +62,30 @@ class Cache {
     std::multimap<std::string, std::unique_ptr<SocketEntry>> _cache;
     /// The fifo deletion of sockets to help reduce open fds (ulimit -n issue)
     std::map<size_t, SocketEntry*> _fifo;
+    /// The failed remote addresses
+    std::vector<FailedAddress> _failedAddresses;
     /// The timestamp counter for deletion
     size_t _timestamp = 0;
     /// The default priority
     int _defaultPriority = 8;
 
+    /// The lifetime of a failed address entry
+    static constexpr std::chrono::seconds failedEntryLifetime{5};
+    /// The maximum number of tracked failed addresses
+    static constexpr size_t failedEntriesMax = 16;
+
+    /// Returns a matching cached socket entry or nullptr
+    std::unique_ptr<SocketEntry> findSocketEntry(const std::string& hostname, unsigned port, bool tls, bool verifyPeer);
+    /// Resolves a fresh socket entry avoiding recently failed ones
+    std::unique_ptr<SocketEntry> forceResolve(const std::string& hostname, unsigned port);
+    /// Remember a failed remote address
+    void markFailed(const addrinfo& addr);
+    /// First usable address; fall back to head if all failed
+    static addrinfo* selectAddress(addrinfo* head, const std::vector<FailedAddress>& failed, std::chrono::steady_clock::time_point now);
+
     public:
     /// The address resolving
-    virtual std::unique_ptr<SocketEntry> resolve(const std::string& hostname, unsigned port, bool tls);
+    virtual std::unique_ptr<SocketEntry> resolve(const std::string& hostname, unsigned port, bool tls, bool verifyPeer);
     /// Start the timing and advance to the next cache bucket
     virtual void startSocket(int /*fd*/) {}
     /// Stops the socket and either closes the connection or cashes it
