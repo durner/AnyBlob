@@ -20,6 +20,8 @@ jobs:
     name: Integration Tests (Clang ${{ matrix.clang-toolchain }}) (Uring Compat ${{ matrix.uring-compat }})
     # Run on ubuntu
     runs-on: ubuntu-latest
+    # The build and the test together stay far below this
+    timeout-minutes: 30
     # Use both the GCC and Clang Toolchain
     strategy:
         matrix:
@@ -61,6 +63,8 @@ jobs:
       # Run the integration test
       - name: Integration Test
         working-directory: ${{github.workspace}}/build
+        # A stuck daemon or controller never returns on its own, so the step ends the run
+        timeout-minutes: 10
         run: |
           export AWS_S3_BUCKET=test
           export AWS_S3_REGION=us-east-1
