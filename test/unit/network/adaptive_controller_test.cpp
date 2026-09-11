@@ -126,7 +126,7 @@ TEST_CASE("adaptive_controller_cpu_bound_growth") {
     // CPU-bound scaling
     auto rec = seed;
     std::vector<AdaptiveController::Recommendation> epochs;
-    for (auto i = 0u; i < 80; i++) {
+    for (auto i = 0u; i < 120; i++) {
         auto bps = static_cast<uint64_t>(rec.threads) * 1'000'000'000;
         rec = controller.measure(sampleThroughput(rec, bps));
         epochs.push_back(rec);
