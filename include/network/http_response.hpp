@@ -37,8 +37,10 @@ struct HttpResponse {
         RANGE_NOT_SATISFIABLE_416,
         TOO_MANY_REQUESTS_429,
         INTERNAL_SERVER_ERROR_500,
+        BAD_GATEWAY_502,
         SERVICE_UNAVAILABLE_503,
         SLOW_DOWN_503,
+        GATEWAY_TIMEOUT_504,
         UNKNOWN = 255
     };
     enum class Type : uint8_t {
@@ -68,8 +70,10 @@ struct HttpResponse {
             case Code::RANGE_NOT_SATISFIABLE_416: return "416 Range Not Satisfiable";
             case Code::TOO_MANY_REQUESTS_429: return "429 Too Many Requests";
             case Code::INTERNAL_SERVER_ERROR_500: return "500 Internal Server Error";
+            case Code::BAD_GATEWAY_502: return "502 Bad Gateway";
             case Code::SERVICE_UNAVAILABLE_503: return "503 Service Unavailable";
             case Code::SLOW_DOWN_503: return "503 Slow Down";
+            case Code::GATEWAY_TIMEOUT_504: return "504 Gateway Timeout";
             default: return "UNKNOWN";
         }
     }
@@ -90,8 +94,10 @@ struct HttpResponse {
             case Code::RANGE_NOT_SATISFIABLE_416: return 416;
             case Code::TOO_MANY_REQUESTS_429: return 429;
             case Code::INTERNAL_SERVER_ERROR_500: return 500;
+            case Code::BAD_GATEWAY_502: return 502;
             case Code::SERVICE_UNAVAILABLE_503: return 503;
             case Code::SLOW_DOWN_503: return 503;
+            case Code::GATEWAY_TIMEOUT_504: return 504;
             default: return 0;
         }
     }
@@ -113,7 +119,7 @@ struct HttpResponse {
     }
     /// Check for transient errors that are worth retrying
     static constexpr auto checkRetryable(const Code& code) {
-        return (code == Code::TOO_MANY_REQUESTS_429 || code == Code::INTERNAL_SERVER_ERROR_500 || code == Code::SERVICE_UNAVAILABLE_503 || code == Code::SLOW_DOWN_503);
+        return (code == Code::TOO_MANY_REQUESTS_429 || code == Code::INTERNAL_SERVER_ERROR_500 || code == Code::BAD_GATEWAY_502 || code == Code::SERVICE_UNAVAILABLE_503 || code == Code::SLOW_DOWN_503 || code == Code::GATEWAY_TIMEOUT_504);
     }
     /// Deserialize the response
     [[nodiscard]] static HttpResponse deserialize(std::string_view data);

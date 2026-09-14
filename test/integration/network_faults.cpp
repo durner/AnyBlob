@@ -126,7 +126,7 @@ TEST_CASE("Network Fault Integration") {
 
     SECTION("transient faults recover") {
         // The cut is tested at a header and at a body offset
-        for (auto& [mode, arg] : {pair<Mode, uint64_t>{Mode::rstOnConnect, 0}, {Mode::closeMidBody, 64 << 10}, {Mode::rstMidBody, 64 << 10}, {Mode::closeMidBody, 1 << 20}, {Mode::garbage, 0}}) {
+        for (auto& [mode, arg] : {pair<Mode, uint64_t>{Mode::rstOnConnect, 0}, {Mode::closeMidBody, 64 << 10}, {Mode::rstMidBody, 64 << 10}, {Mode::closeMidBody, 1 << 20}, {Mode::garbage, 0}, {Mode::gatewayError, 0}}) {
             FaultProxy proxy(env.endpoint, mode, arg, 2);
             auto group = makeGroup();
             auto handle = group->getHandle();
@@ -140,7 +140,7 @@ TEST_CASE("Network Fault Integration") {
     }
 
     SECTION("persistent faults abort within the budget") {
-        for (auto& [mode, arg] : {pair<Mode, uint64_t>{Mode::rstOnConnect, 0}, {Mode::acceptHang, 0}, {Mode::headerStall, 1024}, {Mode::garbage, 0}}) {
+        for (auto& [mode, arg] : {pair<Mode, uint64_t>{Mode::rstOnConnect, 0}, {Mode::acceptHang, 0}, {Mode::headerStall, 1024}, {Mode::garbage, 0}, {Mode::gatewayError, 0}}) {
             FaultProxy proxy(env.endpoint, mode, arg, -1);
             auto group = makeGroup();
             auto handle = group->getHandle();

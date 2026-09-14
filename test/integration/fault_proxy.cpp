@@ -76,6 +76,7 @@ string_view FaultProxy::getName(Mode mode)
         case Mode::trickle: return "trickle";
         case Mode::rstMidUpload: return "rst-mid-upload";
         case Mode::idleClose: return "idle-close";
+        case Mode::gatewayError: return "gateway-error";
     }
     return "unknown";
 }
@@ -110,6 +111,11 @@ void FaultProxy::relay(int client, bool faulty)
         vector<char> request(64u << 10);
         if (::recv(client, request.data(), request.size(), 0) > 0)
             write(client, garbage.data(), garbage.size());
+    } else if (faulty && _mode == Mode::gatewayError) {
+        string response = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        vector<char> request(64u << 10);
+        if (::recv(client, request.data(), request.size(), 0) > 0)
+            write(client, response.data(), response.size());
     } else {
         server = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
         if (server >= 0 && !::connect(server, reinterpret_cast<sockaddr*>(&_target), sizeof(_target))) {
