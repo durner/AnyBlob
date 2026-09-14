@@ -281,7 +281,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
             // Reached timeout
             resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
             if (retryLimit > 0) {
-                return connect(hostname, port, tls, verifyPeer, tcpSettings, retryLimit - 1);
+                return connect(hostname, port, tls, verifyPeer, tcpSettings, retryLimit - 1, timeoutOverride);
             } else {
                 throw runtime_error("Socket creation error! Timeout reached");
             }
