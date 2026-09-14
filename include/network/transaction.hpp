@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cassert>
 #include <concepts>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -34,7 +35,6 @@ class Transaction {
     class Iterator;
     class ConstIterator;
 
-    public:
     /// The message typedef
     using message_vector_type = std::vector<std::unique_ptr<network::OriginalMessage>>;
 
@@ -292,7 +292,7 @@ class Transaction {
                         if (_multipartUploads[position].state != MultipartUpload::State::Aborted) [[likely]] {
                             auto contentData = std::make_unique<std::string>();
                             auto content = contentData.get();
-                            auto finished = [&callback, &initalRequestResult, contentPtr = move(contentData), this](network::MessageResult& result) mutable {
+                            auto finished = [&callback, &initalRequestResult, contentPtr = std::move(contentData), this](network::MessageResult& result) mutable {
                                 if (!result.success()) {
                                     initalRequestResult.state = network::MessageState::Cancelled;
                                     initalRequestResult.originError = &result;
@@ -370,10 +370,11 @@ class Transaction {
         explicit constexpr Iterator(const message_vector_type::iterator& it) { this->it = it; }
         /// Copy constructor
         constexpr Iterator(const Iterator& it) { this->it = it.it; }
+
+        public:
         /// Delete default constructor
         Iterator() = delete;
 
-        public:
         /// Reference
         reference operator*() const;
         /// Pointer
@@ -418,10 +419,11 @@ class Transaction {
         explicit constexpr ConstIterator(const message_vector_type::const_iterator& it) { this->it = it; }
         /// Copy constructor
         constexpr ConstIterator(const ConstIterator& it) { this->it = it.it; }
+
+        public:
         /// Delete default constructor
         ConstIterator() = delete;
 
-        public:
         /// Reference
         reference operator*() const;
         /// Pointer

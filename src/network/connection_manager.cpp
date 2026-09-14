@@ -11,7 +11,6 @@
 #endif
 #include <atomic>
 #include <cassert>
-#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <fcntl.h>

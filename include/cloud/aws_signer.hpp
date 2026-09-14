@@ -1,5 +1,6 @@
 #pragma once
 #include "network/http_request.hpp"
+#include <cstdint>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library

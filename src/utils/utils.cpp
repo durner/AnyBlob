@@ -184,7 +184,7 @@ pair<unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData, uint64_t 
         throw runtime_error("OpenSSL Error!");
 
     size_t len;
-    if (EVP_MAC_final(mctx.get(), NULL, &len, 0) <= 0)
+    if (EVP_MAC_final(mctx.get(), nullptr, &len, 0) <= 0)
         throw runtime_error("OpenSSL Error!");
 
     auto hash = make_unique<uint8_t[]>(len);

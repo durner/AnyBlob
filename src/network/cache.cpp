@@ -42,7 +42,7 @@ void Cache::shutdownSocket(unique_ptr<Cache::SocketEntry> socketEntry, unsigned 
 // Shutdown the socket and dns cache
 {
     // delete all occurences of the cached ips in the cache map
-    if (socketEntry->hostname.length() > 0 && socketEntry->dns && socketEntry->dns->selected) {
+    if (!socketEntry->hostname.empty() && socketEntry->dns && socketEntry->dns->selected) {
         markFailed(*socketEntry->dns->selected);
         for (auto it = _cache.find(socketEntry->hostname); it != _cache.end();) {
             if (it->second->dns && it->second->dns->selected && !strncmp(socketEntry->dns->selected->ai_addr->sa_data, it->second->dns->selected->ai_addr->sa_data, 14)) {
@@ -92,7 +92,7 @@ void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*by
 // Stops the socket and either closes the connection or cashes it
 {
     assert(socketEntry);
-    if (reuseSocket && socketEntry->hostname.length() > 0 && socketEntry->port) {
+    if (reuseSocket && !socketEntry->hostname.empty() && socketEntry->port) {
         if (socketEntry->dns->cachePriority > 0) {
             socketEntry->timestamp = _timestamp++;
             for (auto it = _fifo.begin(); _fifo.size() >= cacheEntries;) {
@@ -128,7 +128,7 @@ unique_ptr<Cache::SocketEntry> Cache::findSocketEntry(const string& hostname, un
             it = _cache.erase(it);
             continue;
         }
-        if (it->first == hostname && it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls.get()))) {
+        if (it->first == hostname && it->second->port == port && ((tls && it->second->tls.get()) || (!tls && !it->second->tls))) {
             if (tls && it->second->fd >= 0 && it->second->tls->verifiesPeer() != verifyPeer) {
                 it++;
                 continue;

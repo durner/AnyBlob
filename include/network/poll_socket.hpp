@@ -1,6 +1,7 @@
 #pragma once
 #include "network/socket.hpp"
 #include <chrono>
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 #include <sys/poll.h>

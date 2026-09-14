@@ -109,7 +109,7 @@ class DataVector {
 
     /// Transfer the ownership of the data
     [[nodiscard]] constexpr std::unique_ptr<T[]> transferBuffer() {
-        return move(_dataOwned);
+        return std::move(_dataOwned);
     }
 };
 //---------------------------------------------------------------------------

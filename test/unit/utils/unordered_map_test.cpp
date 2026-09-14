@@ -38,8 +38,8 @@ TEST_CASE("unordered_map_multi_threaded") {
             }
         });
     }
-    for (int i = 0; i < 10; i++) {
-        t[i].join();
+    for (auto& i : t) {
+        i.join();
     }
     // Find the elements multu-threaded
     for (int i = 0; i < 10; i++) {
@@ -49,8 +49,8 @@ TEST_CASE("unordered_map_multi_threaded") {
             }
         });
     }
-    for (int i = 0; i < 10; i++) {
-        t[i].join();
+    for (auto& i : t) {
+        i.join();
     }
 }
 //---------------------------------------------------------------------------
@@ -65,8 +65,8 @@ TEST_CASE("unordered_map_multi_threaded_delete") {
             }
         });
     }
-    for (int i = 0; i < 10; i++) {
-        t[i].join();
+    for (auto& i : t) {
+        i.join();
     }
     // Delete the elements multi-threaded
     for (int i = 0; i < 10; i++) {
@@ -76,8 +76,8 @@ TEST_CASE("unordered_map_multi_threaded_delete") {
             }
         });
     }
-    for (int i = 0; i < 10; i++) {
-        t[i].join();
+    for (auto& i : t) {
+        i.join();
     }
 }
 //---------------------------------------------------------------------------

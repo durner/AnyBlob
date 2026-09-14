@@ -1,7 +1,7 @@
 #include "network/http_response.hpp"
-#include "utils/data_vector.hpp"
 #include <charconv>
 #include <map>
+#include <stdexcept>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2024
@@ -79,7 +79,8 @@ HttpResponse HttpResponse::deserialize(string_view data)
         } else {
             // headers
             auto keyPos = line.find(strHeaderSeperator);
-            string_view key, value = "";
+            string_view key;
+            string_view value;
             if (keyPos == line.npos) {
                 throw runtime_error("Invalid HttpResponse: Headers need key and value!");
             } else {

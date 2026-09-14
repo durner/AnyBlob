@@ -1,11 +1,8 @@
 #include "catch2/single_include/catch2/catch.hpp"
-#include "cloud/http.hpp"
 #include "cloud/provider.hpp"
 #include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "perfevent/PerfEvent.hpp"
-#include "utils/data_vector.hpp"
-#include <future>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -38,7 +35,7 @@ TEST_CASE("send_receiver") {
     vector<unique_ptr<OriginalMessage>> msgs;
     for (auto i = 0u; i < requests; i++) {
         auto range = std::pair<uint64_t, uint64_t>(0, 0);
-        string file = "";
+        string file;
         msgs.emplace_back(new OriginalMessage{provider->getRequest(file, range), *provider});
         verify(group.send(msgs.back().get()));
 

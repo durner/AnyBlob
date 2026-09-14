@@ -248,14 +248,13 @@ TEST_CASE("MinIO Asynchronous Integration") {
 
         // Create the delete request
         anyblob::network::Transaction deleteTxn(provider.get());
-        for (auto i = 0u; i < 2; i++) {
+        for (auto& currentFileName : fileName) {
             // Check the delete for success
             auto checkSuccess = [&finishedMessages](anyblob::network::MessageResult& result) {
                 // Sucessful request
                 REQUIRE(result.success());
                 finishedMessages++;
             };
-            auto& currentFileName = fileName[i];
             auto deleteRequest = [&deleteTxn, &currentFileName, callback = move(checkSuccess)]() {
                 return deleteTxn.deleteObjectRequest(move(callback), currentFileName);
             };

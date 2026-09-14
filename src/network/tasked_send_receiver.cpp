@@ -1,15 +1,14 @@
 #include "network/tasked_send_receiver.hpp"
-#include "network/http_message.hpp"
-#include "network/https_message.hpp"
+#include "network/http_message.hpp" // IWYU pragma: keep
+#include "network/https_message.hpp" // IWYU pragma: keep
 #include "network/message_result.hpp"
 #include "network/original_message.hpp"
 #include "network/tls_context.hpp"
 #include "utils/data_vector.hpp"
-#include "utils/timer.hpp"
+#include "utils/timer.hpp" // IWYU pragma: keep
 #include "utils/utils.hpp"
 #include <algorithm>
 #include <cassert>
-#include <cstring>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021
@@ -31,10 +30,8 @@ TaskedSendReceiverGroup::TaskedSendReceiverGroup(unsigned chunkSize, uint64_t su
 TaskedSendReceiverGroup::~TaskedSendReceiverGroup()
 // The destructor
 {
-    while (auto val = _reuse.consume()) {
-        if (val.has_value())
-            delete val.value();
-    }
+    while (auto val = _reuse.consume())
+        delete *val;
 }
 //---------------------------------------------------------------------------
 bool TaskedSendReceiverGroup::send(OriginalMessage* msg)

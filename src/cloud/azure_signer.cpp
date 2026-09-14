@@ -95,7 +95,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
 
     // canonicalize headers, assume no unnecessary whitespaces in header
     map<string, string> sorted;
-    if (request.headers.size()) {
+    if (!request.headers.empty()) {
         auto it = request.headers.begin();
         while (it != request.headers.end()) {
             string key = it->first;
@@ -105,7 +105,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
             ++it;
         }
         for (auto& h : sorted)
-            if (h.first.substr(0, 5) == "x-ms-")
+            if (h.first.starts_with("x-ms-"))
                 requestStream << h.first << ":" << h.second << "\n";
     }
 
@@ -113,7 +113,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
 
     stringstream query;
     // canonicalize query; assume that all query arguments are RFC 3986 conform
-    if (request.queries.size()) {
+    if (!request.queries.empty()) {
         requestStream << "\n";
         auto it = request.queries.begin();
         while (it != request.queries.end()) {
@@ -134,7 +134,7 @@ string AzureSigner::createSignedRequest(const string& accountName, const string&
     request.headers.emplace("Authorization", "SharedKey " + accountName + ":" + utils::base64Encode(signature.first.get(), signature.second));
 
     string url = (request.path.empty() ? "/" : request.path);
-    if (request.queries.size())
+    if (!request.queries.empty())
         url = url + "?" + query.str();
     return url;
 }

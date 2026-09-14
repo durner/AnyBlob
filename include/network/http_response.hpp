@@ -95,7 +95,7 @@ struct HttpResponse {
             case Code::TOO_MANY_REQUESTS_429: return 429;
             case Code::INTERNAL_SERVER_ERROR_500: return 500;
             case Code::BAD_GATEWAY_502: return 502;
-            case Code::SERVICE_UNAVAILABLE_503: return 503;
+            case Code::SERVICE_UNAVAILABLE_503:
             case Code::SLOW_DOWN_503: return 503;
             case Code::GATEWAY_TIMEOUT_504: return 504;
             default: return 0;

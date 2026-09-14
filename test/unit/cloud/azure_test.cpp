@@ -1,10 +1,6 @@
 #include "cloud/azure.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
-#include "cloud/azure_instances.hpp"
-#include "cloud/azure_signer.hpp"
 #include "utils/data_vector.hpp"
-#include <cstdio>
-#include <cstring>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022

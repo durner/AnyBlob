@@ -4,6 +4,7 @@
 #include "cloud/provider.hpp"
 #include "utils/data_vector.hpp"
 #include <cassert>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>

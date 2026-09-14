@@ -1,5 +1,4 @@
 #include "catch2/single_include/catch2/catch.hpp"
-#include "cloud/aws_cache.hpp"
 #include "network/connection_manager.hpp"
 #ifdef ANYBLOB_HAS_IO_URING
 #include "network/io_uring_socket.hpp"

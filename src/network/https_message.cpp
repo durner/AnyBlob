@@ -163,9 +163,7 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
             }
         } // fallthrough
         case MessageState::Finished:
-            break;
         case MessageState::Aborted:
-            break;
         default:
             break;
     }
