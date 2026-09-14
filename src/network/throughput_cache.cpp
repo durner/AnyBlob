@@ -2,7 +2,6 @@
 #error "Cannot build throughput_cache.cpp when compiling with libc++"
 #endif
 #include "network/throughput_cache.hpp"
-#include <cstring>
 #include <arpa/inet.h>
 #include <sys/types.h>
 //---------------------------------------------------------------------------

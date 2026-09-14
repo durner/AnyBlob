@@ -20,9 +20,9 @@ class AWSCache : public network::Cache {
     /// The constructor
     AWSCache();
     /// The address resolving
-    virtual std::unique_ptr<network::Cache::SocketEntry> resolve(const std::string& hostname, unsigned port, bool tls, bool verifyPeer) override;
+    std::unique_ptr<network::Cache::SocketEntry> resolve(const std::string& hostname, unsigned port, bool tls, bool verifyPeer) override;
     /// The destructor
-    virtual ~AWSCache() = default;
+    virtual ~AWSCache() override = default;
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::cloud

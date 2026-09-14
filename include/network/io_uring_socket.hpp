@@ -4,6 +4,7 @@
 #endif
 #include "network/socket.hpp"
 #include <chrono>
+#include <cstdint>
 #include <vector>
 #include <liburing.h>
 //---------------------------------------------------------------------------

@@ -9,9 +9,9 @@
 #include "network/config.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
+#include <cassert>
 #include <fstream>
 #include <string>
-#include <assert.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -28,9 +28,9 @@ bool Provider::testEnviornment = false;
 //---------------------------------------------------------------------------
 // Get the dir name without the path
 string Provider::getRemoteParentDirectory(string fileName) noexcept {
-    for (auto i = 0u; i < remoteFileCount; i++) {
-        if (fileName.starts_with(remoteFile[i])) {
-            fileName = fileName.substr(remoteFile[i].size());
+    for (auto i : remoteFile) {
+        if (fileName.starts_with(i)) {
+            fileName = fileName.substr(i.size());
             auto pos = fileName.find('/');
             fileName = fileName.substr(pos + 1);
         }
@@ -43,8 +43,8 @@ string Provider::getRemoteParentDirectory(string fileName) noexcept {
 bool Provider::isRemoteFile(string_view fileName) noexcept
 // Is it a remote file?
 {
-    for (auto i = 0u; i < remoteFileCount; i++)
-        if (fileName.starts_with(remoteFile[i]))
+    for (auto i : remoteFile)
+        if (fileName.starts_with(i))
             return true;
 
     return false;
@@ -155,14 +155,14 @@ vector<string> Provider::parseCSVRow(string_view body)
 // Read a csv row (simplified, no quotes in quotes and no new lines)
 {
     std::vector<std::string> row;
-    row.push_back("");
+    row.emplace_back("");
     auto i = 0ull;
     auto inQuote = false;
     for (char c : body) {
         if (!inQuote) {
             switch (c) {
                 case ',':
-                    row.push_back("");
+                    row.emplace_back("");
                     i++;
                     break;
                 case '"':

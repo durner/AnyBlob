@@ -43,7 +43,7 @@ static string buildAMZTimestamp()
     return s.str();
 }
 //---------------------------------------------------------------------------
-static int64_t convertIAMTimestamp(string awsTimestamp)
+static int64_t convertIAMTimestamp(const string& awsTimestamp)
 // Creates the AWS timestamp
 {
     istringstream s(awsTimestamp);
@@ -185,7 +185,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content, 
 {
     auto pos = content.find('\n');
     string httpHeader = "GET /latest/meta-data/iam/security-credentials/";
-    if (!content.substr(0, pos).size())
+    if (content.substr(0, pos).empty())
         return nullptr;
     httpHeader += content.substr(0, pos);
     httpHeader += " HTTP/1.1\r\nHost: ";
@@ -200,7 +200,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
 // Update secret
 {
     auto secret = make_shared<Secret>();
-    string needle = "\"AccessKeyId\" : \"";
+    string needle = R"("AccessKeyId" : ")";
     auto pos = content.find(needle);
     if (pos == content.npos)
         return false;
@@ -208,7 +208,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
     auto end = content.find('\"', pos);
     secret->keyId = content.substr(pos, end - pos);
 
-    needle = "\"SecretAccessKey\" : \"";
+    needle = R"("SecretAccessKey" : ")";
     pos = content.find(needle);
     if (pos == content.npos)
         return false;
@@ -216,7 +216,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
     end = content.find('\"', pos);
     secret->secret = content.substr(pos, end - pos);
 
-    needle = "\"Token\" : \"";
+    needle = R"("Token" : ")";
     pos = content.find(needle);
     if (pos == content.npos)
         return false;
@@ -224,7 +224,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
     end = content.find('\"', pos);
     secret->token = content.substr(pos, end - pos);
 
-    needle = "\"Expiration\" : \"";
+    needle = R"("Expiration" : ")";
     pos = content.find(needle);
     if (pos == content.npos)
         return false;
@@ -300,9 +300,7 @@ bool AWS::validKeys(uint32_t offset) const
 bool AWS::validSession(uint32_t offset) const
 // Checks whether the session token needs to be refresehd
 {
-    if (!_sessionSecret || _validInstance != this || ((!_sessionSecret->token.empty() && _sessionSecret->expiration - offset < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _sessionSecret->secret.empty()))
-        return false;
-    return true;
+    return _sessionSecret && _validInstance == this && (_sessionSecret->token.empty() || _sessionSecret->expiration - offset >= chrono::system_clock::to_time_t(chrono::system_clock::now())) && !_sessionSecret->secret.empty();
 }
 //---------------------------------------------------------------------------
 void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)

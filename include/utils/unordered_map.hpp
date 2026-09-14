@@ -41,7 +41,7 @@ class UnorderedMap {
         std::shared_mutex sharedMutex;
 
         /// The constructor
-        constexpr TableBucket(std::unique_ptr<ValueBucket> chain = nullptr, TableBucket* next = nullptr) : chain(move(chain)), next(next), sharedMutex() {}
+        constexpr TableBucket(std::unique_ptr<ValueBucket> chain = nullptr, TableBucket* next = nullptr) : chain(std::move(chain)), next(next), sharedMutex() {}
     };
 
     /// The base table of the map
@@ -88,7 +88,10 @@ class UnorderedMap {
                 _lock = std::shared_lock(_tableBucket->sharedMutex);
         }
         /// Copy assignment constructor
-        constexpr Iterator& operator=(Iterator& rhs) {
+        constexpr Iterator& operator=(const Iterator& rhs) {
+            // The release below clears rhs as well when it aliases this
+            if (this == &rhs)
+                return *this;
             release();
             _tableBucket = rhs._tableBucket;
             _valueBucket = rhs._valueBucket;

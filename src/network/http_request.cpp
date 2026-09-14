@@ -90,14 +90,15 @@ HttpRequest HttpRequest::deserialize(string_view data)
 
                     // split between key and value (value might be unnecassary)
                     auto keyPos = query.find(strQuerySeperator);
-                    string_view key, value = "";
+                    string_view key;
+                    string_view value;
                     if (keyPos == query.npos) {
                         key = query;
                     } else {
                         key = query.substr(0, keyPos);
                         value = query.substr(keyPos + 1);
                     }
-                    if (key.size() > 0)
+                    if (!key.empty())
                         request.queries.emplace(utils::decodeUrlParameters(key), utils::decodeUrlParameters(value));
                     if (queryPos == queries.npos)
                         break;
@@ -118,7 +119,8 @@ HttpRequest HttpRequest::deserialize(string_view data)
         } else {
             // headers
             auto keyPos = line.find(strHeaderSeperator);
-            string_view key, value = "";
+            string_view key;
+            string_view value;
             if (keyPos == line.npos) {
                 throw runtime_error("Invalid HttpRequest: Headers need key and value!");
             } else {
@@ -137,7 +139,7 @@ unique_ptr<utils::DataVector<uint8_t>> HttpRequest::serialize(const HttpRequest&
 {
     string httpHeader = getRequestMethod(request.method);
     httpHeader += " " + request.path;
-    if (request.queries.size())
+    if (!request.queries.empty())
         httpHeader += "?";
     auto it = request.queries.begin();
     while (it != request.queries.end()) {

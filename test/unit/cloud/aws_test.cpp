@@ -1,10 +1,7 @@
 #include "cloud/aws.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
 #include "cloud/aws_instances.hpp"
-#include "cloud/aws_signer.hpp"
 #include "utils/data_vector.hpp"
-#include <cstring>
-#include <iostream>
 #include <string_view>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -42,7 +39,7 @@ class AWSTester {
         resultString = "GET /latest/meta-data/iam/security-credentials/ABCDEF HTTP/1.1\r\nHost: 169.254.169.254\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
 
-        string keyService = "{\"AccessKeyId\" : \"ABC\", \"SecretAccessKey\" : \"ABC\", \"Token\" : \"ABC\", \"Expiration\" : \"";
+        string keyService = R"({"AccessKeyId" : "ABC", "SecretAccessKey" : "ABC", "Token" : "ABC", "Expiration" : ")";
         keyService += aws.fakeIAMTimestamp;
         keyService += "\"}";
         REQUIRE(aws.updateSecret(keyService, iamUser));
@@ -53,7 +50,7 @@ class AWSTester {
         resultString += aws.fakeAMZTimestamp;
         resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
-        auto dvResigned = aws.resignRequest(*dv.get());
+        auto dvResigned = aws.resignRequest(*dv);
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
 
         utils::DataVector<uint8_t> putData(10);
@@ -62,7 +59,7 @@ class AWSTester {
         resultString += aws.fakeAMZTimestamp;
         resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
-        dvResigned = aws.resignRequest(*dv.get(), putData.cdata(), putData.size());
+        dvResigned = aws.resignRequest(*dv, putData.cdata(), putData.size());
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
 
         dv = aws.deleteRequest("a/b/c.d");
@@ -70,11 +67,11 @@ class AWSTester {
         resultString += aws.fakeAMZTimestamp;
         resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
-        dvResigned = aws.resignRequest(*dv.get());
+        dvResigned = aws.resignRequest(*dv);
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
 
         auto vec = AWSInstance::getInstanceDetails();
-        REQUIRE(vec.size() > 0);
+        REQUIRE(!vec.empty());
 
         // Signing preserves the inclusive HTTP range for [0, 1 MiB)
         REQUIRE(aws.supportsResigning());
@@ -82,7 +79,7 @@ class AWSTester {
         dv = aws.getRequest("a/b/c.d", range);
         auto rangedRequest = string(reinterpret_cast<char*>(dv->data()), dv->size());
         REQUIRE(rangedRequest.find("Range: bytes=0-1048575") != string::npos);
-        dvResigned = aws.resignRequest(*dv.get());
+        dvResigned = aws.resignRequest(*dv);
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == rangedRequest);
 
         // A single byte range
@@ -96,7 +93,7 @@ class AWSTester {
         resultString += aws.fakeAMZTimestamp;
         resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
-        dvResigned = aws.resignRequest(*dv.get());
+        dvResigned = aws.resignRequest(*dv);
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
 
         // A truncated result is continued with the token it came back with
@@ -105,7 +102,7 @@ class AWSTester {
         resultString += aws.fakeAMZTimestamp;
         resultString += "\r\nx-amz-request-payer: requester\r\nx-amz-security-token: ABC\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
-        dvResigned = aws.resignRequest(*dv.get());
+        dvResigned = aws.resignRequest(*dv);
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
 
         // The list result names the keys of the bucket
@@ -138,7 +135,7 @@ class AWSTester {
         dv = aws.getSuffixRequest("a/b/c.d", 64);
         rangedRequest = string(reinterpret_cast<char*>(dv->data()), dv->size());
         REQUIRE(rangedRequest.find("Range: bytes=-64") != string::npos);
-        dvResigned = aws.resignRequest(*dv.get());
+        dvResigned = aws.resignRequest(*dv);
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == rangedRequest);
 
         // An empty suffix addresses nothing
@@ -150,7 +147,7 @@ class AWSTester {
         dv = anonymous.getRequest("a/b/c.d", p);
         resultString = "GET /a/b/c.d? HTTP/1.1\r\nHost: test.s3.test.amazonaws.com\r\n\r\n";
         REQUIRE(string_view(reinterpret_cast<char*>(dv->data()), dv->size()) == resultString);
-        dvResigned = anonymous.resignRequest(*dv.get());
+        dvResigned = anonymous.resignRequest(*dv);
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == resultString);
 
         // The range of a public bucket survives the resign as well
@@ -158,7 +155,7 @@ class AWSTester {
         rangedRequest = string(reinterpret_cast<char*>(dv->data()), dv->size());
         REQUIRE(rangedRequest.find("Range: bytes=0-0") != string::npos);
         REQUIRE(rangedRequest.find("Authorization") == string::npos);
-        dvResigned = anonymous.resignRequest(*dv.get());
+        dvResigned = anonymous.resignRequest(*dv);
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == rangedRequest);
 
         Provider::testEnviornment = false;

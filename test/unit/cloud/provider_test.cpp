@@ -19,7 +19,7 @@ TEST_CASE("provider") {
     REQUIRE(info.region == "y");
     info = Provider::getRemoteInfo("s3://x/b");
     REQUIRE(info.bucket == "x");
-    REQUIRE(info.region == "");
+    REQUIRE(info.region.empty());
 }
 //---------------------------------------------------------------------------
 TEST_CASE("provider_anonymous") {
@@ -56,9 +56,9 @@ TEST_CASE("provider_object_key") {
     REQUIRE(Provider::getObjectKey("https://host/dir/file.parquet") == "dir/file.parquet");
 
     // An address without a key
-    REQUIRE(Provider::getObjectKey("s3://bucket:region/") == "");
-    REQUIRE(Provider::getObjectKey("s3://bucket:region") == "");
-    REQUIRE(Provider::getObjectKey("minio://127.0.0.1:9000/bucket:region/") == "");
+    REQUIRE(Provider::getObjectKey("s3://bucket:region/").empty());
+    REQUIRE(Provider::getObjectKey("s3://bucket:region").empty());
+    REQUIRE(Provider::getObjectKey("minio://127.0.0.1:9000/bucket:region/").empty());
 }
 //---------------------------------------------------------------------------
 TEST_CASE("provider_verify_peer") {

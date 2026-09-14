@@ -37,7 +37,7 @@ void Timer::start(Steps s)
         vec->emplace_back(make_unique<LoadTracker::Values>());
         _totalLoad.insert({s, move(vec)});
     }
-    _loadTracker[s] = make_unique<LoadTracker>(*_totalLoad.find(s)->second.get());
+    _loadTracker[s] = make_unique<LoadTracker>(*_totalLoad.find(s)->second);
 }
 //---------------------------------------------------------------------------
 void Timer::stop(Steps s)
@@ -74,8 +74,8 @@ void Timer::printResult(ostream& s)
 void Timer::setInfo(string headerInfo, string contentInfo)
 // Sets the info
 {
-    this->_headerInfo = headerInfo;
-    this->_contentInfo = contentInfo;
+    this->_headerInfo = move(headerInfo);
+    this->_contentInfo = move(contentInfo);
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::utils

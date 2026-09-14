@@ -3,7 +3,6 @@
 #include "network/message_result.hpp"
 #include "network/original_message.hpp"
 #include "network/tasked_send_receiver.hpp"
-#include "utils/data_vector.hpp"
 #include <cstdlib>
 #include <string>
 #include <utility>
@@ -28,7 +27,8 @@ struct TrustStoreGuard {
     /// The previous certificate directory
     const char* certDir;
 
-    /// The constructor
+    /// The constructor, the test is single threaded so the environment calls are safe
+    // NOLINTBEGIN(concurrency-mt-unsafe)
     TrustStoreGuard() : certFile(getenv("SSL_CERT_FILE")), certDir(getenv("SSL_CERT_DIR")) {
         setenv("SSL_CERT_FILE", "/dev/null", 1);
         setenv("SSL_CERT_DIR", "/nonexistent", 1);
@@ -39,6 +39,7 @@ struct TrustStoreGuard {
         certFile ? setenv("SSL_CERT_FILE", certFile, 1) : unsetenv("SSL_CERT_FILE");
         certDir ? setenv("SSL_CERT_DIR", certDir, 1) : unsetenv("SSL_CERT_DIR");
     }
+    // NOLINTEND(concurrency-mt-unsafe)
 };
 //---------------------------------------------------------------------------
 } // namespace
@@ -51,7 +52,7 @@ TEST_CASE("tls_verification") {
 
     auto provider = cloud::Provider::makeProvider("https://detectportal.firefox.com/success.txt");
     auto range = pair<uint64_t, uint64_t>(0, 0);
-    string file = "";
+    string file;
 
     OriginalMessage verified{provider->getRequest(file, range), *provider};
     REQUIRE(group.send(&verified));
