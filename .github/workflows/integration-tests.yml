@@ -32,9 +32,9 @@ jobs:
       - name: Install MinIO Docker
         run: |
           docker run -d -p 9000:9000 --name minio \
-          -e "MINIO_ACCESS_KEY=test" -e "MINIO_SECRET_KEY=testtest" \
-          -v /tmp/buckets:/buckets -v /tmp/.minio:/root/.minio \
-          minio/minio server /buckets
+          -e "MINIO_ROOT_USER=test" -e "MINIO_ROOT_PASSWORD=testtest" \
+          -v /tmp/buckets:/buckets \
+          pgsty/silo silo server /buckets
 
           export AWS_ACCESS_KEY_ID=test
           export AWS_SECRET_ACCESS_KEY=testtest
