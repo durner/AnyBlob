@@ -85,29 +85,36 @@ unique_ptr<utils::DataVector<uint8_t>> downloadIMDSToken(string_view address)
     return make_unique<utils::DataVector<uint8_t>>(reinterpret_cast<uint8_t*>(httpHeader.data()), reinterpret_cast<uint8_t*>(httpHeader.data() + httpHeader.size()));
 }
 //---------------------------------------------------------------------------
-bool imdsReachable(string_view address, uint32_t port)
-// Probe once to avoid repeated deadlines when metadata is unreachable
+bool probeIMDS(string_view address, uint32_t port)
+// Check whether the metadata service accepts a connection
 {
-    static const bool reachable = [address, port] {
-        auto fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-        if (fd < 0)
-            return false;
-        sockaddr_in addr{};
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(static_cast<uint16_t>(port));
-        inet_pton(AF_INET, string(address).c_str(), &addr.sin_addr);
-        auto connected = !connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-        if (!connected && errno == EINPROGRESS) {
-            pollfd poller = {.fd = fd, .events = POLLOUT, .revents = 0};
-            if (poll(&poller, 1, imdsProbeTimeout) == 1) {
-                auto err = 0;
-                socklen_t len = sizeof(err);
-                connected = !getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) && !err;
-            }
+    auto fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (fd < 0)
+        return false;
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(static_cast<uint16_t>(port));
+    inet_pton(AF_INET, string(address).c_str(), &addr.sin_addr);
+    auto connected = !connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+    if (!connected && errno == EINPROGRESS) {
+        pollfd poller = {.fd = fd, .events = POLLOUT, .revents = 0};
+        if (poll(&poller, 1, imdsProbeTimeout) == 1) {
+            auto err = 0;
+            socklen_t len = sizeof(err);
+            connected = !getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len) && !err;
         }
-        close(fd);
-        return connected;
-    }();
+    }
+    close(fd);
+    return connected;
+}
+//---------------------------------------------------------------------------
+bool imdsReachable(string_view address, uint32_t port)
+// Probe the endpoint once to avoid repeated deadlines when metadata is unreachable
+{
+    static const auto probed = pair<string, uint32_t>(address, port);
+    static const bool reachable = probeIMDS(address, port);
+    if (probed.first != address || probed.second != port)
+        return probeIMDS(address, port);
     return reachable;
 }
 //---------------------------------------------------------------------------
