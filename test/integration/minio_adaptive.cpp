@@ -78,6 +78,7 @@ TEST_CASE("MinIO Adaptive Integration") {
     // The daemons that work off the group
     vector<anyblob::network::TaskedSendReceiverHandle> sendReceiverHandles;
     vector<future<void>> asyncSendReceiverThreads(maxDaemons);
+    sendReceiverHandles.reserve(maxDaemons);
     for (auto i = 0u; i < maxDaemons; i++)
         sendReceiverHandles.push_back(group.getHandle());
 
@@ -231,8 +232,7 @@ TEST_CASE("MinIO Adaptive Integration") {
     {
         // Create the delete request
         anyblob::network::Transaction deleteTxn(provider.get());
-        for (auto i = 0u; i < 2; i++) {
-            auto& currentFileName = fileName[i];
+        for (auto& currentFileName : fileName) {
             auto deleteRequest = [&deleteTxn, &currentFileName]() {
                 return deleteTxn.deleteObjectRequest(currentFileName);
             };

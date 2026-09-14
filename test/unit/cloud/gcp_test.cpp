@@ -1,7 +1,6 @@
 #include "cloud/gcp.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
 #include "cloud/gcp_instances.hpp"
-#include "cloud/gcp_signer.hpp"
 #include "utils/data_vector.hpp"
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library

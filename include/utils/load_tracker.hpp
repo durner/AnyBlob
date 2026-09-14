@@ -1,5 +1,6 @@
 #pragma once
 #include <chrono>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -92,9 +93,13 @@ class LoadTracker {
 
     /// Destructor
     ~LoadTracker() {
-        std::vector<CPUData> endEntries;
-        readStatsCPU(endEntries);
-        writeStats(_startEntries, endEntries);
+        // The stats are diagnostics, so a mismatched entry must not escape the destructor
+        try {
+            std::vector<CPUData> endEntries;
+            readStatsCPU(endEntries);
+            writeStats(_startEntries, endEntries);
+        } catch (const std::exception&) {
+        }
     }
 
     private:
@@ -125,9 +130,9 @@ class LoadTracker {
             if (_loadValues.size() < i)
                 throw std::runtime_error("Out of bound: loadValues");
 
-            if (_loadValues[i]->cpuName.size() && _loadValues[i]->cpuName != e1.cpu)
+            if (!_loadValues[i]->cpuName.empty() && _loadValues[i]->cpuName != e1.cpu)
                 throw std::runtime_error("Wrong index: loadValues");
-            else if (!_loadValues[i]->cpuName.size())
+            else if (_loadValues[i]->cpuName.empty())
                 _loadValues[i]->cpuName = e1.cpu;
 
             _loadValues[i]->activeTimeAllProcesses += static_cast<double>(getActiveTime(e2) - getActiveTime(e1));
@@ -153,7 +158,7 @@ class LoadTracker {
                 std::istringstream ss(line);
 
                 // store entry
-                entries.emplace_back(CPUData());
+                entries.emplace_back();
                 CPUData& entry = entries.back();
 
                 // read cpu label
@@ -167,8 +172,8 @@ class LoadTracker {
                     entry.cpu = "tot";
 
                 // read times
-                for (int i = 0; i < NUM_CPU_STATES; ++i)
-                    ss >> entry.times[i];
+                for (unsigned long& time : entry.times)
+                    ss >> time;
             }
         }
         for (auto& e : entries) {

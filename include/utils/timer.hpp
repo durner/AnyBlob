@@ -1,6 +1,7 @@
 #pragma once
 #include "utils/load_tracker.hpp"
 #include <chrono>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <unordered_map>

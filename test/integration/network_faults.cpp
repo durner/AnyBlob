@@ -3,7 +3,6 @@
 #include "fault_proxy.hpp"
 #include "network/tasked_send_receiver.hpp"
 #include "network/transaction.hpp"
-#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdlib>

@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cassert>
 #include <condition_variable>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -150,6 +151,13 @@ class TaskedSendReceiver {
 #endif
 
     public:
+    /// Default constructor is deleted
+    TaskedSendReceiver() = delete;
+    /// Delete copy
+    TaskedSendReceiver(TaskedSendReceiver& other) = delete;
+    /// Delete copy assignment
+    TaskedSendReceiver& operator=(TaskedSendReceiver& other) = delete;
+
     /// Get the group
     [[nodiscard]] const TaskedSendReceiverGroup* getGroup() const { return &_group; }
     /// Adds a domain-specific cache
@@ -166,12 +174,6 @@ class TaskedSendReceiver {
     std::unique_ptr<utils::DataVector<uint8_t>> getReused();
 
     private:
-    /// Default constructor is deleted
-    TaskedSendReceiver() = delete;
-    /// Delete copy
-    TaskedSendReceiver(TaskedSendReceiver& other) = delete;
-    /// Delete copy assignment
-    TaskedSendReceiver& operator=(TaskedSendReceiver& other) = delete;
     /// The constructor
     explicit TaskedSendReceiver(TaskedSendReceiverGroup& group);
 
@@ -198,19 +200,20 @@ class TaskedSendReceiverHandle {
     /// The send receiver
     TaskedSendReceiver* _sendReceiver;
 
-    /// Default constructor is deleted
-    TaskedSendReceiverHandle() = delete;
     /// Consturctor
     explicit TaskedSendReceiverHandle(TaskedSendReceiverGroup* group, TaskedSendReceiver* _sendReceiver);
-    /// Delete copy
-    TaskedSendReceiverHandle(TaskedSendReceiverHandle& other) = delete;
-    /// Delete copy assignment
-    TaskedSendReceiverHandle& operator=(TaskedSendReceiverHandle& other) = delete;
 
     /// Submits queue and waits for result
     bool sendReceive(bool local, bool oneQueueInvocation = true);
 
     public:
+    /// Default constructor is deleted
+    TaskedSendReceiverHandle() = delete;
+    /// Delete copy
+    TaskedSendReceiverHandle(TaskedSendReceiverHandle& other) = delete;
+    /// Delete copy assignment
+    TaskedSendReceiverHandle& operator=(TaskedSendReceiverHandle& other) = delete;
+
     /// Move constructor
     TaskedSendReceiverHandle(TaskedSendReceiverHandle&& other) noexcept;
     /// Move assignment

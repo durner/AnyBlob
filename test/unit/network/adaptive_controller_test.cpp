@@ -74,9 +74,9 @@ static uint64_t modelCeiling(const AdaptiveController::Recommendation& rec, uint
     auto concurrency = static_cast<uint64_t>(rec.threads) * rec.requestsPerThread;
     auto perThread = static_cast<double>(threadBps);
     if (knee && concurrency > knee)
-        perThread = perThread * static_cast<double>(knee) / static_cast<double>(knee + (concurrency - knee) / 4);
+        perThread = perThread * static_cast<double>(knee) / (static_cast<double>(knee) + static_cast<double>(concurrency - knee) / 4);
     auto threadCeiling = static_cast<uint64_t>(perThread * rec.threads);
-    return std::min(linkBps, std::min(threadCeiling, concurrency * requestBps));
+    return std::min({linkBps, threadCeiling, concurrency * requestBps});
 }
 //---------------------------------------------------------------------------
 TEST_CASE("adaptive_controller_seeding") {

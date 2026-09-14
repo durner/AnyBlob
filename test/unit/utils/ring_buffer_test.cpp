@@ -34,11 +34,11 @@ TEST_CASE("single_threaded_insert_multi_threaded_consume") {
     std::vector<std::thread> threads;
     threads.reserve(10u);
     for (auto i = 0u; i < 10u; i++) {
-        threads.push_back(std::thread([&] {
+        threads.emplace_back([&] {
             for (int j = 0; j < 100; j++) {
                 REQUIRE(rb.consume<true>().value() < 1000ul);
             }
-        }));
+        });
     }
     for (auto& th : threads) {
         th.join();
@@ -51,11 +51,11 @@ TEST_CASE("multi_threaded_ring_buffer") {
     std::vector<std::thread> threads;
     threads.reserve(10u);
     for (auto i = 0u; i < 10u; i++) {
-        threads.push_back(std::thread([&] {
+        threads.emplace_back([&] {
             for (auto j = 0u; j < 100u; j++) {
                 REQUIRE(rb.insert<true>(j) != ~0ull);
             }
-        }));
+        });
     }
     for (auto& th : threads) {
         th.join();
@@ -71,11 +71,11 @@ TEST_CASE("multi_threaded_ring_buffer_multi_threaded_consume") {
     std::vector<std::thread> threads;
     threads.reserve(10);
     for (int i = 0; i < 10; i++) {
-        threads.push_back(std::thread([&] {
+        threads.emplace_back([&] {
             for (auto j = 0u; j < 100u; j++) {
                 REQUIRE(rb.insert<true>(j) != ~0ull);
             }
-        }));
+        });
     }
     for (auto& th : threads) {
         th.join();
@@ -83,11 +83,11 @@ TEST_CASE("multi_threaded_ring_buffer_multi_threaded_consume") {
     // Consume multi-threaded
     threads.clear();
     for (int i = 0; i < 10; i++) {
-        threads.push_back(std::thread([&] {
+        threads.emplace_back([&] {
             for (auto j = 0u; j < 100u; j++) {
                 REQUIRE(rb.consume<true>().value() < 100ul);
             }
-        }));
+        });
     }
     for (auto& th : threads) {
         th.join();

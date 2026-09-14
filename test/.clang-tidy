@@ -1,0 +1,12 @@
+# Disable certain checks for now since catch2 macros does not play well with clang-tidy
+#
+# bugprone-chained-comparison:
+#   The expression decomposition of REQUIRE and CHECK looks like a chained
+#   comparison to the check.
+#
+# bugprone-forward-declaration-namespace:
+#   Our forward declared utils::Timer clashes with the definition of Catch::Timer.
+InheritParentConfig: true
+Checks: >
+  -bugprone-chained-comparison,
+  -bugprone-forward-declaration-namespace,

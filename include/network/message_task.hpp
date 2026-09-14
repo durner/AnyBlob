@@ -6,6 +6,7 @@
 #include "utils/data_vector.hpp"
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string_view>
 //---------------------------------------------------------------------------
@@ -78,7 +79,7 @@ struct MessageTask {
     void progressed() { stalls = 0; }
 
     /// Report an abandoned request
-    void abort() {
+    void abort() const {
         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
         originalMessage->result.state = MessageState::Aborted;
         if (originalMessage->requiresFinish())
@@ -91,7 +92,7 @@ struct MessageTask {
     /// The pure virtual  callback
     virtual MessageState execute(ConnectionManager& connectionManager) = 0;
     /// The pure virtual destuctor
-    virtual ~MessageTask() {}
+    virtual ~MessageTask() = default;
 
     /// Builds the message task according to the sending message
     template <typename... Args>

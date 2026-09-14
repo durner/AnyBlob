@@ -2,6 +2,7 @@
 #include "network/cache.hpp"
 #include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -97,7 +98,7 @@ class ConnectionManager {
     /// Get the socket
     Socket& getSocketConnection() {
         assert(_socketWrapper);
-        return *_socketWrapper.get();
+        return *_socketWrapper;
     }
 
     /// Get the tls connection of the fd

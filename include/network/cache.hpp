@@ -2,6 +2,7 @@
 #include "network/tls_connection.hpp"
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
@@ -32,7 +33,7 @@ class Cache {
         addrinfo* selected = nullptr;
 
         /// The constructor
-        DnsEntry(std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> address, int cachePriority = 0) : addr(move(address)), cachePriority(cachePriority), selected(addr.get()) {}
+        DnsEntry(std::unique_ptr<addrinfo, decltype(&freeaddrinfo)> address, int cachePriority = 0) : addr(std::move(address)), cachePriority(cachePriority), selected(addr.get()) {}
     };
 
     /// A failed remote address and its expiration

@@ -31,7 +31,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
     // canonicalize headers, assume no unnecessary whitespaces in header
     map<string, string> sorted;
     stringstream headers;
-    if (request.headers.size()) {
+    if (!request.headers.empty()) {
         auto it = request.headers.begin();
         while (it != request.headers.end()) {
             string key = it->first;
@@ -43,7 +43,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
             headers << h.first << ":" << h.second << "\n";
     }
 
-    if (sorted.size()) {
+    if (!sorted.empty()) {
         stringstream signedRequests;
         auto it = sorted.begin();
         while (it != sorted.end()) {
@@ -67,7 +67,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
     request.queries.emplace("X-Goog-Expires", "3600");
     request.queries.emplace("X-Goog-SignedHeaders", stringToSign.signedHeaders);
 
-    if (request.queries.size()) {
+    if (!request.queries.empty()) {
         auto it = request.queries.begin();
         while (it != request.queries.end()) {
             sorted.emplace(utils::encodeUrlParameters(it->first), utils::encodeUrlParameters(it->second));
@@ -79,7 +79,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
 
     stringstream query;
     // canonicalize query; assume that all query arguments are RFC 3986 conform
-    if (request.queries.size()) {
+    if (!request.queries.empty()) {
         auto it = request.queries.begin();
         while (it != request.queries.end()) {
             query << it->first << "=" << it->second;

@@ -2,6 +2,7 @@
 #include "cloud/azure_instances.hpp"
 #include "cloud/provider.hpp"
 #include <cassert>
+#include <cstdint>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library

@@ -3,6 +3,7 @@
 #include "cloud/provider.hpp"
 #include "utils/data_vector.hpp"
 #include <cassert>
+#include <cstdint>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library

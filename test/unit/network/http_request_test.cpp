@@ -1,7 +1,6 @@
 #include "network/http_request.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
 #include "utils/data_vector.hpp"
-#include <iostream>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022

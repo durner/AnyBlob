@@ -1,6 +1,7 @@
 #pragma once
 #include "cloud/provider.hpp"
 #include <cassert>
+#include <cstdint>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
