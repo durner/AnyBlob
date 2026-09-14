@@ -41,7 +41,9 @@ class FaultProxy {
         /// Reset the target after arg uploaded bytes
         rstMidUpload,
         /// Close after arg milliseconds without traffic
-        idleClose
+        idleClose,
+        /// Answer with a bad gateway response
+        gatewayError
     };
 
     private:

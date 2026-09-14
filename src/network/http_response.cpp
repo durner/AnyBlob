@@ -54,7 +54,7 @@ HttpResponse HttpResponse::deserialize(string_view data)
 
             // the response type
             response.code = Code::UNKNOWN;
-            for (auto code = static_cast<uint8_t>(Code::OK_200); code <= static_cast<uint8_t>(Code::SLOW_DOWN_503); code++) {
+            for (auto code = static_cast<uint8_t>(Code::OK_200); code <= static_cast<uint8_t>(Code::GATEWAY_TIMEOUT_504); code++) {
                 const string_view responseCode = getResponseCode(static_cast<Code>(code));
                 if (line.starts_with(responseCode)) {
                     response.code = static_cast<Code>(code);
