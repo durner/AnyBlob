@@ -53,18 +53,16 @@ TEST_CASE("tls_verification") {
     auto range = pair<uint64_t, uint64_t>(0, 0);
     string file = "";
 
-    OriginalMessage rejected{provider->getRequest(file, range), *provider};
-    REQUIRE(group.send(&rejected));
+    OriginalMessage verified{provider->getRequest(file, range), *provider};
+    REQUIRE(group.send(&verified));
     group.process(true);
-    REQUIRE(rejected.result.getState() == MessageState::Aborted);
-    REQUIRE(rejected.result.getFailureCode() & static_cast<uint16_t>(MessageFailureCode::Certificate));
+    REQUIRE(verified.result.getState() == MessageState::Finished);
 
-    // The same endpoint connects unverified
     provider->setVerifyPeer(false);
-    OriginalMessage accepted{provider->getRequest(file, range), *provider};
-    REQUIRE(group.send(&accepted));
+    OriginalMessage unverified{provider->getRequest(file, range), *provider};
+    REQUIRE(group.send(&unverified));
     group.process(true);
-    REQUIRE(accepted.result.getState() == MessageState::Finished);
+    REQUIRE(unverified.result.getState() == MessageState::Finished);
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::network::test

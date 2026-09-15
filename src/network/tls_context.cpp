@@ -1,5 +1,6 @@
 #include "network/tls_context.hpp"
 #include "network/tls_connection.hpp"
+#include <array>
 #include <openssl/crypto.h>
 #include <openssl/ssl.h>
 //---------------------------------------------------------------------------
@@ -13,6 +14,17 @@
 namespace anyblob::network {
 //---------------------------------------------------------------------------
 using namespace std;
+//---------------------------------------------------------------------------
+/// The trust stores of the common distributions (see also https://go.dev/src/crypto/x509/root_linux.go)
+static constexpr array<const char*, 7> trustStoreFiles = {
+    "/etc/ssl/certs/ca-certificates.crt", // Debian, Ubuntu, Gentoo, Alpine
+    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // Fedora, RHEL, CentOS, Amazon Linux
+    "/etc/pki/tls/certs/ca-bundle.crt", // Older Fedora and RHEL
+    "/etc/pki/tls/cacert.pem", // OpenELEC
+    "/etc/ssl/ca-bundle.pem", // openSUSE, SLES
+    "/etc/ssl/cert.pem", // Arch, Alpine
+    "/usr/lib/ssl/cert.pem", // The OPENSSLDIR of Debian and Ubuntu
+};
 //---------------------------------------------------------------------------
 static int newSession(SSL* ssl, SSL_SESSION* session)
 // Keeps a session the server just issued, tls 1.3 sends its ticket after the handshake
@@ -38,8 +50,20 @@ TLSContext::TLSContext() : _trustStore(false), _sessionCache()
         SSL_CTX_sess_set_new_cb(_ctx, newSession);
 
         // Load the trust store
-        _trustStore = SSL_CTX_set_default_verify_paths(_ctx) == 1;
+        _trustStore = loadTrustStore();
     }
+}
+//---------------------------------------------------------------------------
+bool TLSContext::loadTrustStore()
+// Loads the root certificates
+{
+    auto defaultPaths = SSL_CTX_set_default_verify_paths(_ctx) == 1;
+
+    for (auto* file : trustStoreFiles)
+        if (SSL_CTX_load_verify_file(_ctx, file) == 1)
+            return true;
+
+    return defaultPaths;
 }
 //---------------------------------------------------------------------------
 TLSContext::~TLSContext()

@@ -41,6 +41,9 @@ class TLSContext {
     /// The session cache, uses the hostname as key
     std::unordered_map<std::string, SessionEntry> _sessionCache;
 
+    /// Loads the root certificates
+    bool loadTrustStore();
+
     public:
     /// The constructor
     TLSContext();
