@@ -1,6 +1,5 @@
-#include "network/http_helper.hpp"
-#include "network/http_response.hpp"
 #include "catch2/single_include/catch2/catch.hpp"
+#include "network/http_response.hpp"
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022

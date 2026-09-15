@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -126,6 +127,11 @@ class RingBuffer {
     /// Check if empty
     [[nodiscard]] constexpr bool empty() const {
         return !(_insert.commited.load(std::memory_order_acquire) - _seen.commited.load(std::memory_order_acquire));
+    }
+
+    /// Get the number of elements
+    [[nodiscard]] constexpr uint64_t size() const {
+        return _insert.commited.load(std::memory_order_acquire) - _seen.commited.load(std::memory_order_acquire);
     }
 };
 //---------------------------------------------------------------------------

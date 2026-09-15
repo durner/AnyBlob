@@ -7,6 +7,7 @@
 #pragma once
 #include "network/cache.hpp"
 #include <chrono>
+#include <cstdint>
 #include <ext/pb_ds/assoc_container.hpp>
 #include <ext/pb_ds/tree_policy.hpp>
 #include <unordered_map>
@@ -23,13 +24,12 @@ namespace anyblob::network {
 /// Implements the throughput-based cache logic
 class ThroughputCache : public network::Cache {
     /// Order statistic tree
-    typedef __gnu_pbds::tree<
+    using map_t = __gnu_pbds::tree<
         double,
         __gnu_pbds::null_type,
         std::greater<double>,
         __gnu_pbds::rb_tree_tag,
-        __gnu_pbds::tree_order_statistics_node_update>
-        map_t;
+        __gnu_pbds::tree_order_statistics_node_update>;
     /// The order statistic tree
     map_t _throughputTree;
     /// The seconds vector as stable ring buffer
@@ -47,11 +47,11 @@ class ThroughputCache : public network::Cache {
     /// The constructor
     explicit ThroughputCache();
     /// Start the timing and advance to the next cache bucket
-    virtual void startSocket(int fd) override;
+    void startSocket(int fd) override;
     /// Stops the socket and either closes the connection or cashes it
-    virtual void stopSocket(std::unique_ptr<SocketEntry> socketEntry, uint64_t bytes, unsigned cachedEntries, bool reuseSocket) override;
+    void stopSocket(std::unique_ptr<SocketEntry> socketEntry, uint64_t bytes, unsigned cachedEntries, bool reuseSocket) override;
     /// The destructor
-    virtual ~ThroughputCache() = default;
+    virtual ~ThroughputCache() override = default;
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::network

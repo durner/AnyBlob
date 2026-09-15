@@ -51,7 +51,6 @@ class Socket {
 #endif
     };
 
-    public:
     /// The destructor
     virtual ~Socket() noexcept = default;
     /// Prepare a submission send

@@ -1,5 +1,5 @@
 #define CATCH_CONFIG_MAIN
-#include "catch2/single_include/catch2/catch.hpp"
+#include "catch2/single_include/catch2/catch.hpp" // IWYU pragma: keep
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021

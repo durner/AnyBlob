@@ -1,6 +1,7 @@
 #pragma once
 #include "network/http_message.hpp"
 #include "network/tls_connection.hpp"
+#include <cstdint>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2023

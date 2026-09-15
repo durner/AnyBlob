@@ -1,6 +1,7 @@
 #pragma once
 #include "network/message_result.hpp"
 #include "utils/data_vector.hpp"
+#include <cstdint>
 #include <memory>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -70,7 +71,8 @@ struct OriginalCallbackMessage : public OriginalMessage {
     /// The callback
     Callback callback;
 
-    /// The constructor
+    /// The constructor, the receive buffer is written by the socket layer so it cannot be const
+    // NOLINTNEXTLINE(readability-non-const-parameter)
     OriginalCallbackMessage(Callback&& callback, std::unique_ptr<utils::DataVector<uint8_t>> message, cloud::Provider& provider, uint8_t* receiveBuffer = nullptr, uint64_t bufferSize = 0, uint64_t traceId = 0) : OriginalMessage(std::move(message), provider, receiveBuffer, bufferSize, traceId), callback(std::forward<Callback>(callback)) {}
 
     /// The destructor

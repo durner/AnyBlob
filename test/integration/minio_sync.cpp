@@ -120,8 +120,7 @@ TEST_CASE("MinIO Sync Integration") {
     {
         // Create the get request
         anyblob::network::Transaction getTxn(provider.get());
-        for (auto i = 0u; i < 2; i++) {
-            auto& currentFileName = fileName[i];
+        for (auto& currentFileName : fileName) {
             auto getObjectRequest = [&getTxn, &currentFileName]() {
                 return getTxn.getObjectRequest(currentFileName);
             };
@@ -205,8 +204,7 @@ TEST_CASE("MinIO Sync Integration") {
         string listPrefix = "list/";
         string listNames[]{listPrefix + "a.parquet", listPrefix + "b.parquet"};
         anyblob::network::Transaction listPutTxn(provider.get());
-        for (auto i = 0u; i < 2; i++) {
-            auto& currentFileName = listNames[i];
+        for (auto& currentFileName : listNames) {
             auto putObjectRequest = [&listPutTxn, &currentFileName, &content]() {
                 return listPutTxn.putObjectRequest(currentFileName, content[0].data(), content[0].size());
             };
@@ -254,8 +252,7 @@ TEST_CASE("MinIO Sync Integration") {
         REQUIRE(pagedKeys[1] == listNames[1]);
 
         anyblob::network::Transaction listDeleteTxn(provider.get());
-        for (auto i = 0u; i < 2; i++) {
-            auto& currentFileName = listNames[i];
+        for (auto& currentFileName : listNames) {
             auto deleteObjectRequest = [&listDeleteTxn, &currentFileName]() {
                 return listDeleteTxn.deleteObjectRequest(currentFileName);
             };
@@ -268,8 +265,7 @@ TEST_CASE("MinIO Sync Integration") {
     {
         // Create the delete request
         anyblob::network::Transaction deleteTxn(provider.get());
-        for (auto i = 0u; i < 2; i++) {
-            auto& currentFileName = fileName[i];
+        for (auto& currentFileName : fileName) {
             auto deleteRequest = [&deleteTxn, &currentFileName]() {
                 return deleteTxn.deleteObjectRequest(currentFileName);
             };

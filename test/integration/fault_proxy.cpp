@@ -91,7 +91,7 @@ void FaultProxy::accept()
         bound(client);
         auto accepted = _accepted.fetch_add(1, memory_order_relaxed);
         auto faulty = _faults < 0 || accepted < static_cast<uint64_t>(_faults);
-        _relays.push_back(thread([this, client, faulty]() { relay(client, faulty); }));
+        _relays.emplace_back([this, client, faulty]() { relay(client, faulty); });
     }
 }
 //---------------------------------------------------------------------------

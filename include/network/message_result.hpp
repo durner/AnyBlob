@@ -1,6 +1,7 @@
 #pragma once
 #include "network/http_helper.hpp"
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <string_view>
 //---------------------------------------------------------------------------

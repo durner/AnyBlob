@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -57,15 +58,15 @@ class Provider {
         /// The provider
         CloudService provider = Provider::CloudService::HTTPS;
         /// The bucket name
-        std::string bucket = "";
+        std::string bucket;
         /// The region name
-        std::string region = "";
+        std::string region;
         /// The endpoint
-        std::string endpoint = "";
+        std::string endpoint;
         /// The port
         uint32_t port = 80;
         /// The object key within the request path
-        std::string key = "";
+        std::string key;
         /// Is zonal endpoint?
         bool zonal = false;
     };

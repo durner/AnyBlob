@@ -1,5 +1,6 @@
 #pragma once
 #include "cloud/aws.hpp"
+#include <cstdint>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2021

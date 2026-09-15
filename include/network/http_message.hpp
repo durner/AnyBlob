@@ -1,5 +1,6 @@
 #pragma once
 #include "network/message_task.hpp"
+#include <cstdint>
 #include <memory>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library

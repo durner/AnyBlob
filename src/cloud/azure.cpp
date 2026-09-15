@@ -65,7 +65,7 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiverHandle& 
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
 
-    string needle = "\"vmSize\" : \"";
+    string needle = R"("vmSize" : ")";
     auto pos = s.find(needle);
     if (pos != s.npos) {
         pos += needle.length();
@@ -95,7 +95,7 @@ string Azure::getRegion(network::TaskedSendReceiverHandle& sendReceiverHandle)
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
 
-    string needle = "\"location\" : \"";
+    string needle = R"("location" : ")";
     auto pos = s.find(needle);
     if (pos == s.npos)
         throw runtime_error("Azure Region: No location found.");
