@@ -15,23 +15,18 @@ namespace anyblob::network {
 //---------------------------------------------------------------------------
 class TaskedSendReceiverGroup;
 //---------------------------------------------------------------------------
-/// Adaptively saturate throughput using requests before threads
-/// Each epoch judges the step of the previous epoch against the measured throughput: a step that
-/// pays is repeated, a step that does not is rolled back and hands the turn to the next one, so
-/// the controller climbs while it wins and probes the other knobs once it holds
+/// Saturate throughput by increasing requests before threads.
+/// Repeat successful steps; revert failures and try the next adjustment.
+/// Probe periodically once settled.
 class AdaptiveController {
     public:
-    /// Epoch length for statistics collection
-    static constexpr std::chrono::milliseconds epochLength{1000};
-    /// Throughput increase (distinguish noise)
+    /// Measurement interval
+    static constexpr std::chrono::milliseconds epochLength{2000};
+    /// Throughput tolerance for noise
     static constexpr double tolerance = 0.05;
-    /// Fraction of throughput a growth step needs
-    static constexpr double efficiency = 0.2;
     /// Number of epochs between probes
     static constexpr unsigned probeInterval = 5;
-    /// Epochs of memory in the plateau estimate
-    static constexpr unsigned smoothing = 4;
-    /// The advisory output
+    /// Recommended concurrency
     struct Recommendation {
         /// Threads
         unsigned threads;
@@ -42,7 +37,7 @@ class AdaptiveController {
         bool operator==(const Recommendation& other) const = default;
     };
 
-    /// The epoch measurement sample
+    /// Measurements for one epoch
     struct Sample {
         /// Bytes finished during the epoch
         uint64_t transferredBytes;
@@ -54,14 +49,14 @@ class AdaptiveController {
         uint64_t inflightMessages;
         /// The configuration that actually ran
         Recommendation applied;
-        /// The hard request bound during the epoch
+        /// Request limit per thread during the epoch
         unsigned maxRequestsPerThread;
     };
 
     /// Constructor
     explicit AdaptiveController(const Config& config, bool tls, unsigned hardwareThreads = 0);
 
-    /// Recommnedation tick, the threads are the ones the caller actually runs
+    /// Update using the actual running thread count
     [[nodiscard]] Recommendation recommend(const TaskedSendReceiverGroup& group, unsigned runningThreads);
     /// Get the current recommendation
     [[nodiscard]] Recommendation current() const { return _current; }
@@ -72,16 +67,14 @@ class AdaptiveController {
     Recommendation measure(const Sample& sample);
 
     private:
-    /// What the controller tries next
+    /// Next adjustment
     enum class Step : uint8_t {
         /// Raise the requests per thread
         RequestsUp,
         /// Add threads
         ThreadsUp,
-        /// Give threads back
+        /// Remove threads and redistribute their requests
         ThreadsDown,
-        /// Carry the same concurrency on fewer threads
-        Repack,
         /// Lower the requests per thread
         RequestsDown,
     };
@@ -94,22 +87,18 @@ class AdaptiveController {
         uint64_t transferredBytes;
     };
 
-    /// The threads maximum
+    /// Thread limit
     unsigned _maxThreads;
     /// The current recommendation
     Recommendation _current;
     /// The last kept configuration
-    Recommendation _previous;
-    /// The configuration of the previous sample
-    Recommendation _applied;
-    /// Smoothed throughput of the kept configuration
-    double _plateauThroughput = 0;
-    /// Throughput of the previous epoch
-    double _lastThroughput = 0;
-    /// The step of the next epoch
-    Step _next = Step::RequestsUp;
-    /// Epochs since the last step
-    unsigned _since = probeInterval;
+    Recommendation _kept;
+    /// Last throughput of the kept configuration
+    double _keptThroughput = 0;
+    /// The step on trial
+    Step _step = Step::RequestsUp;
+    /// Epochs measured with the current recommendation
+    unsigned _since = 0;
     /// Whether the threads are parked
     bool _parked = false;
     /// The epoch baseline
