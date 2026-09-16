@@ -45,12 +45,11 @@ AdaptiveController::AdaptiveController(const Config& config, bool tls, unsigned 
     _maxThreads = hardware ? hardware : max(1u, thread::hardware_concurrency());
     _current.threads = seedThreads(config, tls, _maxThreads);
     _current.requestsPerThread = max(1u, config.coreRequests());
-    _previous = _current;
-    _applied = _current;
+    _kept = _current;
 }
 //---------------------------------------------------------------------------
 AdaptiveController::Recommendation AdaptiveController::recommend(const TaskedSendReceiverGroup& group, unsigned runningThreads)
-/// Recommnedation tick
+/// Update the recommendation
 {
     _current.requestsPerThread = min(_current.requestsPerThread, max(1u, TaskedSendReceiverGroup::maxConcurrentRequests));
     auto now = chrono::steady_clock::now();
@@ -73,115 +72,81 @@ AdaptiveController::Recommendation AdaptiveController::measure(const Sample& sam
 {
     auto maxRequests = max(1u, sample.maxRequestsPerThread);
     _current.requestsPerThread = min(_current.requestsPerThread, maxRequests);
-    _previous.requestsPerThread = min(_previous.requestsPerThread, maxRequests);
-    _applied.requestsPerThread = min(_applied.requestsPerThread, maxRequests);
+    _kept.requestsPerThread = min(_kept.requestsPerThread, maxRequests);
     auto seconds = chrono::duration<double>(sample.elapsed).count();
     auto throughput = seconds > 0 ? static_cast<double>(sample.transferredBytes) / seconds : 0.0;
-    auto applied = sample.applied;
-    auto concurrency = static_cast<uint64_t>(applied.threads) * applied.requestsPerThread;
-    // Require settled throughput before adding concurrency
-    auto settled = _lastThroughput > 0 && abs(throughput - _lastThroughput) <= tolerance * _lastThroughput;
+    // Reductions must preserve throughput; increases must improve it
+    auto lowers = _step == Step::ThreadsDown || _step == Step::RequestsDown;
 
-    /// Whether a step adds concurrency
-    auto raisesConcurrency = [](Step step) {
-        return step == Step::RequestsUp || step == Step::ThreadsUp;
-    };
-
-    /// The step the epoch ran
-    auto pendingStep = [&]() -> optional<Step> {
-        if (applied.threads != _previous.threads)
-            return applied.threads > _previous.threads ? Step::ThreadsUp : Step::ThreadsDown;
-        if (applied.requestsPerThread != _previous.requestsPerThread)
-            return applied.requestsPerThread > _previous.requestsPerThread ? Step::RequestsUp : Step::RequestsDown;
-        return {};
-    };
-
-    /// Whether the step was beneficial
-    auto wasBeneficial = [&](Step step) {
-        if (step == Step::RequestsUp || step == Step::RequestsDown)
-            return throughput >= (1 + tolerance) * _lastThroughput;
-        // Thread growth must pay out
-        if (step == Step::ThreadsUp) {
-            auto previous = static_cast<double>(_previous.threads) * _previous.requestsPerThread;
-            auto band = max(tolerance, efficiency * abs((static_cast<double>(concurrency) - previous) / previous));
-            return throughput >= (1 + band) * _lastThroughput;
-        }
-        // A thread costs a core, so rather release
-        return throughput >= (1 - tolerance) * _plateauThroughput;
-    };
-
-    /// Try out a different step
+    /// Try the next adjustment
     auto rotateStep = [&]() {
-        _next = static_cast<Step>((static_cast<uint8_t>(_next) + 1) % (static_cast<uint8_t>(Step::RequestsDown) + 1));
+        _step = static_cast<Step>((static_cast<uint8_t>(_step) + 1) % (static_cast<uint8_t>(Step::RequestsDown) + 1));
     };
 
-    /// Move the knob of the next step
+    /// Apply the step; return false at the limit
     auto stepSwitch = [&]() {
-        constexpr auto stepFraction = 4;
-        switch (_next) {
+        constexpr auto stepFraction = 8;
+        switch (_step) {
+            // Requests need no extra core, so increase them faster
             case Step::RequestsUp: _current.requestsPerThread = increase(_current.requestsPerThread, stepFraction >> 1, maxRequests); break;
             case Step::ThreadsUp: _current.threads = increase(_current.threads, stepFraction, _maxThreads); break;
-            case Step::ThreadsDown: _current.threads = decrease(_current.threads, stepFraction, 1); break;
-            case Step::Repack: {
-                // Carry the concurrency that ran on fewer threads, at the granularity of the other steps
+            case Step::ThreadsDown: {
+                // Redistribute requests across the remaining threads, or decline to keep the concurrency
+                auto concurrency = static_cast<uint64_t>(_current.threads) * _current.requestsPerThread;
                 auto packed = decrease(_current.threads, stepFraction, 1);
-                auto requests = static_cast<unsigned>((concurrency + packed - 1) / packed);
+                auto requests = (concurrency + packed - 1) / packed;
                 if (packed < _current.threads && requests <= maxRequests) {
                     _current.threads = packed;
-                    _current.requestsPerThread = requests;
+                    _current.requestsPerThread = static_cast<unsigned>(requests);
                 }
                 break;
             }
             case Step::RequestsDown: _current.requestsPerThread = decrease(_current.requestsPerThread, stepFraction, 1); break;
         }
-        return _current != _previous;
+        return _current != _kept;
     };
 
-    // No demand -> reduce the threads
+    // Use one thread while idle
     if (!sample.transferredBytes && !sample.queuedMessages && !sample.inflightMessages) {
         if (!_parked) {
-            _current = _previous;
+            _current = _kept;
             _current.threads = 1;
             _parked = true;
         }
-        _applied = applied;
         return _current;
     }
-    // Reuse best configuration
+    // Restore the kept configuration
     if (_parked) {
-        _current = _previous;
-        _applied = applied;
+        _current = _kept;
         _parked = false;
         _since = 0;
-        _lastThroughput = throughput;
         return _current;
     }
 
-    // A configuration should only be measured when it actually ran
-    if (applied != _applied) {
-        _applied = applied;
+    // Wait for a full epoch with this recommendation
+    if (sample.applied != _current || !_since++)
         return _current;
-    }
 
-    auto step = pendingStep();
-    if (step && !wasBeneficial(*step)) {
-        _current = _previous;
-        _since = 0;
-        rotateStep();
-    } else {
-        if (step) {
-            // Keep moving while the step pays
-            _previous = applied;
-            _since = probeInterval;
-        } else {
-            _plateauThroughput = _plateauThroughput > 0 ? _plateauThroughput + (throughput - _plateauThroughput) / smoothing : throughput;
+    auto won = false;
+    if (_current != _kept) {
+        // Compare throughput with the kept configuration
+        if (throughput < (lowers ? 1 - (tolerance / 2) : 1 + tolerance) * _keptThroughput) {
+            _current = _kept;
+            _since = 0;
+            rotateStep();
+            return _current;
         }
-        _current = applied;
-        auto due = _since++ >= probeInterval && (settled || !raisesConcurrency(_next));
-        if (due && !stepSwitch())
+        // Keep successful steps
+        _kept = _current;
+        won = true;
+    }
+    _keptThroughput = 0.5 * throughput + 0.5 * _keptThroughput;
+    if (won || _since > probeInterval) {
+        if (stepSwitch())
+            _since = 0;
+        else
             rotateStep();
     }
-    _lastThroughput = throughput;
     return _current;
 }
 //---------------------------------------------------------------------------

@@ -18,13 +18,13 @@ namespace anyblob::network::test {
 using namespace std;
 using namespace std::chrono_literals;
 //---------------------------------------------------------------------------
-/// The machine the controller cases model, the host must not change a result
+/// Fixed hardware model for reproducible tests
 static constexpr auto hardwareThreads = 24u;
 //---------------------------------------------------------------------------
-/// The group the controller cases model, a thread may not run more requests
+/// Request limit per thread in the test model
 static constexpr auto maxRequests = 32u;
 //---------------------------------------------------------------------------
-/// The instance config of the modeled machine, the network is what seeds the threads
+/// Model config; network bandwidth seeds the thread count
 static Config modelConfig(uint64_t network) {
     return Config{Config::defaultCoreThroughput, Config::defaultCoreConcurrency, network};
 }
@@ -34,17 +34,17 @@ static AdaptiveController makeController(unsigned seed = 0) {
     return AdaptiveController(modelConfig(2 * seed * Config::defaultCoreThroughput), false, hardwareThreads);
 }
 //---------------------------------------------------------------------------
-/// Builds a sample of one second for a consumer that applied the recommendation
+/// One second with the recommendation applied
 static AdaptiveController::Sample sampleThroughput(const AdaptiveController::Recommendation& applied, uint64_t bytesPerSec, unsigned ceiling = maxRequests) {
     return {bytesPerSec, std::chrono::nanoseconds(1s), 1000, 1000, applied, ceiling};
 }
 //---------------------------------------------------------------------------
-/// Builds a sample of one second without any demand
+/// One second without transfers or queued requests
 static AdaptiveController::Sample sampleIdle(const AdaptiveController::Recommendation& applied, uint64_t inflight = 0) {
     return {0, std::chrono::nanoseconds(1s), 0, inflight, applied, maxRequests};
 }
 //---------------------------------------------------------------------------
-/// The configuration the controller holds, the most frequent of a tail skips the probes
+/// Most frequent recent configuration, excluding occasional probes
 static AdaptiveController::Recommendation held(const std::vector<AdaptiveController::Recommendation>& epochs) {
     static constexpr auto window = 40u;
     auto begin = epochs.size() > window ? epochs.size() - window : 0u;
@@ -80,16 +80,16 @@ TEST_CASE("adaptive_controller_seeding") {
     CHECK(controller.current().requestsPerThread == Config::defaultCoreConcurrency);
     CHECK(controller.maxThreads() == hardwareThreads);
 
-    // The seeded threads of a controller on the given instance
+    // Initial thread count for the instance
     auto seedOf = [](uint64_t network, bool tls, unsigned hardware) {
         return AdaptiveController(modelConfig(network), tls, hardware).current().threads;
     };
 
-    // A wider link and the TLS cost both ask for more threads
+    // Higher bandwidth and TLS need more threads
     CHECK(seedOf(300'000, false, 96) > seedOf(50'000, false, 96));
     CHECK(seedOf(300'000, true, 96) > seedOf(300'000, false, 96));
 
-    // The seed stays within the hardware bound, an unknown bandwidth falls back to it
+    // Cap threads at hardware capacity; use a fallback for unknown bandwidth
     CHECK(seedOf(600'000, true, 8) == 8);
     CHECK(seedOf(0, true, 96) == 12);
     AdaptiveController detected(modelConfig(0), false);
@@ -131,21 +131,33 @@ TEST_CASE("adaptive_controller_cpu_bound_growth") {
         rec = controller.measure(sampleThroughput(rec, bps));
         epochs.push_back(rec);
     }
-    // Requests never help a thread bound workload
+    // More requests cannot help a CPU-bound workload
     auto settled = held(epochs);
     CHECK(settled.requestsPerThread <= seed.requestsPerThread);
     CHECK(settled.threads >= 2 * seed.threads);
 }
 //---------------------------------------------------------------------------
-TEST_CASE("adaptive_controller_growth_gate_noise") {
+TEST_CASE("adaptive_controller_noise_does_not_shed_throughput") {
     auto controller = makeController();
-    auto seed = controller.current();
+    uint64_t perRequest = 25'000'000;
+    uint64_t link = 1'000'000'000;
 
-    auto rec = seed;
-    for (auto i = 0u; i < 25; i++) {
-        rec = controller.measure(sampleThroughput(rec, i % 2 ? 1'000'000'000 : 800'000'000));
-        CHECK(rec == seed);
+    // Model throughput loss when concurrency drops
+    auto rec = controller.current();
+    double delivered = 0;
+    auto epochs = 0u;
+    for (auto i = 0u; i < 200; i++) {
+        auto clean = static_cast<double>(modelThroughput(rec, perRequest, link));
+        // Alternate throughput by +/-5%
+        auto noisy = static_cast<uint64_t>(clean * (i % 2 ? 1.05 : 0.95));
+        rec = controller.measure(sampleThroughput(rec, noisy));
+        if (i > 3 * AdaptiveController::probeInterval) {
+            delivered += static_cast<double>(modelThroughput(rec, perRequest, link));
+            epochs++;
+        }
     }
+    // Probes may dip, but average throughput should stay near capacity
+    CHECK(delivered / epochs >= 0.9 * static_cast<double>(link));
 }
 //---------------------------------------------------------------------------
 TEST_CASE("adaptive_controller_idle_and_reattach") {
@@ -154,22 +166,25 @@ TEST_CASE("adaptive_controller_idle_and_reattach") {
     uint64_t perRequest = 25'000'000;
     uint64_t link = 1'000'000'000'000;
 
-    // Requests still in flight are not an idle group
+    // In-flight requests keep the group active
     CHECK(controller.measure(sampleIdle(seed, 5)).threads == seed.threads);
 
-    // One settle epoch, one growth step, one epoch in effect, one kept judgement
+    // Grow and record the settled configuration
     auto rec = controller.current();
-    for (auto i = 0u; i < 4; i++)
+    std::vector<AdaptiveController::Recommendation> epochs;
+    for (auto i = 0u; i < 120; i++) {
         rec = controller.measure(sampleThroughput(rec, modelThroughput(rec, perRequest, link)));
-    auto grown = rec;
+        epochs.push_back(rec);
+    }
+    auto grown = held(epochs);
     CHECK(grown != seed);
 
-    // An idle epoch releases the threads
+    // Idle groups fall back to one thread
     rec = controller.measure(sampleIdle(grown));
     CHECK(rec.threads == 1);
     CHECK(rec.requestsPerThread == grown.requestsPerThread);
 
-    // Returning demand reattaches
+    // New demand restores the kept configuration
     rec = controller.measure(sampleThroughput(grown, modelThroughput(grown, perRequest, link)));
     CHECK(rec == grown);
 }
@@ -183,7 +198,7 @@ TEST_CASE("adaptive_controller_degradation_recovery") {
     for (auto i = 0u; i < 12; i++)
         rec = controller.measure(sampleThroughput(rec, modelThroughput(rec, 25'000'000, link)));
 
-    // The per-request throughput collapses, the controller has to buy the link back
+    // Recover link throughput after the per-request rate drops
     for (auto i = 0u; i < 60; i++)
         rec = controller.measure(sampleThroughput(rec, modelThroughput(rec, 5'000'000, link)));
     CHECK(static_cast<double>(modelThroughput(rec, 5'000'000, link)) >= 0.9 * static_cast<double>(link));
@@ -210,13 +225,13 @@ TEST_CASE("adaptive_controller_requests_ceiling") {
     auto rec = controller.current();
     std::vector<AdaptiveController::Recommendation> epochs;
     for (auto i = 0u; i < 80; i++) {
-        // A consumer never runs more than its group allows
+        // Apply the group request limit
         rec.requestsPerThread = std::min(rec.requestsPerThread, ceiling);
         rec = controller.measure(sampleThroughput(rec, modelCeiling(rec, link, link, 25'000'000), ceiling));
         CHECK(rec.requestsPerThread <= ceiling);
         epochs.push_back(rec);
     }
-    // The requests are capped, so the threads have to carry the concurrency
+    // Add threads when requests per thread are capped
     auto settled = held(epochs);
     CHECK(settled.requestsPerThread == ceiling);
     CHECK(settled.threads > controller.maxThreads() / 8);
@@ -234,7 +249,7 @@ TEST_CASE("adaptive_controller_trades_threads_for_requests") {
     for (auto i = 0u; i < 300; i++)
         rec = controller.measure(sampleThroughput(rec, modelCeiling(rec, link, threadBps, requestBps)));
 
-    // The same concurrency is carried by fewer threads, and the link still saturates
+    // Fewer threads still saturate the link
     CHECK(rec.threads < seed.threads);
     CHECK(rec.requestsPerThread > seed.requestsPerThread);
     CHECK(modelCeiling(rec, link, threadBps, requestBps) >= link - link / 10);

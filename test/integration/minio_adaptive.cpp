@@ -24,7 +24,7 @@ namespace anyblob::test {
 using namespace std;
 //---------------------------------------------------------------------------
 TEST_CASE("MinIO Adaptive Integration") {
-    // Get the enviornment
+    // Read connection settings
     const char* bucket = getenv("AWS_S3_BUCKET");
     const char* region = getenv("AWS_S3_REGION");
     const char* endpoint = getenv("AWS_S3_ENDPOINT");
@@ -44,51 +44,49 @@ TEST_CASE("MinIO Adaptive Integration") {
         return resultString;
     };
 
-    // The files to be uploaded and downloaded
+    // Test files and content
     string bucketName = "minio://";
     bucketName = bucketName + endpoint + "/" + bucket + ":" + region;
     string fileName[]{"adaptive_first.txt", "adaptive_second.txt"};
     string content[]{stringGen(1 << 20), stringGen(1 << 20)};
-    // The outstanding requests of one download round
+    // Requests per download round
     static constexpr auto requests = 64u;
-    // The machine the controller is modeled on, the host must not change the run
+    // Fixed hardware model for reproducible tests
     static constexpr auto modeledThreads = 16u;
-    // The daemons the test is willing to start of a larger recommendation
+    // Daemon limit for this test
     static constexpr auto maxDaemons = 4u;
-    // The controller measures in epochs, so the load phases are counted in them
+    // Run load phases for two measurement epochs
     static constexpr auto loadEpochs = 2 * anyblob::network::AdaptiveController::epochLength;
 
-    // Create a new task group that bounds the requests of a single daemon
+    // Create the shared task group
     anyblob::network::TaskedSendReceiverGroup group(64u * 1024, requests << 2, 0);
 
-    // Create an AnyBlob scheduler object for the group
+    // Get a scheduler handle
     auto sendReceiverHandle = group.getHandle();
 
-    // Create the provider for the corresponding filename
+    // Create the bucket provider
     auto provider = anyblob::cloud::Provider::makeProvider(bucketName, false, key, secret, &sendReceiverHandle);
 
-    // Seed the controller according to instance settings (hardware estimate here, as minio reports no bandwidth)
+    // Seed from hardware; MinIO reports no bandwidth
     auto config = provider->getConfig(sendReceiverHandle);
     anyblob::network::AdaptiveController controller(config, false, modeledThreads);
 
-    // The seeded daemons must be able to fall back to a single one
+    // Start with multiple daemons to test idle reduction
     REQUIRE(controller.current().threads > 1);
     REQUIRE(controller.maxThreads() == modeledThreads);
 
-    // The daemons that work off the group
+    // Worker handles and futures
     vector<anyblob::network::TaskedSendReceiverHandle> sendReceiverHandles;
     vector<future<void>> asyncSendReceiverThreads(maxDaemons);
     sendReceiverHandles.reserve(maxDaemons);
     for (auto i = 0u; i < maxDaemons; i++)
         sendReceiverHandles.push_back(group.getHandle());
 
-    // Create a round of downloads, the callbacks run on the daemons and Catch2 is not thread safe
+    // Use counters in worker callbacks; Catch2 is not thread safe
     auto createDownloads = [&](anyblob::network::Transaction& getTxn, atomic<uint16_t>& finishedMessages, atomic<uint16_t>& validMessages) {
         for (auto i = 0u; i < requests; i++) {
             auto file = i % 2;
-            // Check the download for success
             auto checkSuccess = [&finishedMessages, &validMessages, &content, file](anyblob::network::MessageResult& result) {
-                // Sucessful request with the uploaded content
                 if (result.success() && result.getSize() == content[file].size() && !content[file].compare(result.getResult()))
                     validMessages++;
                 finishedMessages++;
@@ -103,7 +101,7 @@ TEST_CASE("MinIO Adaptive Integration") {
     };
 
     {
-        // Create the put request
+        // Create upload requests
         anyblob::network::Transaction putTxn(provider.get());
         for (auto i = 0u; i < 2; i++) {
             auto putObjectRequest = [&putTxn, &fileName, &content, i]() {
@@ -112,12 +110,11 @@ TEST_CASE("MinIO Adaptive Integration") {
             putTxn.verifyKeyRequest(sendReceiverHandle, move(putObjectRequest));
         }
 
-        // Upload the request synchronously with the scheduler object on this thread
+        // Upload synchronously
         putTxn.processSync(sendReceiverHandle);
 
         // Check the upload
         for (const auto& it : putTxn) {
-            // Sucessful request
             REQUIRE(it.success());
         }
     }
@@ -130,29 +127,28 @@ TEST_CASE("MinIO Adaptive Integration") {
             atomic<uint16_t> finishedMessages = 0;
             atomic<uint16_t> validMessages = 0;
 
-            // Create the get request
+            // Create download requests
             anyblob::network::Transaction getTxn(provider.get());
             createDownloads(getTxn, finishedMessages, validMessages);
 
-            // Queue the requests before the daemons start, they would exit on an empty queue
+            // Queue work first; daemons exit on an empty queue
             REQUIRE(getTxn.processAsync(group));
 
-            // Ask the controller how to work off the burst
+            // Apply the recommendation for this burst
             auto recommendation = controller.recommend(group, running);
             group.setConcurrentRequests(recommendation.requestsPerThread);
             auto daemons = min(recommendation.threads, maxDaemons);
             running = daemons;
 
-            // Start the daemons, they end as soon as the group runs out of work
+            // Start daemons that exit when the queue empties
             for (auto i = 0u; i < daemons; i++) {
                 auto runLambda = [&sendReceiverHandles](unsigned recv) {
-                    // Runs the download thread as long as the group has work
                     sendReceiverHandles[recv].process(true);
                 };
                 asyncSendReceiverThreads[i] = async(launch::async, runLambda, i);
             }
 
-            // No handle is stopped here, the daemons end on the empty group
+            // Wait for daemons to exit on their own
             for (auto i = 0u; i < daemons; i++)
                 asyncSendReceiverThreads[i].get();
 
@@ -167,10 +163,10 @@ TEST_CASE("MinIO Adaptive Integration") {
     }
 
     SECTION("an epoch without work falls back to a single daemon") {
-        // No daemon runs, so the controller measures an idle group
+        // Measure an idle group
         auto running = 0u;
         auto recommendation = controller.current();
-        // The collapse is the check, the controller has to walk the threads down
+        // Wait for the recommendation to drop to one thread
         while (recommendation.threads != 1) {
             recommendation = controller.recommend(group, running);
             usleep(1000);
@@ -181,12 +177,12 @@ TEST_CASE("MinIO Adaptive Integration") {
     SECTION("resizing a running pool answers every request") {
         auto runningDaemons = 0u;
 
-        // Start and stop daemons that outlive their work until the pool matches the size
+        // Resize the persistent daemon pool
         auto reconcileDaemons = [&](unsigned daemons) {
             auto target = min(daemons, maxDaemons);
             while (runningDaemons < target) {
                 auto runLambda = [&sendReceiverHandles](unsigned recv) {
-                    // Runs the download thread in full daemon mode
+                    // Keep running when the queue empties
                     sendReceiverHandles[recv].process(false);
                 };
                 asyncSendReceiverThreads[runningDaemons] = async(launch::async, runLambda, runningDaemons);
@@ -202,14 +198,14 @@ TEST_CASE("MinIO Adaptive Integration") {
         atomic<uint16_t> finishedMessages = 0;
         atomic<uint16_t> validMessages = 0;
 
-        // Create the get request
+        // Create download requests
         anyblob::network::Transaction getTxn(provider.get());
         createDownloads(getTxn, finishedMessages, validMessages);
 
-        // Retrieve the request asynchronously
+        // Queue downloads
         REQUIRE(getTxn.processAsync(group));
 
-        // Walk the pool and the per daemon requests through their bounds, shrinking drains a daemon
+        // Vary pool size and request limits; removed daemons drain first
         unsigned daemonSteps[]{1, maxDaemons, 2, maxDaemons, 1};
         unsigned requestSteps[]{1, 32, 4, 16, 8};
         for (auto step = 0u; step < 10; step++) {
@@ -221,7 +217,7 @@ TEST_CASE("MinIO Adaptive Integration") {
         while (finishedMessages != requests)
             usleep(100);
 
-        // Stop the daemons before the check, no late callback may arrive
+        // Stop daemons before checking callback counts
         reconcileDaemons(0);
         REQUIRE(finishedMessages == requests);
         REQUIRE(validMessages == requests);
@@ -230,7 +226,7 @@ TEST_CASE("MinIO Adaptive Integration") {
     }
 
     {
-        // Create the delete request
+        // Create delete requests
         anyblob::network::Transaction deleteTxn(provider.get());
         for (auto& currentFileName : fileName) {
             auto deleteRequest = [&deleteTxn, &currentFileName]() {
@@ -239,12 +235,11 @@ TEST_CASE("MinIO Adaptive Integration") {
             deleteTxn.verifyKeyRequest(sendReceiverHandle, move(deleteRequest));
         }
 
-        // Delete the request synchronously with the scheduler object on this thread
+        // Delete synchronously
         deleteTxn.processSync(sendReceiverHandle);
 
         // Check the deletion
         for (const auto& it : deleteTxn) {
-            // Sucessful request
             REQUIRE(it.success());
         }
     }
