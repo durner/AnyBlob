@@ -1,7 +1,8 @@
 #pragma once
 #include <cstdint>
-#include <memory>
+#include <span>
 #include <string>
+#include <vector>
 #include <openssl/types.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -16,22 +17,22 @@ namespace anyblob::network {
 struct HTTPSMessage;
 class TLSContext;
 class ConnectionManager;
+class Socket;
+enum class MessageFailureCode : uint16_t;
 //---------------------------------------------------------------------------
-/// The TLS Interface
+/// The TLS interface
 //---------------------------------------------------------------------------
 /* anyblob |   OpenSSL
  *   |     |
  *    -------> SSL_read / SSL_write / SSL_connect
  *         |     /\    ||
  *         |     ||    \/
- *         |    internalBio
- *         |    networkBio
- *         |     ||     /\
- *         |     \/     ||
+ *         |   socket BIO
+ *   |     |     ||    /\
+ *   |     |     \/    ||
  *    -------<  recv / send
  *   |     |
- *   |     |
- *  socket
+ *  socket backend
  * Adopted from https://www.openssl.org/docs/man3.1/man3/BIO_new_bio_pair.html
 */
 //---------------------------------------------------------------------------
@@ -39,60 +40,30 @@ class TLSConnection {
     public:
     /// The progress of the TLS
     enum class Progress : uint16_t {
-        Init,
-        SendingInit,
-        Sending,
-        ReceivingInit,
-        Receiving,
-        Progress,
+        Pending,
         Finished,
         Aborted
     };
 
     private:
-    /// The state
-    struct State {
-        /// Bytes wanted to write from internal bio (used for send)
-        size_t internalBioWrite;
-        /// Bytes read from network bio (used for send)
-        int64_t networkBioRead;
-        /// Bytes written to socket (used for send)
-        size_t socketWrite;
-        /// Bytes wanted to read from internal bio (used for recv)
-        size_t internalBioRead;
-        /// Bytes written to network bio (used for recv)
-        int64_t networkBioWrite;
-        /// Bytes read fromsocket (used for recv)
-        size_t socketRead;
-        /// The progress
-        Progress progress;
-
-        /// Resets the statistics
-        inline void reset() {
-            internalBioWrite = 0;
-            networkBioRead = 0;
-            socketWrite = 0;
-            internalBioRead = 0;
-            networkBioWrite = 0;
-            socketRead = 0;
-        }
-    };
-    /// The corresponding
+    /// The corresponding message
     HTTPSMessage* _message;
     /// The SSL context
     TLSContext& _context;
     /// The SSL connection
     SSL* _ssl;
-    /// The internal buffer used for communicating with SSL
-    BIO* _internalBio;
-    /// The external buffer used for communicating with the socket
-    BIO* _networkBio;
-    /// The buffer
-    std::unique_ptr<char[]> _buffer;
-    /// The state
-    State _state;
-    /// Already conencted
-    bool _connected;
+    /// The decoding buffer
+    std::vector<uint8_t> _buffer;
+    /// The buffer offset
+    uint64_t _bufferOffset;
+    /// The buffer length
+    uint64_t _bufferLength;
+    /// The number of bytes sent
+    uint64_t _sent;
+    /// The record OpenSSL wants sent
+    std::span<const uint8_t> _record;
+    /// Is a transfer in flight
+    bool _pending;
     /// The hostname
     std::string _hostname;
     /// The port
@@ -107,9 +78,9 @@ class TLSConnection {
     /// The destructor
     ~TLSConnection();
 
-    // Initialze SSL
+    /// Initialize SSL
     [[nodiscard]] bool init(HTTPSMessage* message);
-    // Initialze SSL
+    /// Destroy SSL state
     void destroy();
     /// Get the SSL/TLS context
     [[nodiscard]] inline TLSContext& getContext() const { return _context; }
@@ -127,16 +98,29 @@ class TLSConnection {
     /// SSL/TLS connect
     [[nodiscard]] Progress connect(ConnectionManager& connectionManager);
     /// SSL/TLS shutdown
-    [[nodiscard]] Progress shutdown(ConnectionManager& connectionManager, bool failedOnce = false);
+    [[nodiscard]] Progress shutdown(ConnectionManager& connectionManager);
 
     private:
-    /// Helper function that handles the SSL_op calls
+    /// Run an SSL operation and queue the transfer it needs
     template <typename F>
-    Progress operationHelper(ConnectionManager& connectionManager, F&& func, int64_t& result);
-    /// The processing of the shadow tls layer
-    Progress process(ConnectionManager& connectionManager);
+    Progress runOperation(ConnectionManager& connectionManager, F operation, int64_t& result, MessageFailureCode failure);
+    /// Consume the completed events
+    bool consumeCompletion(MessageFailureCode failure);
+    /// Queue the next receive
+    void queueReceive(Socket& socket);
+    /// Queue the record for sending
+    void queueSend(Socket& socket);
+    /// Record a message failure
+    void fail(MessageFailureCode failure);
+    /// Read a ciphertext from the staging buffer
+    uint64_t bioRead(std::span<uint8_t> out);
+    /// Remember the record OpenSSL wants sent
+    uint64_t bioWrite(std::span<const uint8_t> record);
     /// Abort on a rejected peer certificate
     Progress verifyCertificate(Progress status);
+
+    /// Create the bio that moves the records over the socket
+    static BIO* createBio();
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::network
