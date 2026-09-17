@@ -3,6 +3,7 @@
 #endif
 #include "network/io_uring_socket.hpp"
 #include <cassert>
+#include <cerrno>
 #include <cstring>
 #include <stdexcept>
 //---------------------------------------------------------------------------
@@ -33,134 +34,48 @@ IOUringSocket::IOUringSocket(uint32_t entries, int32_t /*flags*/)
     }
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::send_prep(const Request& req, int32_t msg_flags, uint8_t flags)
-// Prepare a submission (sqe) send
+void IOUringSocket::prepare(Request& req, chrono::milliseconds timeout, int32_t msg_flags)
+// Prepare a submission (sqe)
 {
     assert(req.length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags | MSG_NOSIGNAL);
-    sqe->flags |= flags;
-    sqe->user_data = reinterpret_cast<uintptr_t>(&req);
-    return sqe;
-}
-//---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::recv_prep(Request& req, int32_t msg_flags, uint8_t flags)
-// Prepare a submission (sqe) recv
-{
-    assert(req.length > 0);
-    auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_recv(sqe, req.fd, req.data.data, static_cast<uint64_t>(req.length), msg_flags);
-    sqe->flags |= flags;
-    sqe->user_data = reinterpret_cast<uintptr_t>(&req);
-    return sqe;
-}
-//---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::send_prep_to(const Request& req, int32_t msg_flags, uint8_t flags)
-// Prepare a submission (sqe) send with relative timeout
-{
-    assert(req.length > 0);
-    auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags | MSG_NOSIGNAL);
-    sqe->flags |= flags | IOSQE_IO_LINK;
-    sqe->user_data = reinterpret_cast<uintptr_t>(&req);
+    if (req.event == EventType::write)
+        io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags | MSG_NOSIGNAL);
+    else
+        io_uring_prep_recv(sqe, req.fd, req.data.data, static_cast<uint64_t>(req.length), msg_flags);
+    io_uring_sqe_set_data(sqe, &req);
+    if (!timeout.count())
+        return;
+    sqe->flags |= IOSQE_IO_LINK;
+    req.kernelTimeout = toKernelTimespec(timeout);
     auto timeoutSqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_link_timeout(timeoutSqe, const_cast<__kernel_timespec*>(&req.kernelTimeout), 0);
-    timeoutSqe->user_data = reinterpret_cast<uintptr_t>(nullptr);
-    return sqe;
+    io_uring_prep_link_timeout(timeoutSqe, &req.kernelTimeout, 0);
+    io_uring_sqe_set_data(timeoutSqe, nullptr);
 }
 //---------------------------------------------------------------------------
-io_uring_sqe* IOUringSocket::recv_prep_to(Request& req, int32_t msg_flags, uint8_t flags)
-// Prepare a submission (sqe) recv with relative timeout
+void IOUringSocket::processImpl()
+// Submit the queued requests and append completed CQE
 {
-    assert(req.length > 0);
-    auto sqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_recv(sqe, req.fd, req.data.data, static_cast<uint64_t>(req.length), msg_flags);
-    sqe->flags |= flags | IOSQE_IO_LINK;
-    sqe->user_data = reinterpret_cast<uintptr_t>(&req);
-    auto timeoutSqe = io_uring_get_sqe(&_uring);
-    io_uring_prep_link_timeout(timeoutSqe, const_cast<__kernel_timespec*>(&req.kernelTimeout), 0);
-    timeoutSqe->user_data = reinterpret_cast<uintptr_t>(nullptr);
-    return sqe;
-}
-//---------------------------------------------------------------------------
-IOUringSocket::Request* IOUringSocket::peek()
-// Get a completion (cqe) event if it is available and mark it as seen; return the SQE attached Request if available else nullptr
-{
-    io_uring_cqe* cqe;
-    auto res = io_uring_peek_cqe(&_uring, &cqe);
-    if (!res) {
-        Request* req = nullptr;
-        memcpy(&req, &cqe->user_data, sizeof(cqe->user_data));
-        if (req)
-            req->length = cqe->res;
-        seen(cqe);
-        return req;
-    }
-    return nullptr;
-}
-//---------------------------------------------------------------------------
-IOUringSocket::Request* IOUringSocket::complete()
-// Get a completion (cqe) event and mark it as seen; return the SQE attached Request
-{
-    io_uring_cqe* cqe;
-    auto res = io_uring_wait_cqe(&_uring, &cqe);
-    if (!res) {
-        Request* req = nullptr;
-        memcpy(&req, &cqe->user_data, sizeof(cqe->user_data));
-        if (req)
-            req->length = cqe->res;
-        seen(cqe);
-        return req;
-    }
-    throw runtime_error("io_uring_wait_cqe error!");
-}
-//---------------------------------------------------------------------------
-io_uring_cqe* IOUringSocket::completion()
-// Get a completion (cqe) event
-{
-    io_uring_cqe* cqe;
-    auto res = io_uring_wait_cqe(&_uring, &cqe);
-    if (!res) {
-        return cqe;
-    }
-    throw runtime_error("Completion error!");
-}
-//---------------------------------------------------------------------------
-uint32_t IOUringSocket::submitCompleteAll(uint32_t events, vector<IOUringSocket::Request*>& completions)
-// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests
-{
-    uint32_t count = 0;
-    while (events > count) {
-        io_uring_submit_and_wait(&_uring, 1);
-        io_uring_cqe* cqe;
-        uint32_t head;
-        uint32_t localCount = 0;
+    auto submitted = io_uring_submit_and_wait(&_uring, hasOutstanding() ? 1u : 0u);
+    if (submitted < 0 && submitted != -EINTR && submitted != -EAGAIN)
+        throw runtime_error("socket submit error: " + to_string(-submitted));
+    if (submitted > 0)
+        _outstanding += static_cast<uint32_t>(submitted);
 
-        // iterate all cqes
-        io_uring_for_each_cqe(&_uring, head, cqe) {
-            localCount++;
-            Request* req = nullptr;
-            memcpy(&req, &cqe->user_data, sizeof(cqe->user_data));
-            if (req)
-                req->length = cqe->res;
-            completions.push_back(req);
+    // Drain the whole completion queue
+    uint32_t collected = 0;
+    uint32_t head;
+    io_uring_cqe* cqe;
+    io_uring_for_each_cqe(&_uring, head, cqe) {
+        collected++;
+        // A timeout carries no request
+        if (auto req = static_cast<Request*>(io_uring_cqe_get_data(cqe))) {
+            req->length = cqe->res;
+            _completions.push_back(req->messageTask);
         }
-        io_uring_cq_advance(&_uring, localCount);
-        count += localCount;
     }
-    return count;
-}
-//---------------------------------------------------------------------------
-void IOUringSocket::seen(io_uring_cqe* cqe)
-// Mark a completion (cqe) event seen to allow for new completions in the kernel
-{
-    io_uring_cqe_seen(&_uring, cqe);
-}
-//---------------------------------------------------------------------------
-int32_t IOUringSocket::submit()
-// Submit uring to the kernel and return the number of submitted entries
-{
-    return io_uring_submit(&_uring);
+    io_uring_cq_advance(&_uring, collected);
+    _outstanding -= collected;
 }
 //---------------------------------------------------------------------------
 IOUringSocket::~IOUringSocket() noexcept

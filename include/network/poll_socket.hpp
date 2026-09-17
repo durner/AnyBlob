@@ -29,38 +29,27 @@ class PollSocket : public Socket {
         /// The flags for the syscall (e.g., MSG_DONTWAIT for recv)
         int32_t flags;
     };
-    /// The ready request vector
-    std::vector<Request*> ready;
     /// The fd to request mapping
     std::unordered_map<int, RequestInfo> fdToRequest;
     /// The pollfd vector
     std::vector<pollfd> pollfds;
-    /// The ready pollfds
-    int32_t readyFds = 0;
-    /// The submitted requests since last invocation
-    int32_t submitted = 0;
 
     public:
     /// The destructor
     ~PollSocket() noexcept override = default;
 
-    /// Prepare a submission send
-    bool send(const Request& req, int32_t msg_flags = 0) override;
-    /// Prepare a submission recv
-    bool recv(Request& req, int32_t msg_flags = 0) override;
-    /// Prepare a submission send with timeout
-    bool send_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override;
-    /// Prepare a submission recv with timeout
-    bool recv_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override;
-
-    /// Get a completion event and mark it as seen; return the Request
-    Request* complete() override;
-    /// Submit the request to the kernel
-    int32_t submit() override;
+    /// Prepare a submission
+    void prepare(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override;
+    /// Whether a transfer is queued or still in flight
+    [[nodiscard]] bool hasOutstanding() const override { return !fdToRequest.empty(); }
 
     private:
+    /// Submit the queued requests and append finished tasks
+    void processImpl() override;
     /// Implement the fd into our submission queue
     void enqueue(int fd, short events, RequestInfo req);
+    /// Poll the registered fds and collect completed tasks
+    bool collectReady();
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::network
