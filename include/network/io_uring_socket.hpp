@@ -5,7 +5,6 @@
 #include "network/socket.hpp"
 #include <chrono>
 #include <cstdint>
-#include <vector>
 #include <liburing.h>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -25,6 +24,11 @@ class IOUringSocket : public Socket {
     private:
     /// The uring buffer
     struct io_uring _uring;
+    /// The outstanding entries
+    uint32_t _outstanding = 0;
+
+    /// Submit the queued requests and append finished tasks
+    void processImpl() override;
 
     public:
     /// The IO Uring Socket Constructor
@@ -32,57 +36,16 @@ class IOUringSocket : public Socket {
     /// The destructor
     ~IOUringSocket() noexcept override;
 
-    /// Prepare a submission (sqe) send
-    io_uring_sqe* send_prep(const Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
-    /// Prepare a submission (sqe) recv
-    io_uring_sqe* recv_prep(Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
-    /// Prepare a submission (sqe) send with timeout
-    io_uring_sqe* send_prep_to(const Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
-    /// Prepare a submission (sqe) recv with timeout
-    io_uring_sqe* recv_prep_to(Request& req, int32_t msg_flags = 0, uint8_t flags = 0);
-
-    /// Prepare a submission send
-    bool send(const Request& req, int32_t msg_flags = 0) override {
-        return send_prep(req, msg_flags);
-    }
-    /// Prepare a submission recv
-    bool recv(Request& req, int32_t msg_flags = 0) override {
-        return recv_prep(req, msg_flags);
-    }
-    /// Prepare a submission send with timeout
-    bool send_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override {
-        if (!timeout.count())
-            return send_prep(req, msg_flags);
-        req.kernelTimeout = toKernelTimespec(timeout);
-        return send_prep_to(req, msg_flags);
-    }
-    /// Prepare a submission recv with timeout
-    bool recv_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override {
-        if (!timeout.count())
-            return recv_prep(req, msg_flags);
-        req.kernelTimeout = toKernelTimespec(timeout);
-        return recv_prep_to(req, msg_flags);
-    }
-
+    /// Prepare a submission (sqe) event
+    void prepare(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override;
     /// Convert a timeout into kernel timespec
     static constexpr __kernel_timespec toKernelTimespec(std::chrono::milliseconds timeout) {
         auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count();
         return {ns / 1'000'000'000, ns % 1'000'000'000};
     }
 
-    /// Submits queue and gets all completion (cqe) event and mark them as seen; return the SQE attached requests
-    uint32_t submitCompleteAll(uint32_t events, std::vector<IOUringSocket::Request*>& completions);
-    /// Get a completion (cqe) event and mark it as seen; return the SQE attached Request
-    [[nodiscard]] Request* complete() override;
-    /// Get a completion (cqe) event if it is available and mark it as seen; return the SQE attached Request if available else nullptr
-    Request* peek();
-    /// Get a completion (cqe) event
-    [[nodiscard]] io_uring_cqe* completion();
-    /// Mark a completion (cqe) event seen to allow for new completions in the kernel
-    void seen(io_uring_cqe* cqe);
-
-    /// Submit uring to the kernel and return the number of submitted entries
-    int32_t submit() override;
+    /// Whether a transfer is queued or still in flight
+    [[nodiscard]] bool hasOutstanding() const override { return _outstanding || io_uring_sq_ready(&_uring); }
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::network

@@ -1,6 +1,7 @@
 #pragma once
 #include <chrono>
 #include <cstdint>
+#include <vector>
 #ifdef ANYBLOB_HAS_IO_URING
 #include <liburing.h>
 #endif
@@ -53,19 +54,26 @@ class Socket {
 
     /// The destructor
     virtual ~Socket() noexcept = default;
-    /// Prepare a submission send
-    virtual bool send(const Request& req, int32_t msg_flags = 0) = 0;
-    /// Prepare a submission recv
-    virtual bool recv(Request& req, int32_t msg_flags = 0) = 0;
-    /// Prepare a submission send with timeout
-    virtual bool send_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) = 0;
-    /// Prepare a submission recv with timeout
-    virtual bool recv_to(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) = 0;
+    /// Prepare a submission (a zero timeout waits indefinitely)
+    virtual void prepare(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) = 0;
+    /// Submit the queued requests and run the callback on the completed transfers.
+    /// Blocks for the first completion unless nothing is outstanding.
+    template <typename F>
+    void process(F&& onCompletion) {
+        _completions.clear();
+        processImpl();
+        for (auto task : _completions)
+            onCompletion(task);
+    }
+    /// Whether a transfer is queued or still in flight
+    [[nodiscard]] virtual bool hasOutstanding() const = 0;
 
-    /// Get a completion event and mark it as seen; return the Request
-    [[nodiscard]] virtual Request* complete() = 0;
-    /// Submit the request to the kernel
-    virtual int32_t submit() = 0;
+    protected:
+    /// Submit the queued requests and append finished tasks
+    virtual void processImpl() = 0;
+
+    /// The completed message tasks
+    std::vector<MessageTask*> _completions;
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::network

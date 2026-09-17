@@ -163,16 +163,13 @@ void TaskedSendReceiver::addCache(const string& hostname, unique_ptr<Cache> cach
 }
 //--------------------------------------------------------------------------
 void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
-// Creates a sending message chaining IOSQE_IO_LINK, creates a receiving message, and waits for result
+// Process queued messages and their socket completions
 {
 #ifndef NDEBUG
     assert(countThreads == 0);
     countThreads++;
 #endif
     exception_ptr firstException = nullptr;
-
-    // Current requests in flight
-    auto count = 0u;
 
     // Send new requests
     auto emplaceNewRequest = [&] {
@@ -253,30 +250,15 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
         }
     };
 
-    // iterate over all messages
-    while (!_stopDeamon || count) {
-        if (count > 0) {
-            // get cqe
-            Socket::Request* req = nullptr;
-            try {
-                req = _connectionManager->getSocketConnection().complete();
-            } catch (const exception& e) {
-                continue;
-            }
-            // reduce count
-            count--;
+    auto& socket = _connectionManager->getSocketConnection();
 
-            // nullptr in user_data if IORING_OP_LINK_TIMEOUT, skip this one
-            if (!req || !req->messageTask)
-                continue;
-
-            // get the task
-            auto task = reinterpret_cast<MessageTask*>(req->messageTask);
-            // execute next task, handle if the tasks throws (e.g., the task callback)
-
+    while (!_stopDeamon || socket.hasOutstanding()) {
+        if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests.load(memory_order_acquire) && !firstException) {
+            local ? emplaceLocalRequest() : emplaceNewRequest();
+        }
+        socket.process([&](MessageTask* task) {
             try {
                 auto status = task->execute(*_connectionManager);
-                // check if finished
                 if (status == MessageState::Finished || status == MessageState::Aborted) {
                     if (status == MessageState::Finished) {
                         auto size = task->originalMessage->result.getSize();
@@ -286,7 +268,6 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                     }
                     for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
                         if (it->get() == task) {
-                            // Remove the second param with the real data
                             if (_timings) {
                                 (*_timings)[task->originalMessage->traceId].size = status == MessageState::Aborted ? 0 : task->originalMessage->result.getSize();
                                 (*_timings)[task->originalMessage->traceId].finish = chrono::steady_clock::now();
@@ -307,19 +288,11 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                 if (!firstException)
                     firstException = current_exception();
             }
-        }
-        if (!_stopDeamon && _messageTasks.size() < _group._concurrentRequests.load(memory_order_acquire) && !firstException) {
-            local ? emplaceLocalRequest() : emplaceNewRequest();
-        }
-        auto cnt = _connectionManager->getSocketConnection().submit();
-        if (cnt < 0)
-            throw runtime_error("socket submit error: " + to_string(-cnt));
-        count += static_cast<unsigned>(cnt);
+        });
 
         auto empty = local ? _submissions.empty() : _group._submissions.empty();
-        if (oneQueueInvocation && (empty || firstException) && !count) {
+        if (oneQueueInvocation && (empty || firstException) && !socket.hasOutstanding())
             _stopDeamon = true;
-        }
     }
     _stopDeamon = false;
 
@@ -333,12 +306,6 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
         reset();
         rethrow_exception(firstException);
     }
-}
-//---------------------------------------------------------------------------
-int32_t TaskedSendReceiver::submitRequests()
-// Submits the queue
-{
-    return _connectionManager->getSocketConnection().submit();
 }
 //---------------------------------------------------------------------------
 void TaskedSendReceiver::reset()
