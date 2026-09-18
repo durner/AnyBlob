@@ -183,8 +183,6 @@ class TaskedSendReceiver {
     void stop() { _stopDeamon = true; }
     /// Submits queue and waits for result
     void sendReceive(bool local = false, bool oneQueueInvocation = true);
-    /// Submits the queue
-    [[nodiscard]] int32_t submitRequests();
     /// Reset the receiver
     void reset();
 

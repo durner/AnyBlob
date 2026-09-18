@@ -79,10 +79,8 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                     length = static_cast<int64_t>(originalMessage->putLength + originalMessage->message->size()) - sendBufferOffset;
                 }
                 request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = length, .fd = fd, .event = Socket::EventType::write, .messageTask = this});
-                if (length <= static_cast<int64_t>(chunkSize))
-                    connectionManager.getSocketConnection().send_to(*request, attemptTimeout());
-                else
-                    connectionManager.getSocketConnection().send(*request);
+                auto timeout = length <= static_cast<int64_t>(chunkSize) ? attemptTimeout() : std::chrono::milliseconds::zero();
+                connectionManager.getSocketConnection().prepare(*request, timeout);
             }
             break;
         }
@@ -143,7 +141,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
             }
             receive.resize(receive.size() + chunkSize);
             request = std::make_unique<Socket::Request>(Socket::Request{.data = {.data = receive.data() + receiveBufferOffset}, .length = static_cast<int64_t>(chunkSize), .fd = request->fd, .event = Socket::EventType::read, .messageTask = this});
-            connectionManager.getSocketConnection().recv_to(*request, attemptTimeout(), tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
+            connectionManager.getSocketConnection().prepare(*request, attemptTimeout(), tcpSettings.recvNoWait ? MSG_DONTWAIT : 0);
             state = MessageState::Receiving;
             break;
         }
