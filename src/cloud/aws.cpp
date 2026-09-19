@@ -60,6 +60,19 @@ static bool validIMDSValue(string_view value)
     return !value.empty() && value.find_first_of("\r\n \t") == string_view::npos;
 }
 //---------------------------------------------------------------------------
+static optional<string_view> quotedValue(string_view content, string_view key)
+// Gets a quoted JSON value
+{
+    auto start = content.find(key);
+    if (start == content.npos)
+        return {};
+    start += key.size();
+    auto end = content.find('"', start);
+    if (end == content.npos)
+        return {};
+    return content.substr(start, end - start);
+}
+//---------------------------------------------------------------------------
 static string escapeXml(string_view value)
 // Escape the characters that would end the surrounding xml element
 {
@@ -223,40 +236,18 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content, 
 bool AWS::updateSecret(string_view content, string_view iamUser)
 // Update secret
 {
+    auto keyId = quotedValue(content, R"("AccessKeyId" : ")");
+    auto accessKey = quotedValue(content, R"("SecretAccessKey" : ")");
+    auto token = quotedValue(content, R"("Token" : ")");
+    auto expiration = quotedValue(content, R"("Expiration" : ")");
+    if (!keyId || !accessKey || !token || !expiration)
+        return false;
+
     auto secret = make_shared<Secret>();
-    string needle = R"("AccessKeyId" : ")";
-    auto pos = content.find(needle);
-    if (pos == content.npos)
-        return false;
-    pos += needle.length();
-    auto end = content.find('\"', pos);
-    secret->keyId = content.substr(pos, end - pos);
-
-    needle = R"("SecretAccessKey" : ")";
-    pos = content.find(needle);
-    if (pos == content.npos)
-        return false;
-    pos += needle.length();
-    end = content.find('\"', pos);
-    secret->secret = content.substr(pos, end - pos);
-
-    needle = R"("Token" : ")";
-    pos = content.find(needle);
-    if (pos == content.npos)
-        return false;
-    pos += needle.length();
-    end = content.find('\"', pos);
-    secret->token = content.substr(pos, end - pos);
-
-    needle = R"("Expiration" : ")";
-    pos = content.find(needle);
-    if (pos == content.npos)
-        return false;
-    pos += needle.length();
-    end = content.find('\"', pos);
-    auto sv = content.substr(pos, end - pos);
-    string timestamp(sv.begin(), sv.end());
-    secret->expiration = convertIAMTimestamp(timestamp);
+    secret->keyId = *keyId;
+    secret->secret = *accessKey;
+    secret->token = *token;
+    secret->expiration = convertIAMTimestamp(string(*expiration));
     secret->iamUser = iamUser;
     _globalSecret = secret;
     _secret = secret;
@@ -267,45 +258,19 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
 bool AWS::updateSessionToken(string_view content)
 // Update secret
 {
+    uint64_t pos = 0;
+    auto keyId = getXMLTagValue(content, "AccessKeyId", pos);
+    auto accessKey = getXMLTagValue(content, "SecretAccessKey", pos);
+    auto token = getXMLTagValue(content, "SessionToken", pos);
+    auto expiration = getXMLTagValue(content, "Expiration", pos);
+    if (!keyId || !accessKey || !token || !expiration)
+        return false;
+
     auto secret = make_shared<Secret>();
-    string needle = "<AccessKeyId>";
-    auto pos = content.find(needle);
-    if (pos == content.npos)
-        return false;
-    pos += needle.length();
-    needle = "</AccessKeyId>";
-    auto end = content.find(needle, pos);
-    secret->keyId = content.substr(pos, end - pos);
-
-    needle = "<SecretAccessKey>";
-    pos = content.find(needle);
-    if (pos == content.npos)
-        return false;
-    pos += needle.length();
-    needle = "</SecretAccessKey>";
-    end = content.find(needle, pos);
-    secret->secret = content.substr(pos, end - pos);
-
-    needle = "<SessionToken>";
-    pos = content.find(needle);
-    if (pos == content.npos)
-        return false;
-    pos += needle.length();
-    needle = "</SessionToken>";
-    end = content.find(needle, pos);
-    secret->token = content.substr(pos, end - pos);
-
-    needle = "<Expiration>";
-    pos = content.find(needle);
-    if (pos == content.npos)
-        return false;
-    pos += needle.length();
-    needle = "</Expiration>";
-    end = content.find(needle, pos);
-
-    auto sv = content.substr(pos, end - pos);
-    string timestamp(sv.begin(), sv.end());
-    secret->expiration = convertIAMTimestamp(timestamp);
+    secret->keyId = *keyId;
+    secret->secret = *accessKey;
+    secret->token = *token;
+    secret->expiration = convertIAMTimestamp(string(*expiration));
     _globalSessionSecret = secret;
     _sessionSecret = secret;
     return true;

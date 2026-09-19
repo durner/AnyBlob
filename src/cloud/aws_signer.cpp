@@ -32,11 +32,14 @@ void AWSSigner::encodeCanonicalRequest(network::HttpRequest& request, StringToSi
         requestStream << request.path << "\n";
 
     // Step 3, canonicalize query; assume that all query arguments are RFC 3986 conform
-    if (!request.queries.empty()) {
-        auto it = request.queries.begin();
-        while (it != request.queries.end()) {
-            requestStream << utils::encodeUrlParameters(it->first) << "=" << utils::encodeUrlParameters(it->second);
-            if (++it != request.queries.end())
+    map<string, string> sortedQueries;
+    for (const auto& q : request.queries)
+        sortedQueries.emplace(utils::encodeUrlParameters(q.first), utils::encodeUrlParameters(q.second));
+    if (!sortedQueries.empty()) {
+        auto it = sortedQueries.begin();
+        while (it != sortedQueries.end()) {
+            requestStream << it->first << "=" << it->second;
+            if (++it != sortedQueries.end())
                 requestStream << "&";
         }
     }

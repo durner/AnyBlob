@@ -158,7 +158,7 @@ class Provider {
     [[nodiscard]] static std::vector<std::string> parseCSVRow(std::string_view body);
 
     /// Create a provider (keyId is access email for GCP/Azure)
-    [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = false, const std::string& keyId = "", const std::string& keyFile = "", network::TaskedSendReceiverHandle* sendReceiverHandle = nullptr);
+    [[nodiscard]] static std::unique_ptr<Provider> makeProvider(const std::string& filepath, bool https = false, const std::string& keyId = "", const std::string& secret = "", network::TaskedSendReceiverHandle* sendReceiverHandle = nullptr);
     /// Create a provider for a public endpoint without credentials
     [[nodiscard]] static std::unique_ptr<Provider> makeAnonymousProvider(const std::string& filepath, bool https = false);
 
