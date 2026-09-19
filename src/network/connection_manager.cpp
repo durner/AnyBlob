@@ -213,17 +213,6 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
         // Set timeout
         int64_t timeoutInMs = connectTimeout.count();
         if (timeoutInMs > 0) {
-            struct timeval tv;
-            tv.tv_sec = timeoutInMs / 1000;
-            tv.tv_usec = (timeoutInMs - (tv.tv_sec * 1000)) * 1000;
-            if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof tv)) {
-                resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
-                throw runtime_error("Socket creation error - recv timeout error!");
-            }
-            if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&tv), sizeof tv)) {
-                resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
-                throw runtime_error("Socket creation error - send timeout error!");
-            }
             if (setsockopt(fd, SOL_TCP, TCP_USER_TIMEOUT, &timeoutInMs, sizeof(timeoutInMs))) {
                 resCache->shutdownSocket(move(socketEntry), maxCacheEntries);
                 throw runtime_error("Socket creation error - tcp timeout error!" + string(strerror(errno)));
@@ -248,7 +237,7 @@ int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool t
         auto fd = socketEntry->fd;
         if (tls)
             socketEntry->tls = make_unique<TLSConnection>(*_context);
-        _fdSockets.emplace(fd, move(socketEntry));
+        _fdSockets.insert_or_assign(fd, move(socketEntry));
         return fd;
     };
 
@@ -294,7 +283,8 @@ void ConnectionManager::disconnect(int32_t fd, const TCPSettings* tcpSettings, u
 // Disconnects the socket
 {
     auto socketIt = _fdSockets.find(fd);
-    assert(socketIt != _fdSockets.end());
+    if (socketIt == _fdSockets.end())
+        throw runtime_error("The socket is not connected!");
     Cache* resCache;
     auto tldName = string(Cache::tld(socketIt->second->hostname));
     auto it = _cache.find(tldName);
@@ -319,23 +309,12 @@ void ConnectionManager::addCache(const string& hostname, unique_ptr<Cache> cache
     _cache.emplace(string(Cache::tld(hostname)), move(cache));
 }
 //---------------------------------------------------------------------------
-bool ConnectionManager::checkTimeout(int fd, const TCPSettings& tcpSettings)
-// Check for a timeout
-{
-    pollfd p = {fd, POLLIN, 0};
-    int r = poll(&p, 1, static_cast<int>(tcpSettings.timeout.count()));
-    if (r == 0) {
-        shutdown(fd, SHUT_RDWR);
-        return true;
-    }
-    return false;
-}
-//---------------------------------------------------------------------------
 TLSConnection* ConnectionManager::getTLSConnection(int32_t fd)
 // Get the tls connection of the fd
 {
     auto it = _fdSockets.find(fd);
-    assert(it != _fdSockets.end());
+    if (it == _fdSockets.end())
+        throw runtime_error("The socket is not connected!");
     return it->second->tls.get();
 }
 //---------------------------------------------------------------------------

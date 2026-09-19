@@ -15,9 +15,9 @@ namespace anyblob::network {
 /// Implements a https message roundtrip
 struct HTTPSMessage : public HTTPMessage {
     /// The tls layer
-    TLSConnection* tlsLayer;
+    TLSConnection* tlsLayer = nullptr;
     /// The fd
-    int32_t fd;
+    int32_t fd = -1;
 
     /// The constructor
     HTTPSMessage(OriginalMessage* sendingMessage, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunksize);

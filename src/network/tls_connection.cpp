@@ -233,6 +233,9 @@ TLSConnection::Progress TLSConnection::runOperation(ConnectionManager& connectio
             // A peer that closed without answering is the empty result of the plain socket path
             if (error == SSL_ERROR_ZERO_RETURN || !status)
                 fail(MessageFailureCode::Empty);
+            else
+                fail(MessageFailureCode::TLS);
+            ERR_clear_error();
             return Progress::Aborted;
         }
     }

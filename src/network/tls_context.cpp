@@ -44,6 +44,11 @@ TLSContext::TLSContext() : _trustStore(false), _sessionCache()
     // Set up the context
     _ctx = SSL_CTX_new(method);
 
+    if (_ctx && SSL_CTX_set_min_proto_version(_ctx, TLS1_2_VERSION) != 1) {
+        SSL_CTX_free(_ctx);
+        _ctx = nullptr;
+    }
+
     if (_ctx) {
         // Enable session cache
         SSL_CTX_set_session_cache_mode(_ctx, SSL_SESS_CACHE_CLIENT);

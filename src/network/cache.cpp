@@ -45,7 +45,7 @@ void Cache::shutdownSocket(unique_ptr<Cache::SocketEntry> socketEntry, unsigned 
     if (!socketEntry->hostname.empty() && socketEntry->dns && socketEntry->dns->selected) {
         markFailed(*socketEntry->dns->selected);
         for (auto it = _cache.find(socketEntry->hostname); it != _cache.end();) {
-            if (it->second->dns && it->second->dns->selected && !strncmp(socketEntry->dns->selected->ai_addr->sa_data, it->second->dns->selected->ai_addr->sa_data, 14)) {
+            if (it->second->dns && it->second->dns->selected && !memcmp(socketEntry->dns->selected->ai_addr->sa_data, it->second->dns->selected->ai_addr->sa_data, 14)) {
                 it->second->dns->cachePriority = 0;
                 _fifo.erase(it->second->timestamp);
                 stopSocket(move(it->second), 0, cacheEntries, false);
@@ -113,6 +113,8 @@ void Cache::stopSocket(unique_ptr<Cache::SocketEntry> socketEntry, uint64_t /*by
         else
             return;
         socketEntry->fd = -1;
+        if (socketEntry->tls)
+            socketEntry->tls->destroy();
         if (socketEntry->dns->cachePriority > 0)
             _cache.emplace(socketEntry->hostname, move(socketEntry));
     }

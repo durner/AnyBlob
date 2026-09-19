@@ -92,8 +92,6 @@ class ConnectionManager {
     void recordThroughput(uint64_t bytes, std::chrono::nanoseconds elapsed);
     /// Estimated bytes/s
     [[nodiscard]] double healthyRate() const { return _healthyRate; }
-    /// Checks for a timeout
-    bool checkTimeout(int fd, const TCPSettings& settings);
 
     /// Get the socket
     Socket& getSocketConnection() {
