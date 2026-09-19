@@ -49,13 +49,37 @@ static int64_t convertIAMTimestamp(const string& awsTimestamp)
     istringstream s(awsTimestamp);
     tm t{};
     s >> get_time(&t, "%Y-%m-%dT%H:%M:%SZ");
-    return mktime(&t);
+    if (s.fail())
+        return -1;
+    return timegm(&t);
+}
+//---------------------------------------------------------------------------
+static bool validIMDSValue(string_view value)
+// Reject a metadata value that could open a second request
+{
+    return !value.empty() && value.find_first_of("\r\n \t") == string_view::npos;
+}
+//---------------------------------------------------------------------------
+static string escapeXml(string_view value)
+// Escape the characters that would end the surrounding xml element
+{
+    string result;
+    for (auto c : value) {
+        switch (c) {
+            case '&': result += "&amp;"; break;
+            case '<': result += "&lt;"; break;
+            case '>': result += "&gt;"; break;
+            case '"': result += "&quot;"; break;
+            default: result += c;
+        }
+    }
+    return result;
 }
 //---------------------------------------------------------------------------
 static void appendIMDSToken(string& httpHeader, string_view token)
 // Authenticates the request when the instance requires IMDSv2
 {
-    if (!token.empty()) {
+    if (validIMDSValue(token)) {
         httpHeader += "\r\nX-aws-ec2-metadata-token: ";
         httpHeader += token;
     }
@@ -185,7 +209,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::downloadSecret(string_view content, 
 {
     auto pos = content.find('\n');
     string httpHeader = "GET /latest/meta-data/iam/security-credentials/";
-    if (content.substr(0, pos).empty())
+    if (!validIMDSValue(content.substr(0, pos)))
         return nullptr;
     httpHeader += content.substr(0, pos);
     httpHeader += " HTTP/1.1\r\nHost: ";
@@ -598,7 +622,7 @@ unique_ptr<utils::DataVector<uint8_t>> AWS::completeMultiPartRequest(const strin
         content += "<Part>\n<PartNumber>";
         content += to_string(i + 1);
         content += "</PartNumber>\n<ETag>\"";
-        content += etags[i];
+        content += escapeXml(etags[i]);
         content += "\"</ETag>\n</Part>\n";
     }
     content += "</CompleteMultipartUpload>\n";
@@ -653,12 +677,11 @@ string AWS::getAddress() const
     if (!_settings.endpoint.empty())
         return _settings.endpoint;
     if (_settings.zonal) {
-        // remove --x-s3 and use at most 9 characters az id + --
-        auto bucket = _settings.bucket.substr(0, _settings.bucket.size() - 6);
-        bucket = bucket.substr(bucket.size() - 11);
-        auto find = bucket.find("--");
-        auto zone = bucket.substr(find + 2);
-        return _settings.bucket + ".s3express-" + zone + "." + _settings.region + ".amazonaws.com";
+        // The az id is what follows the last separator before the suffix
+        auto bucket = string_view(_settings.bucket).substr(0, _settings.bucket.size() - zonalSuffix.size());
+        auto separator = bucket.rfind("--");
+        auto zone = separator == string_view::npos ? bucket : bucket.substr(separator + 2);
+        return _settings.bucket + ".s3express-" + string(zone) + "." + _settings.region + ".amazonaws.com";
     }
     return _settings.bucket + ".s3." + _settings.region + ".amazonaws.com";
 }

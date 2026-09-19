@@ -112,7 +112,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::getRequest(const string& filePath,
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::GET;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + _settings.container + "/" + filePath;
+    request.path = "/" + _settings.container + "/" + utils::encodeUrlPath(filePath);
 
     request.headers.emplace("x-ms-date", testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp());
     request.headers.emplace("Host", getAddress());
@@ -189,7 +189,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::putRequest(const string& filePath,
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::PUT;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + _settings.container + "/" + filePath;
+    request.path = "/" + _settings.container + "/" + utils::encodeUrlPath(filePath);
     auto bodyLength = object.size();
 
     auto date = testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp();
@@ -217,7 +217,7 @@ unique_ptr<utils::DataVector<uint8_t>> Azure::deleteRequest(const string& filePa
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::DELETE;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + _settings.container + "/" + filePath;
+    request.path = "/" + _settings.container + "/" + utils::encodeUrlPath(filePath);
 
     auto date = testEnviornment ? fakeXMSTimestamp : buildXMSTimestamp();
     request.headers.emplace("x-ms-date", date);

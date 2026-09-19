@@ -61,6 +61,8 @@ class HTTP : public Provider {
     [[nodiscard]] std::string getAddress() const override;
     /// Get the port of the server
     [[nodiscard]] uint32_t getPort() const override;
+    /// Uses tls for https
+    [[nodiscard]] bool useTls() const override { return _type == CloudService::HTTPS; }
     /// Get the instance details
     [[nodiscard]] Provider::Instance getInstanceDetails(network::TaskedSendReceiverHandle& sendReceiver) override;
 

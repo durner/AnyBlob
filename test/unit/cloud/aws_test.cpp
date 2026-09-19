@@ -158,6 +158,11 @@ class AWSTester {
         dvResigned = anonymous.resignRequest(*dv);
         REQUIRE(string_view(reinterpret_cast<char*>(dvResigned->data()), dvResigned->size()) == rangedRequest);
 
+        // An object key must not be able to open a second request
+        dv = aws.getRequest("a\r\nX-Injected: 1\r\n\r\nGET /other", p);
+        auto splitRequest = string(reinterpret_cast<char*>(dv->data()), dv->size());
+        CHECK(splitRequest.find("\r\n\r\n") == splitRequest.size() - 4);
+
         Provider::testEnviornment = false;
     }
 };

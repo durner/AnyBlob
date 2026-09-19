@@ -56,7 +56,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
     sorted.clear();
 
     auto it = request.queries.find("X-Goog-Date");
-    if (it == request.headers.end())
+    if (it == request.queries.end())
         throw runtime_error("missing X-Goog-Date");
 
     stringstream credentialScope;
@@ -97,7 +97,7 @@ string GCPSigner::createSignedRequest(const string& serviceAccountEmail, const s
     auto requestHash = utils::sha256Encode(reinterpret_cast<uint8_t*>(requestString.data()), requestString.length());
 
     it = request.queries.find("X-Goog-Date");
-    if (it == request.headers.end())
+    if (it == request.queries.end())
         throw runtime_error("missing X-Goog-Date");
 
     stringstream stringToSignStream;

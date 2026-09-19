@@ -10,8 +10,11 @@
 #include "network/tasked_send_receiver.hpp"
 #include "utils/data_vector.hpp"
 #include <cassert>
+#include <charconv>
 #include <fstream>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2022
@@ -64,9 +67,11 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
                 auto addressPort = sub.substr(0, pos);
                 if (auto colonPos = addressPort.find(':'); colonPos != string::npos) {
                     info.endpoint = addressPort.substr(0, colonPos);
-                    auto port = atoi(addressPort.substr(colonPos + 1).c_str());
-                    assert(port > 0);
-                    info.port = static_cast<unsigned>(port);
+                    auto portString = string_view(addressPort).substr(colonPos + 1);
+                    unsigned port = 0;
+                    if (from_chars(portString.data(), portString.data() + portString.size(), port).ec != errc() || !port || port > 65535)
+                        throw runtime_error("The uri needs a port between 1 and 65535!");
+                    info.port = port;
                 } else {
                     info.endpoint = addressPort;
                     info.port = remoteFile[i].compare("https://") ? 80 : 443;
@@ -88,10 +93,12 @@ Provider::RemoteInfo Provider::getRemoteInfo(const string& fileName) {
             }
             if (!remoteFile[i].compare("s3://")) {
                 // Handle s3 one zone express
-                if (info.bucket.size() > 6 && string::npos != info.bucket.find("--x-s3", info.bucket.size() - 7)) {
+                if (info.bucket.size() > zonalSuffix.size() && info.bucket.ends_with(zonalSuffix)) {
                     info.zonal = true;
                 }
             }
+            if (info.endpoint.find_first_of("\r\n") != string::npos)
+                throw runtime_error("The uri endpoint must not contain a line break!");
             info.provider = static_cast<CloudService>(i);
         }
     }
@@ -120,6 +127,8 @@ string Provider::getETag(string_view header)
         return "";
     pos += needle.length();
     auto end = header.find('\"', pos);
+    if (end == header.npos)
+        return "";
     return string(header.substr(pos, end - pos));
 }
 //---------------------------------------------------------------------------
@@ -132,6 +141,8 @@ string Provider::getUploadId(string_view body)
         return "";
     pos += needle.length();
     auto end = body.find("</UploadId>", pos);
+    if (end == body.npos)
+        return "";
     return string(body.substr(pos, end - pos));
 }
 //---------------------------------------------------------------------------
