@@ -1,4 +1,5 @@
 #include "tls_proxy.hpp"
+#include <csignal>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -23,6 +24,7 @@ using namespace std;
 TlsProxy::TlsProxy(const string& target) : LoopbackProxy(target, "tls")
 // The constructor listens on a free loopback port and starts the proxy
 {
+    std::signal(SIGPIPE, SIG_IGN);
     createContext();
     start([this](int client, uint64_t) { relay(client); });
 }

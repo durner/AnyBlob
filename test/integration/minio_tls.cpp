@@ -125,6 +125,70 @@ TEST_CASE("MinIO TLS Integration") {
         CHECK(faults.getAccepted() == 3);
     }
 
+    SECTION("a large object survives the record path in small chunks") {
+        auto smallChunks = make_unique<network::TaskedSendReceiverGroup>(4u << 10);
+        smallChunks->getTCPSettings().timeout = 1s;
+        smallChunks->getTCPSettings().requestDeadline = 60s;
+        auto chunkHandle = smallChunks->getHandle();
+
+        string large(8u << 20, '\0');
+        for (auto i = 0u; i < large.size(); i++)
+            large[i] = static_cast<char>('A' + (i % 251));
+
+        network::Transaction putTxn(provider.get());
+        putTxn.verifyKeyRequest(chunkHandle, [&]() { return putTxn.putObjectRequest("tls/large.bin", large.data(), large.size()); });
+        putTxn.processSync(chunkHandle);
+        for (const auto& it : putTxn)
+            REQUIRE(it.success());
+
+        network::Transaction getTxn(provider.get());
+        getTxn.verifyKeyRequest(chunkHandle, [&]() { return getTxn.getObjectRequest("tls/large.bin"); });
+        getTxn.processSync(chunkHandle);
+        for (const auto& it : getTxn) {
+            REQUIRE(it.success());
+            CHECK(it.getSize() == large.size());
+            CHECK(!large.compare(it.getResult()));
+        }
+        CHECK(smallChunks->getInflightMessages() == 0);
+    }
+
+    SECTION("a corrupted record fails the request instead of delivering it") {
+        test::TlsProxy innerTls(endpoint);
+        test::FaultProxy corrupt(innerTls.getEndpoint(), test::FaultProxy::Mode::corruptStream, 4 << 10, -1);
+        auto corruptProvider = makeProvider(corrupt.getEndpoint());
+
+        network::Transaction getTxn(corruptProvider.get());
+        getTxn.verifyKeyRequest(handle, [&]() { return getTxn.getObjectRequest(fileName); });
+        auto start = chrono::steady_clock::now();
+        getTxn.processSync(handle);
+        for (const auto& it : getTxn) {
+            INFO("state " << static_cast<unsigned>(it.getState()) << " failure " << it.getFailureCode());
+            if (it.success())
+                CHECK(!content.compare(it.getResult()));
+            else
+                CHECK(it.getFailureCode() != 0);
+        }
+        CHECK(chrono::steady_clock::now() - start < 30s);
+    }
+
+    SECTION("a truncated tls stream is not a short success") {
+        test::TlsProxy innerTls(endpoint);
+        test::FaultProxy cut(innerTls.getEndpoint(), test::FaultProxy::Mode::closeMidBody, 4 << 10, -1);
+        auto cutProvider = makeProvider(cut.getEndpoint());
+
+        network::Transaction getTxn(cutProvider.get());
+        getTxn.verifyKeyRequest(handle, [&]() { return getTxn.getObjectRequest(fileName); });
+        auto start = chrono::steady_clock::now();
+        getTxn.processSync(handle);
+        for (const auto& it : getTxn) {
+            if (it.success())
+                CHECK(!content.compare(it.getResult()));
+            else
+                CHECK(it.getFailureCode() != 0);
+        }
+        CHECK(chrono::steady_clock::now() - start < 30s);
+    }
+
     SECTION("a stalled connection aborts within the deadline") {
         test::FaultProxy faults(endpoint, test::FaultProxy::Mode::headerStall, 1024, -1);
         test::TlsProxy faultyTls(faults.getEndpoint());

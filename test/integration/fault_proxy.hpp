@@ -37,6 +37,10 @@ class FaultProxy : public LoopbackProxy {
         trickle,
         /// Reset the target after arg uploaded bytes
         rstMidUpload,
+        /// Stall after arg uploaded bytes
+        uploadStall,
+        /// Corrupt the stream after arg bytes
+        corruptStream,
         /// Close after arg milliseconds without traffic
         idleClose,
         /// Answer with a bad gateway response
