@@ -50,6 +50,8 @@ struct MessageTask {
     uint32_t chunkSize;
     /// The failures
     uint16_t failures;
+    /// The connection failures
+    uint16_t connectionFailures;
     /// The failures since the connection last made progress
     uint16_t stalls;
     /// The message task class
@@ -72,7 +74,13 @@ struct MessageTask {
     /// Count a failure and check the retry limit
     [[nodiscard]] bool exhausted(uint16_t limit) {
         stalls++;
-        return failures++ > limit;
+        return ++failures > limit;
+    }
+
+    /// Count a connection failure
+    [[nodiscard]] bool connectionExhausted() {
+        stalls++;
+        return ++connectionFailures > connectionFailuresMax;
     }
 
     /// Restore the base timeout after progress

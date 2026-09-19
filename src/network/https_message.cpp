@@ -47,13 +47,13 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                 if (request)
                     request->fd = -1;
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Socket);
-                reset(connectionManager, exhausted(connectionFailuresMax));
+                reset(connectionManager, connectionExhausted());
                 return execute(connectionManager);
             }
             tlsLayer = connectionManager.getTLSConnection(fd);
             if (!tlsLayer->init(this)) {
                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::TLS);
-                reset(connectionManager, rejectedCertificate() || exhausted(connectionFailuresMax));
+                reset(connectionManager, rejectedCertificate() || connectionExhausted());
                 return execute(connectionManager);
             }
             state = MessageState::TLSHandshake;
