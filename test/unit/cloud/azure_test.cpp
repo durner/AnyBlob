@@ -91,6 +91,10 @@ class AzureTester {
         // Azure serves no suffix range
         REQUIRE(!provider->getSuffixRequest("a/b/c.d", 64));
 
+        dv = azure.getRequest("a\r\nX-Injected: 1\r\n\r\nGET /other", p);
+        auto splitRequest = string(reinterpret_cast<char*>(dv->data()), dv->size());
+        CHECK(splitRequest.find("\r\n\r\n") == splitRequest.size() - 4);
+
         Provider::testEnviornment = false;
     }
 };

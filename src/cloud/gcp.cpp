@@ -10,6 +10,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
@@ -58,7 +59,10 @@ Provider::Instance GCP::getInstanceDetails(network::TaskedSendReceiverHandle& se
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.data(), content.size(), infoPtr);
 
-    auto machineType = s.substr(s.find("machineTypes/"));
+    auto machineTypePos = s.find("machineTypes/");
+    if (machineTypePos == s.npos)
+        throw runtime_error("The instance metadata has no machine type!");
+    auto machineType = s.substr(machineTypePos);
     for (auto& instance : GCPInstance::getInstanceDetails())
         if (!instance.type.compare(machineType))
             return instance;
@@ -81,8 +85,10 @@ string GCP::getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiverHan
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
     auto s = network::HttpHelper::retrieveContent(content.data(), content.size(), infoPtr);
-    auto region = s.substr(s.find("zones/"));
-    region = region.substr(0, region.size() - 2);
+    auto zonePos = s.find("zones/");
+    if (zonePos == s.npos || s.size() - zonePos < 2)
+        throw runtime_error("The instance metadata has no zone!");
+    auto region = s.substr(zonePos, s.size() - zonePos - 2);
     return string(region);
 }
 //---------------------------------------------------------------------------
@@ -92,7 +98,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::buildGetRequest(const string& filePa
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::GET;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + filePath;
+    request.path = "/" + utils::encodeUrlPath(filePath);
     request.queries.emplace("X-Goog-Date", testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp());
 
     request.headers.emplace("Host", getAddress());
@@ -191,7 +197,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::putRequestGeneric(const string& file
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::PUT;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + filePath;
+    request.path = "/" + utils::encodeUrlPath(filePath);
 
     // Is it a multipart upload?
     if (part) {
@@ -226,7 +232,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::deleteRequestGeneric(const string& f
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::DELETE;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + filePath;
+    request.path = "/" + utils::encodeUrlPath(filePath);
 
     // Is it a multipart upload?
     if (!uploadId.empty()) {
@@ -258,7 +264,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::createMultiPartRequest(const string&
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::POST;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + filePath;
+    request.path = "/" + utils::encodeUrlPath(filePath);
     request.queries.emplace("uploads", "");
 
     auto date = testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp();
@@ -297,7 +303,7 @@ unique_ptr<utils::DataVector<uint8_t>> GCP::completeMultiPartRequest(const strin
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::POST;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + filePath;
+    request.path = "/" + utils::encodeUrlPath(filePath);
     request.queries.emplace("uploadId", uploadId);
 
     auto date = testEnviornment ? fakeAMZTimestamp : buildAMZTimestamp();

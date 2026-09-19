@@ -37,6 +37,8 @@ class Provider {
     static constexpr unsigned remoteFileCount = 8;
     /// The remote prefixes
     static constexpr std::string_view remoteFile[] = {"https://", "http://", "s3://", "azure://", "gs://", "oci://", "ibm://", "minio://"};
+    /// The suffix of an s3 express one zone bucket
+    static constexpr std::string_view zonalSuffix = "--x-s3";
     /// Are we currently testing the provdiers
     static bool testEnviornment;
 

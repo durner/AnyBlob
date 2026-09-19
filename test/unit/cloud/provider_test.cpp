@@ -74,4 +74,22 @@ TEST_CASE("provider_verify_peer") {
     REQUIRE(!https->verifyPeer());
 }
 //---------------------------------------------------------------------------
+TEST_CASE("provider_tls_selection") {
+    auto defaultPort = Provider::makeProvider("https://host/file");
+    REQUIRE(defaultPort->getPort() == 443);
+    CHECK(defaultPort->useTls());
+
+    auto customPort = Provider::makeProvider("https://host:8443/file");
+    REQUIRE(customPort->getPort() == 8443);
+    CHECK(customPort->useTls());
+
+    auto plain = Provider::makeProvider("http://host:9000/file");
+    CHECK(!plain->useTls());
+}
+//---------------------------------------------------------------------------
+TEST_CASE("provider_malformed_uri") {
+    auto shortZonal = Provider::makeProvider("s3://ab--x-s3:region/file", false, "key", "secret");
+    CHECK_NOTHROW(shortZonal->getAddress());
+}
+//---------------------------------------------------------------------------
 } // namespace anyblob::cloud::test

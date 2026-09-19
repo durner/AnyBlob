@@ -1,6 +1,7 @@
 #include "cloud/http.hpp"
 #include "network/http_request.hpp"
 #include "utils/data_vector.hpp"
+#include "utils/utils.hpp"
 #include <cassert>
 #include <sstream>
 #include <string>
@@ -22,7 +23,7 @@ unique_ptr<utils::DataVector<uint8_t>> HTTP::buildGetRequest(const string& fileP
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::GET;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + filePath;
+    request.path = "/" + utils::encodeUrlPath(filePath);
 
     request.headers.emplace("Host", getAddress());
     if (!range.empty())
@@ -68,7 +69,7 @@ unique_ptr<utils::DataVector<uint8_t>> HTTP::putRequest(const string& filePath, 
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::PUT;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + filePath;
+    request.path = "/" + utils::encodeUrlPath(filePath);
     auto bodyLength = object.size();
 
     request.headers.emplace("Host", getAddress());
@@ -91,7 +92,7 @@ unique_ptr<utils::DataVector<uint8_t>> HTTP::deleteRequest(const string& filePat
     network::HttpRequest request;
     request.method = network::HttpRequest::Method::DELETE;
     request.type = network::HttpRequest::Type::HTTP_1_1;
-    request.path = "/" + filePath;
+    request.path = "/" + utils::encodeUrlPath(filePath);
 
     request.headers.emplace("Host", getAddress());
 
