@@ -40,8 +40,8 @@ std::pair<std::unique_ptr<uint8_t[]>, uint64_t> hmacSign(const uint8_t* keyData,
 /// Sing with rsa and return sha256 encoded signature
 std::pair<std::unique_ptr<uint8_t[]>, uint64_t> rsaSign(const uint8_t* keyData, uint64_t keyLength, const uint8_t* msgData, uint64_t msgLength);
 /// Decrypt with AES-256-CBC
-uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* encData, uint64_t encLength, uint8_t* plainData);
+uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* encData, uint64_t encLength, uint8_t* plainData, uint64_t plainCapacity);
 /// Encrypt with AES-256-CBC
-uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* plainData, uint64_t plainLength, uint8_t* encData);
+uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* plainData, uint64_t plainLength, uint8_t* encData, uint64_t encCapacity);
 //---------------------------------------------------------------------------
 } // namespace anyblob::utils

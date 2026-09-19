@@ -228,10 +228,12 @@ pair<unique_ptr<uint8_t[]>, uint64_t> rsaSign(const uint8_t* keyData, uint64_t k
     return {move(hash), msgLenghtEnc};
 }
 //---------------------------------------------------------------------------
-uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* encData, uint64_t encLength, uint8_t* plainData)
+uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* encData, uint64_t encLength, uint8_t* plainData, uint64_t plainCapacity)
 // Decrypt with AES
 {
     assert(in_range<int>(encLength));
+    if (plainCapacity < encLength + static_cast<uint64_t>(EVP_CIPHER_block_size(EVP_aes_256_cbc())))
+        throw runtime_error("OpenSSL Decrypt Capacity Error!");
     int len;
     uint64_t plainLength;
 
@@ -255,10 +257,12 @@ uint64_t aesDecrypt(const unsigned char* key, const unsigned char* iv, const uin
     return plainLength;
 }
 //---------------------------------------------------------------------------
-uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* plainData, uint64_t plainLength, uint8_t* encData)
+uint64_t aesEncrypt(const unsigned char* key, const unsigned char* iv, const uint8_t* plainData, uint64_t plainLength, uint8_t* encData, uint64_t encCapacity)
 // Encrypt with AES
 {
     assert(in_range<int>(plainLength));
+    if (encCapacity < plainLength + static_cast<uint64_t>(EVP_CIPHER_block_size(EVP_aes_256_cbc())))
+        throw runtime_error("OpenSSL Encrypt Capacity Error!");
     int len;
     uint64_t encLength;
 

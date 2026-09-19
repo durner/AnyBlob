@@ -17,9 +17,9 @@ TEST_CASE("utils") {
     constexpr unsigned char iv[] = "0123456789012345";
     string plain = "AnyBlob - Universal Cloud Object Storage Library";
     uint8_t buffer[512];
-    auto len = utils::aesEncrypt(key, iv, reinterpret_cast<const uint8_t*>(plain.data()), plain.length(), buffer);
+    auto len = utils::aesEncrypt(key, iv, reinterpret_cast<const uint8_t*>(plain.data()), plain.length(), buffer, sizeof(buffer));
     uint8_t result[512];
-    len = utils::aesDecrypt(key, iv, buffer, len, result);
+    len = utils::aesDecrypt(key, iv, buffer, len, result, sizeof(result));
     string_view res(reinterpret_cast<char*>(result), len);
     REQUIRE(!plain.compare(res));
 }
@@ -35,6 +35,13 @@ TEST_CASE("url_parameters") {
     // An incomplete escape stays untouched
     REQUIRE(utils::decodeUrlParameters("%2") == "%2");
     REQUIRE(utils::decodeUrlParameters("100%") == "100%");
+}
+//---------------------------------------------------------------------------
+TEST_CASE("base64_padding") {
+    for (auto length = 1u; length != 12u; length++) {
+        string padding(length, '=');
+        CHECK_THROWS(utils::base64Decode(reinterpret_cast<const uint8_t*>(padding.data()), padding.size()));
+    }
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::utils::test

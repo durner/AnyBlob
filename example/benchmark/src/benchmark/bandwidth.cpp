@@ -221,7 +221,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri, b
                 else
                     plain->resize(result.getSize() + result.getOffset());
                 try {
-                    auto len = utils::aesDecrypt(aesKey, aesIv, result.getData() + result.getOffset(), result.getSize(), plain->data());
+                    auto len = utils::aesDecrypt(aesKey, aesIv, result.getData() + result.getOffset(), result.getSize(), plain->data(), plain->capacity());
                     plain->resize(len);
                 } catch (exception& e) {
                     cerr << "Request was not successful: " << e.what() << endl;
@@ -342,7 +342,7 @@ void Bandwidth::runUring(const Settings& benchmarkSettings, const string& uri, b
             if (benchmarkSettings.encryption) {
                 auto plainBlob = make_unique<utils::DataVector<uint8_t>>((1 << 24) - 16);
                 try {
-                    auto len = utils::aesEncrypt(aesKey, aesIv, plainBlob->cdata(), plainBlob->size(), blob->data());
+                    auto len = utils::aesEncrypt(aesKey, aesIv, plainBlob->cdata(), plainBlob->size(), blob->data(), blob->capacity());
                     blob->resize(len);
                 } catch (exception& e) {
                     cerr << "Encryption unsuccessfult: " << e.what() << endl;
