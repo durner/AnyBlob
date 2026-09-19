@@ -44,6 +44,9 @@ class AWSTester {
         keyService += "\"}";
         REQUIRE(aws.updateSecret(keyService, iamUser));
 
+        string truncated = R"({"AccessKeyId" : "ABC", "SecretAccessKey" : "ABC", "Token" : "ABC", "Expiration" : ")";
+        REQUIRE(!aws.updateSecret(truncated, iamUser));
+
         auto p = pair<uint64_t, uint64_t>(numeric_limits<uint64_t>::max(), numeric_limits<uint64_t>::max());
         dv = aws.getRequest("a/b/c.d", p);
         resultString = "GET /a/b/c.d? HTTP/1.1\r\nAuthorization: AWS4-HMAC-SHA256 Credential=ABC/21000101/test/s3/aws4_request, SignedHeaders=host;x-amz-content-sha256;x-amz-date;x-amz-request-payer;x-amz-security-token, Signature=839175aaf3e48a7f0a05fc053f48d1ef731b0fe93bfa6051f596fcce83b2542b\r\nHost: test.s3.test.amazonaws.com\r\nx-amz-content-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\r\nx-amz-date: ";

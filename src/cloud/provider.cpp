@@ -115,6 +115,8 @@ string Provider::getKey(const string& keyFile)
 // Gets the key from the kefile
 {
     ifstream ifs(keyFile);
+    if (!ifs.is_open())
+        throw runtime_error("The key file could not be opened!");
     return string((istreambuf_iterator<char>(ifs)), (istreambuf_iterator<char>()));
 }
 //---------------------------------------------------------------------------
