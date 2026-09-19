@@ -1,6 +1,8 @@
 #include "network/poll_socket.hpp"
 #include <cerrno>
+#include <cstring>
 #include <stdexcept>
+#include <string>
 #include <sys/socket.h>
 #include <unistd.h>
 //---------------------------------------------------------------------------
@@ -31,7 +33,11 @@ void PollSocket::prepare(Request& req, chrono::milliseconds timeout, int32_t msg
 bool PollSocket::collectReady()
 // Poll the registered fds and append the finished tasks
 {
-    ::poll(pollfds.data(), pollfds.size(), 1);
+    if (::poll(pollfds.data(), pollfds.size(), 1) < 0) {
+        if (errno == EINTR)
+            return false;
+        throw runtime_error("poll error! " + string(strerror(errno)));
+    }
 
     auto completed = false;
     auto currentTime = chrono::steady_clock::now();
@@ -79,8 +85,9 @@ void PollSocket::processImpl()
 void PollSocket::enqueue(int fd, short events, RequestInfo req)
 // Implement the fd into our submission queue
 {
+    if (!fdToRequest.emplace(fd, req).second)
+        throw runtime_error("the fd already has an outstanding request");
     pollfds.emplace_back(fd, events);
-    fdToRequest.emplace(fd, req);
 }
 //---------------------------------------------------------------------------
 } // namespace anyblob::network
