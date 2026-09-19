@@ -36,13 +36,13 @@ MessageResult::MessageResult(utils::DataVector<uint8_t>* dataVector) : response(
 const string_view MessageResult::getResult() const
 /// Get the result
 {
-    return string_view(reinterpret_cast<const char*>(dataVector->cdata()) + response->headerLength, response->length);
+    return string_view(reinterpret_cast<const char*>(dataVector->cdata()) + response->headerLength, response->boundedLength(dataVector->size()));
 }
 //---------------------------------------------------------------------------
 string_view MessageResult::getResult()
 /// Get the result
 {
-    return string_view(reinterpret_cast<char*>(dataVector->data()) + response->headerLength, response->length);
+    return string_view(reinterpret_cast<char*>(dataVector->data()) + response->headerLength, response->boundedLength(dataVector->size()));
 }
 //---------------------------------------------------------------------------
 const uint8_t* MessageResult::getData() const
@@ -66,7 +66,7 @@ unique_ptr<uint8_t[]> MessageResult::moveData()
 uint64_t MessageResult::getSize() const
 // Get the size
 {
-    return response->length;
+    return response->boundedLength(dataVector->size());
 }
 //---------------------------------------------------------------------------
 uint64_t MessageResult::getObjectSize() const

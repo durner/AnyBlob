@@ -29,4 +29,15 @@ TEST_CASE("data_vector") {
     REQUIRE(dv2.capacity() == 2);
 }
 //---------------------------------------------------------------------------
+TEST_CASE("data_vector_transfer") {
+    DataVector<uint8_t> dv(4);
+    *dv.data() = 42;
+
+    auto buffer = dv.transferBuffer();
+    REQUIRE(buffer);
+    CHECK(dv.size() == 0);
+    CHECK(dv.capacity() == 0);
+    CHECK(dv.cdata() == nullptr);
+}
+//---------------------------------------------------------------------------
 } // namespace anyblob::utils::test

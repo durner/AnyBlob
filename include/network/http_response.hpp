@@ -28,6 +28,10 @@ struct HttpResponse {
         CREATED_201,
         NO_CONTENT_204,
         PARTIAL_CONTENT_206,
+        MOVED_PERMANENTLY_301,
+        FOUND_302,
+        TEMPORARY_REDIRECT_307,
+        PERMANENT_REDIRECT_308,
         BAD_REQUEST_400,
         UNAUTHORIZED_401,
         FORBIDDEN_403,
@@ -61,6 +65,10 @@ struct HttpResponse {
             case Code::CREATED_201: return "201 Created";
             case Code::NO_CONTENT_204: return "204 No Content";
             case Code::PARTIAL_CONTENT_206: return "206 Partial Content";
+            case Code::MOVED_PERMANENTLY_301: return "301 Moved Permanently";
+            case Code::FOUND_302: return "302 Found";
+            case Code::TEMPORARY_REDIRECT_307: return "307 Temporary Redirect";
+            case Code::PERMANENT_REDIRECT_308: return "308 Permanent Redirect";
             case Code::BAD_REQUEST_400: return "400 Bad Request";
             case Code::UNAUTHORIZED_401: return "401 Unauthorized";
             case Code::FORBIDDEN_403: return "403 Forbidden";
@@ -85,6 +93,10 @@ struct HttpResponse {
             case Code::CREATED_201: return 201;
             case Code::NO_CONTENT_204: return 204;
             case Code::PARTIAL_CONTENT_206: return 206;
+            case Code::MOVED_PERMANENTLY_301: return 301;
+            case Code::FOUND_302: return 302;
+            case Code::TEMPORARY_REDIRECT_307: return 307;
+            case Code::PERMANENT_REDIRECT_308: return 308;
             case Code::BAD_REQUEST_400: return 400;
             case Code::UNAUTHORIZED_401: return 401;
             case Code::FORBIDDEN_403: return 403;

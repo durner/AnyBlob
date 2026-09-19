@@ -1,5 +1,6 @@
 #pragma once
 #include "network/http_response.hpp"
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <string_view>
@@ -23,26 +24,34 @@ class HttpHelper {
         ChunkedEncoding
     };
 
+    /// The response metadata
     struct Info {
         /// The response header
         HttpResponse response;
         /// The maximum length
-        uint64_t length;
+        uint64_t length = 0;
         /// The header length
-        uint32_t headerLength;
+        uint32_t headerLength = 0;
         /// The encoding
-        Encoding encoding;
+        Encoding encoding = Encoding::Unknown;
+
+        /// Get the available body length
+        [[nodiscard]] constexpr uint64_t boundedLength(uint64_t bufferLength) const {
+            return bufferLength > headerLength ? std::min(length, bufferLength - headerLength) : 0;
+        }
     };
 
     private:
     /// Detect the protocol
     [[nodiscard]] static Info detect(std::string_view s);
+    /// Decode a complete chunked body
+    [[nodiscard]] static uint64_t decodeChunks(uint8_t* data, uint64_t length, const Info& info);
 
     public:
     /// Retrieve the content without http meta info, note that this changes data
-    [[nodiscard]] static std::string_view retrieveContent(const uint8_t* data, uint64_t length, std::unique_ptr<Info>& info);
+    [[nodiscard]] static std::string_view retrieveContent(uint8_t* data, uint64_t length, std::unique_ptr<Info>& info);
     /// Detect end / content
-    [[nodiscard]] static bool finished(const uint8_t* data, uint64_t length, std::unique_ptr<Info>& info);
+    [[nodiscard]] static bool finished(uint8_t* data, uint64_t length, std::unique_ptr<Info>& info);
 };
 //---------------------------------------------------------------------------
 } // namespace anyblob::network

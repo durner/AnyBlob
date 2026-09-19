@@ -63,7 +63,7 @@ Provider::Instance Azure::getInstanceDetails(network::TaskedSendReceiverHandle& 
     verify(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
-    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+    auto s = network::HttpHelper::retrieveContent(content.data(), content.size(), infoPtr);
 
     string needle = R"("vmSize" : ")";
     auto pos = s.find(needle);
@@ -93,7 +93,7 @@ string Azure::getRegion(network::TaskedSendReceiverHandle& sendReceiverHandle)
     verify(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
-    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+    auto s = network::HttpHelper::retrieveContent(content.data(), content.size(), infoPtr);
 
     string needle = R"("location" : ")";
     auto pos = s.find(needle);

@@ -56,7 +56,7 @@ Provider::Instance GCP::getInstanceDetails(network::TaskedSendReceiverHandle& se
     verify(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
-    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+    auto s = network::HttpHelper::retrieveContent(content.data(), content.size(), infoPtr);
 
     auto machineType = s.substr(s.find("machineTypes/"));
     for (auto& instance : GCPInstance::getInstanceDetails())
@@ -80,7 +80,7 @@ string GCP::getInstanceRegion(network::TaskedSendReceiverHandle& sendReceiverHan
     verify(sendReceiverHandle.processSync());
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
-    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+    auto s = network::HttpHelper::retrieveContent(content.data(), content.size(), infoPtr);
     auto region = s.substr(s.find("zones/"));
     region = region.substr(0, region.size() - 2);
     return string(region);

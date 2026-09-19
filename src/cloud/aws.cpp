@@ -133,7 +133,7 @@ string imdsFetch(network::TaskedSendReceiverHandle& sendReceiverHandle, unique_p
         return {};
     auto& content = originalMsg->result.getDataVector();
     unique_ptr<network::HttpHelper::Info> infoPtr;
-    auto s = network::HttpHelper::retrieveContent(content.cdata(), content.size(), infoPtr);
+    auto s = network::HttpHelper::retrieveContent(content.data(), content.size(), infoPtr);
     if (infoPtr && !network::HttpResponse::checkSuccess(infoPtr->response.code))
         return {};
     return string(s);
@@ -340,7 +340,7 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
             if (sendReceiverHandle.sendSync(originalMsg.get()) && sendReceiverHandle.processSync() && originalMsg->result.success()) {
                 auto& secretContent = originalMsg->result.getDataVector();
                 unique_ptr<network::HttpHelper::Info> infoPtr;
-                auto s = network::HttpHelper::retrieveContent(secretContent.cdata(), secretContent.size(), infoPtr);
+                auto s = network::HttpHelper::retrieveContent(secretContent.data(), secretContent.size(), infoPtr);
                 updateSessionToken(s);
             }
             if (validSession(60))

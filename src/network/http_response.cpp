@@ -66,6 +66,8 @@ HttpResponse HttpResponse::deserialize(string_view data)
             }
 
             string_view httpType = getResponseType(response.type);
+            if (line.size() <= httpType.size() + 1)
+                throw runtime_error("Invalid HttpResponse: Missing the status code!");
             line = line.substr(httpType.size() + 1);
 
             // the response type
