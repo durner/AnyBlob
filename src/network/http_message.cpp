@@ -35,7 +35,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
     switch (state) {
         case MessageState::Init: {
             try {
-                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), false, false, tcpSettings);
+                fd = connectionManager.connect(originalMessage->provider.getAddress(), originalMessage->provider.getPort(), false, false, tcpSettings, 0, boundedByDeadline(tcpSettings.connectTimeout));
             } catch (exception& /*e*/) {
                 if (request)
                     request->fd = -1;
@@ -79,8 +79,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                     length = static_cast<int64_t>(originalMessage->putLength + originalMessage->message->size()) - sendBufferOffset;
                 }
                 request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = length, .fd = fd, .event = Socket::EventType::write, .messageTask = this});
-                auto timeout = length <= static_cast<int64_t>(chunkSize) ? attemptTimeout() : std::chrono::milliseconds::zero();
-                connectionManager.getSocketConnection().prepare(*request, timeout);
+                connectionManager.getSocketConnection().prepare(*request, boundedByDeadline(attemptTimeout()));
             }
             break;
         }
@@ -163,7 +162,7 @@ bool HTTPMessage::expired(const ConnectionManager& connectionManager) const
     auto rate = connectionManager.healthyRate();
     if (rate > 0 && info && info->length >= chunkSize) {
         auto predicted = chrono::duration<double>(static_cast<double>(info->length) / rate);
-        return elapsed > deadlineFactor * predicted;
+        return elapsed > min(deadlineFactor * predicted, chrono::duration<double>(deadlineExtensionMax * tcpSettings.requestDeadline));
     }
     return true;
 }

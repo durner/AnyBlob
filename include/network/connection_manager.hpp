@@ -52,6 +52,8 @@ class ConnectionManager {
         int linger = 1;
         /// The timeout
         std::chrono::milliseconds timeout = std::chrono::milliseconds(500);
+        /// The connect timeout
+        std::chrono::milliseconds connectTimeout = std::chrono::milliseconds(500);
         /// Base request deadline; zero disables
         std::chrono::milliseconds requestDeadline = std::chrono::seconds(30);
         /// Reuse sockets

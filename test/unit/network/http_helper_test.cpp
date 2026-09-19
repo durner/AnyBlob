@@ -24,8 +24,6 @@ uint8_t* bytes(std::string& response) { return reinterpret_cast<uint8_t*>(respon
 } // namespace
 //---------------------------------------------------------------------------
 TEST_CASE("http_helper") {
-    using namespace std;
-
     auto deserialize = [](string_view status) {
         string header(status);
         header += "\r\nContent-Length: 0\r\n\r\n";
@@ -52,7 +50,6 @@ TEST_CASE("http_helper") {
 
 //---------------------------------------------------------------------------
 TEST_CASE("http_helper_content_length") {
-    // A complete response reports its body
     {
         string response = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello";
         unique_ptr<HttpHelper::Info> info;
@@ -60,28 +57,24 @@ TEST_CASE("http_helper_content_length") {
         CHECK(HttpHelper::retrieveContent(bytes(response), response.size(), info) == "hello");
     }
 
-    // A header that arrives in two pieces needs more bytes, it is not a protocol error
     {
         string partial = "HTTP/1.1 200 OK\r\nContent-Len";
         unique_ptr<HttpHelper::Info> info;
         CHECK_NOTHROW(HttpHelper::finished(bytes(partial), partial.size(), info));
     }
 
-    // A malformed length has to be rejected instead of being used uninitialized
     {
         string response = "HTTP/1.1 200 OK\r\nContent-Length: abc\r\n\r\nhello";
         unique_ptr<HttpHelper::Info> info;
         CHECK_THROWS(HttpHelper::finished(bytes(response), response.size(), info));
     }
 
-    // Header names are case insensitive, an http/2 origin proxy lowercases them
     {
         string response = "HTTP/1.1 200 OK\r\ncontent-length: 5\r\n\r\nhello";
         unique_ptr<HttpHelper::Info> info;
         CHECK_NOTHROW(HttpHelper::finished(bytes(response), response.size(), info));
     }
 
-    // A response without a body reports no body, its length is never assigned
     {
         string response = "HTTP/1.1 204 No Content\r\nDate: today\r\n\r\n";
         unique_ptr<HttpHelper::Info> info;
@@ -91,7 +84,6 @@ TEST_CASE("http_helper_content_length") {
 }
 //---------------------------------------------------------------------------
 TEST_CASE("http_helper_chunked") {
-    // A chunked body is delivered like any other
     {
         string response = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n";
         unique_ptr<HttpHelper::Info> info;
@@ -99,7 +91,6 @@ TEST_CASE("http_helper_chunked") {
         CHECK(HttpHelper::retrieveContent(bytes(response), response.size(), info) == "hello");
     }
 
-    // The terminator of the framing is not the same as the bytes of the object
     {
         string response = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n9\r\nab0\r\n\r\ncd\r\n0\r\n\r\n";
         unique_ptr<HttpHelper::Info> info;
@@ -107,34 +98,59 @@ TEST_CASE("http_helper_chunked") {
         CHECK(HttpHelper::retrieveContent(bytes(response), response.size(), info) == "ab0\r\n\r\ncd");
     }
 
-    // Chunked wins over a content length, as the rfc requires
     {
         string response = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n";
         unique_ptr<HttpHelper::Info> info;
         REQUIRE(HttpHelper::finished(bytes(response), response.size(), info));
         CHECK(info->encoding == HttpHelper::Encoding::ChunkedEncoding);
     }
+
+    {
+        string response = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n5\r\nworld\r\n0\r\n\r\n";
+        string buffer;
+        unique_ptr<HttpHelper::Info> info;
+        for (auto i = 0u; i + 1 < response.size(); i++) {
+            buffer.push_back(response[i]);
+            REQUIRE(!HttpHelper::finished(bytes(buffer), buffer.size(), info));
+        }
+        buffer.push_back(response.back());
+        REQUIRE(HttpHelper::finished(bytes(buffer), buffer.size(), info));
+        CHECK(HttpHelper::retrieveContent(bytes(buffer), buffer.size(), info) == "helloworld");
+    }
+}
+//---------------------------------------------------------------------------
+TEST_CASE("http_helper_header_limits") {
+    {
+        string response = "HTTP/1.1 200 OK\r\nX-Pad: ";
+        response.resize(HttpHelper::maxHeaderLength + 1, 'x');
+        unique_ptr<HttpHelper::Info> info;
+        CHECK_THROWS_AS(HttpHelper::finished(bytes(response), response.size(), info), runtime_error);
+    }
+
+    {
+        string header = "HTTP/1.1 200 OK\r\n";
+        for (auto i = 0u; i < 200u; i++)
+            header += "X-Pad-" + to_string(i) + ": 1\r\n";
+        header += "Content-Length: 0\r\n\r\n";
+        CHECK_THROWS_AS(HttpResponse::deserialize(header), runtime_error);
+    }
 }
 //---------------------------------------------------------------------------
 TEST_CASE("http_helper_redirect") {
-    // A redirect is a protocol answer, not an unparseable status
     string header = "HTTP/1.1 301 Moved Permanently\r\nLocation: http://other/\r\nContent-Length: 0\r\n\r\n";
     CHECK(HttpResponse::deserialize(header).code != HttpResponse::Code::UNKNOWN);
 }
 //---------------------------------------------------------------------------
 TEST_CASE("http_helper_hostile_length") {
-    // A length longer than the buffer must not hand out memory past its end
     {
         string response = "HTTP/1.1 200 OK\r\nContent-Length: 4096\r\n\r\nhello";
         unique_ptr<HttpHelper::Info> info;
-        // Reading the returned view is a heap overflow, so only its bounds are checked here
         auto content = HttpHelper::retrieveContent(bytes(response), response.size(), info);
         CHECK(content.size() <= response.size());
     }
 }
 //---------------------------------------------------------------------------
 TEST_CASE("http_helper_status_line") {
-    // A status line with nothing after the version is malformed, not a crash
     CHECK_THROWS_AS(HttpResponse::deserialize("HTTP/1.1\r\n\r\n"), std::runtime_error);
 }
 //---------------------------------------------------------------------------

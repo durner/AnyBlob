@@ -36,6 +36,7 @@ HttpResponse HttpResponse::deserialize(string_view data)
     static constexpr string_view strHttp1_1 = "HTTP/1.1";
     static constexpr string_view strNewline = "\r\n";
     static constexpr string_view strHeaderSeperator = ": ";
+    static constexpr size_t maxHeaders = 128;
 
     HttpResponse response;
 
@@ -89,6 +90,8 @@ HttpResponse HttpResponse::deserialize(string_view data)
                 key = line.substr(0, keyPos);
                 value = line.substr(keyPos + strHeaderSeperator.size());
             }
+            if (response.headers.size() >= maxHeaders)
+                throw runtime_error("Invalid HttpResponse: Too many headers!");
             response.headers.emplace(key, value);
         }
     }

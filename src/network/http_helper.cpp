@@ -117,8 +117,11 @@ bool HttpHelper::finished(uint8_t* data, uint64_t length, unique_ptr<Info>& info
 {
     string_view sv(reinterpret_cast<const char*>(data), length);
     if (!info) {
-        if (sv.find("\r\n\r\n"sv) == sv.npos)
+        if (sv.find("\r\n\r\n"sv) == sv.npos) {
+            if (length > maxHeaderLength)
+                throw runtime_error("The HTTP header is too large");
             return false;
+        }
         info = make_unique<Info>(detect(sv));
     }
     if (HttpResponse::withoutContent(info->response.code))
