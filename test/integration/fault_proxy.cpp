@@ -42,6 +42,8 @@ string_view FaultProxy::getName(Mode mode)
         case Mode::responseDelay: return "response-delay";
         case Mode::trickle: return "trickle";
         case Mode::rstMidUpload: return "rst-mid-upload";
+        case Mode::uploadStall: return "upload-stall";
+        case Mode::corruptStream: return "corrupt-stream";
         case Mode::idleClose: return "idle-close";
         case Mode::gatewayError: return "gateway-error";
     }
@@ -72,6 +74,10 @@ void FaultProxy::relay(int client, uint64_t index)
         if (::recv(client, request.data(), request.size(), 0) > 0)
             write(client, response.data(), response.size());
     } else {
+        if (faulty && _mode == Mode::uploadStall) {
+            int receiveBuffer = 8 << 10;
+            setsockopt(client, SOL_SOCKET, SO_RCVBUF, &receiveBuffer, sizeof(receiveBuffer));
+        }
         server = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
         if (server >= 0 && !::connect(server, reinterpret_cast<sockaddr*>(&_target), sizeof(_target))) {
             bound(server);
@@ -121,6 +127,9 @@ void FaultProxy::pump(int from, int to, bool faulty, bool downstream, atomic<uin
                     park();
                 return;
             }
+            if (_mode == Mode::corruptStream && moved + length > _arg && moved <= _arg) {
+                buffer[_arg - moved] = static_cast<char>(buffer[_arg - moved] ^ 0xff);
+            }
             if (_mode == Mode::responseDelay && !moved)
                 this_thread::sleep_for(chrono::milliseconds(static_cast<int64_t>(_arg)));
             if (_mode == Mode::trickle) {
@@ -141,6 +150,10 @@ void FaultProxy::pump(int from, int to, bool faulty, bool downstream, atomic<uin
         // The upload reset hits the target socket
         if (faulty && !downstream && _mode == Mode::rstMidUpload && moved + length > _arg) {
             resetOnClose(to);
+            return;
+        }
+        if (faulty && !downstream && _mode == Mode::uploadStall && moved + length > _arg) {
+            park();
             return;
         }
         if (!write(to, buffer.data(), length))
