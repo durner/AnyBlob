@@ -71,6 +71,14 @@ struct MessageTask {
         return tcpSettings.timeout * (1u << std::min(stalls, timeoutShiftMax));
     }
 
+    /// Bound a timeout by the deadline
+    [[nodiscard]] std::chrono::milliseconds boundedByDeadline(std::chrono::milliseconds timeout) const {
+        if (!tcpSettings.requestDeadline.count())
+            return timeout;
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime);
+        return std::max(std::chrono::milliseconds(1), std::min(timeout, tcpSettings.requestDeadline - elapsed));
+    }
+
     /// Count a failure and check the retry limit
     [[nodiscard]] bool exhausted(uint16_t limit) {
         stalls++;
@@ -96,6 +104,8 @@ struct MessageTask {
 
     /// Allowed multiple of predicted transfer duration
     static constexpr unsigned deadlineFactor = 4;
+    /// Maximum deadline extension
+    static constexpr unsigned deadlineExtensionMax = 16;
 
     /// The pure virtual  callback
     virtual MessageState execute(ConnectionManager& connectionManager) = 0;

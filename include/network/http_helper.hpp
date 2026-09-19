@@ -24,6 +24,9 @@ class HttpHelper {
         ChunkedEncoding
     };
 
+    /// The maximum header size
+    static constexpr uint64_t maxHeaderLength = 64ull << 10;
+
     /// The response metadata
     struct Info {
         /// The response header

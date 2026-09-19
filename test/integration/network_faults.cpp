@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <memory>
 #include <future>
 #include <string>
 #include <thread>
@@ -211,6 +212,37 @@ TEST_CASE("Network Fault Integration") {
             CHECK(!boundedPut(*provider, handle, "faults/upload.bin", content));
             CHECK(group->getInflightMessages() == 0);
         }
+    }
+
+    SECTION("the deadline stops a stalled upload on its own") {
+        string large(32u << 20, '\0');
+        for (auto i = 0u; i < large.size(); i++)
+            large[i] = static_cast<char>('A' + (i % 53));
+
+        auto proxy = make_unique<FaultProxy>(env.endpoint, Mode::uploadStall, 64 << 10, -1);
+        auto group = makeGroup();
+        group->getTCPSettings().timeout = 30s;
+        auto handle = group->getHandle();
+        auto provider = cloud::Provider::makeProvider(env.uri(proxy->getEndpoint()), false, env.key, env.secret, &handle);
+
+        auto start = chrono::steady_clock::now();
+        auto worker = async(launch::async, [&]() {
+            network::Transaction txn(provider.get());
+            txn.verifyKeyRequest(handle, [&]() { return txn.putObjectRequest("faults/stalled.bin", large.data(), large.size()); });
+            txn.processSync(handle);
+            for (const auto& it : txn)
+                if (!it.success())
+                    return false;
+            return true;
+        });
+        auto finished = worker.wait_for(20s) == future_status::ready;
+        if (!finished)
+            proxy.reset();
+        auto succeeded = worker.get();
+        INFO("gave up after " << chrono::duration_cast<chrono::milliseconds>(chrono::steady_clock::now() - start).count() << " ms");
+        CHECK(finished);
+        CHECK(!succeeded);
+        CHECK(group->getInflightMessages() == 0);
     }
 
     SECTION("idle closed connections are not reused") {

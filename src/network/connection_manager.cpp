@@ -72,7 +72,7 @@ void ConnectionManager::recordThroughput(uint64_t bytes, chrono::nanoseconds ela
 int32_t ConnectionManager::connect(const string& hostname, uint32_t port, bool tls, bool verifyPeer, const TCPSettings& tcpSettings, int retryLimit, chrono::milliseconds timeoutOverride)
 // Creates a new socket connection
 {
-    auto connectTimeout = timeoutOverride.count() ? timeoutOverride : tcpSettings.timeout;
+    auto connectTimeout = timeoutOverride.count() ? timeoutOverride : tcpSettings.connectTimeout;
     Cache* resCache;
     auto tldName = string(Cache::tld(hostname));
     auto it = _cache.find(tldName);
