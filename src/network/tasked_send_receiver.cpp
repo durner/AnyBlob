@@ -265,6 +265,8 @@ void TaskedSendReceiver::sendReceive(bool local, bool oneQueueInvocation)
                         _group._transferredBytes.fetch_add(size, memory_order_acq_rel);
                         if (size >= _group._chunkSize)
                             _connectionManager->recordThroughput(size, chrono::steady_clock::now() - task->startTime);
+                    } else {
+                        _connectionManager->recordThroughput(static_cast<uint64_t>(max<int64_t>(task->receiveBufferOffset, 0)), chrono::steady_clock::now() - task->startTime);
                     }
                     for (auto it = _messageTasks.begin(); it != _messageTasks.end(); it++) {
                         if (it->get() == task) {

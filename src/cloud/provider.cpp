@@ -28,6 +28,7 @@ namespace anyblob::cloud {
 using namespace std;
 //---------------------------------------------------------------------------
 bool Provider::testEnviornment = false;
+atomic<uint64_t> Provider::_nextInstanceId{0};
 //---------------------------------------------------------------------------
 // Get the dir name without the path
 string Provider::getRemoteParentDirectory(string fileName) noexcept {

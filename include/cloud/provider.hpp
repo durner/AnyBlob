@@ -1,4 +1,5 @@
 #pragma once
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -41,6 +42,8 @@ class Provider {
     static constexpr std::string_view zonalSuffix = "--x-s3";
     /// Are we currently testing the provdiers
     static bool testEnviornment;
+    /// The identity counter
+    static std::atomic<uint64_t> _nextInstanceId;
 
     /// The cloud service enum
     enum class CloudService : uint8_t {
@@ -88,6 +91,8 @@ class Provider {
     protected:
     /// The type
     CloudService _type;
+    /// Identity of this provider
+    const uint64_t _instanceId = _nextInstanceId.fetch_add(1, std::memory_order_relaxed) + 1;
     /// Verify the peer certificate
     bool _verifyPeer = true;
     /// Initialize secret

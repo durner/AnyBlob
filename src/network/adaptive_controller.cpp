@@ -129,8 +129,9 @@ AdaptiveController::Recommendation AdaptiveController::measure(const Sample& sam
 
     auto won = false;
     if (_current != _kept) {
+        auto stalled = throughput <= 0 && (sample.inflightMessages || sample.queuedMessages);
         // Compare throughput with the kept configuration
-        if (throughput < (lowers ? 1 - (tolerance / 2) : 1 + tolerance) * _keptThroughput) {
+        if (stalled || throughput < (lowers ? 1 - (tolerance / 2) : 1 + tolerance) * _keptThroughput) {
             _current = _kept;
             _since = 0;
             rotateStep();
@@ -140,7 +141,7 @@ AdaptiveController::Recommendation AdaptiveController::measure(const Sample& sam
         _kept = _current;
         won = true;
     }
-    _keptThroughput = 0.5 * throughput + 0.5 * _keptThroughput;
+    _keptThroughput = _keptThroughput > 0 ? 0.5 * throughput + 0.5 * _keptThroughput : throughput;
     if (won || _since > probeInterval) {
         if (stepSwitch())
             _since = 0;
