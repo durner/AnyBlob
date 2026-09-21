@@ -292,6 +292,38 @@ TEST_CASE("Network Fault Integration") {
         CHECK(group->getInflightMessages() == 0);
     }
 
+    SECTION("a throttled endpoint is retried with a growing delay") {
+        FaultProxy proxy(env.endpoint, Mode::throttle, 0, 2);
+        auto group = makeGroup();
+        group->getTCPSettings().requestDeadline = 20s;
+        auto handle = group->getHandle();
+        auto provider = cloud::Provider::makeProvider(env.uri(proxy.getEndpoint()), false, env.key, env.secret, &handle);
+        CHECK(boundedGet(*provider, handle, "faults/data.bin", &content));
+
+        auto accepts = proxy.getAcceptTimes();
+        REQUIRE(accepts.size() == 3);
+        auto first = chrono::duration_cast<chrono::milliseconds>(accepts[1] - accepts[0]);
+        auto second = chrono::duration_cast<chrono::milliseconds>(accepts[2] - accepts[1]);
+        INFO("gaps " << first.count() << " ms and " << second.count() << " ms");
+        CHECK(first >= 50ms);
+        CHECK(second > first);
+    }
+
+    SECTION("a retry after header is honoured") {
+        FaultProxy proxy(env.endpoint, Mode::throttle, 2, 1);
+        auto group = makeGroup();
+        group->getTCPSettings().requestDeadline = 20s;
+        auto handle = group->getHandle();
+        auto provider = cloud::Provider::makeProvider(env.uri(proxy.getEndpoint()), false, env.key, env.secret, &handle);
+        CHECK(boundedGet(*provider, handle, "faults/data.bin", &content));
+
+        auto accepts = proxy.getAcceptTimes();
+        REQUIRE(accepts.size() == 2);
+        auto gap = chrono::duration_cast<chrono::milliseconds>(accepts[1] - accepts[0]);
+        INFO("gap " << gap.count() << " ms");
+        CHECK(gap >= 2s);
+    }
+
     SECTION("hive style keys round trip") {
         auto group = makeGroup();
         auto handle = group->getHandle();

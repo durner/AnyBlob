@@ -53,6 +53,16 @@ void IOUringSocket::prepare(Request& req, chrono::milliseconds timeout, int32_t 
     io_uring_sqe_set_data(timeoutSqe, nullptr);
 }
 //---------------------------------------------------------------------------
+void IOUringSocket::prepareTimer(Request& req, chrono::milliseconds delay)
+// Prepare a timer submission
+{
+    req.event = EventType::timer;
+    req.kernelTimeout = toKernelTimespec(delay);
+    auto sqe = io_uring_get_sqe(&_uring);
+    io_uring_prep_timeout(sqe, &req.kernelTimeout, 0, 0);
+    io_uring_sqe_set_data(sqe, &req);
+}
+//---------------------------------------------------------------------------
 void IOUringSocket::processImpl()
 // Submit the queued requests and append completed CQE
 {

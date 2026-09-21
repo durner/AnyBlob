@@ -33,6 +33,8 @@ class PollSocket : public Socket {
     std::unordered_map<int, RequestInfo> fdToRequest;
     /// The pollfd vector
     std::vector<pollfd> pollfds;
+    /// The timer requests
+    std::vector<RequestInfo> timers;
 
     public:
     /// The destructor
@@ -40,8 +42,10 @@ class PollSocket : public Socket {
 
     /// Prepare a submission
     void prepare(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override;
+    /// Prepare a timer submission
+    void prepareTimer(Request& req, std::chrono::milliseconds delay) override;
     /// Whether a transfer is queued or still in flight
-    [[nodiscard]] bool hasOutstanding() const override { return !fdToRequest.empty(); }
+    [[nodiscard]] bool hasOutstanding() const override { return !fdToRequest.empty() || !timers.empty(); }
 
     private:
     /// Submit the queued requests and append finished tasks

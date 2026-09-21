@@ -65,6 +65,12 @@ struct MessageTask {
     static constexpr uint16_t connectionFailuresMax = 4;
     /// The maximum shift for the per-attempt timeout
     static constexpr uint16_t timeoutShiftMax = 4;
+    /// The first retry delay
+    static constexpr std::chrono::milliseconds retryDelayBase{100};
+    /// The maximum retry delay
+    static constexpr std::chrono::milliseconds retryDelayMax{2000};
+    /// The maximum shift for the retry delay
+    static constexpr uint16_t retryDelayShiftMax = 5;
 
     /// Exponential timeout backoff between progress events
     [[nodiscard]] std::chrono::milliseconds attemptTimeout() const {
@@ -77,6 +83,12 @@ struct MessageTask {
             return timeout;
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime);
         return std::max(std::chrono::milliseconds(1), std::min(timeout, tcpSettings.requestDeadline - elapsed));
+    }
+
+    /// Delay before the next retry
+    [[nodiscard]] std::chrono::milliseconds retryDelay(std::chrono::seconds retryAfter) const {
+        auto backoff = std::min(retryDelayMax, retryDelayBase * (1u << std::min(failures, retryDelayShiftMax)));
+        return boundedByDeadline(std::max(std::chrono::duration_cast<std::chrono::milliseconds>(retryAfter), backoff));
     }
 
     /// Count a failure and check the retry limit
