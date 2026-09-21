@@ -1,5 +1,6 @@
 #include "network/http_response.hpp"
 #include <charconv>
+#include <chrono>
 #include <map>
 #include <stdexcept>
 //---------------------------------------------------------------------------
@@ -27,6 +28,19 @@ uint64_t HttpResponse::getObjectSize() const
     if (auto it = headers.find("Content-Length"); it != headers.end())
         from_chars(it->second.data(), it->second.data() + it->second.size(), size);
     return size;
+}
+//---------------------------------------------------------------------------
+chrono::seconds HttpResponse::retryAfter() const
+// Get the delay the endpoint asks for
+{
+    auto it = headers.find("Retry-After");
+    if (it == headers.end())
+        return chrono::seconds(0);
+    uint32_t seconds = 0;
+    auto parsed = from_chars(it->second.data(), it->second.data() + it->second.size(), seconds);
+    if (parsed.ec != errc() || parsed.ptr != it->second.data() + it->second.size())
+        return chrono::seconds(0);
+    return chrono::seconds(seconds);
 }
 //---------------------------------------------------------------------------
 HttpResponse HttpResponse::deserialize(string_view data)

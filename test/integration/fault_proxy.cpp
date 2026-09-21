@@ -1,6 +1,8 @@
 #include "fault_proxy.hpp"
 #include <algorithm>
 #include <chrono>
+#include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 #include <sys/socket.h>
@@ -46,13 +48,25 @@ string_view FaultProxy::getName(Mode mode)
         case Mode::corruptStream: return "corrupt-stream";
         case Mode::idleClose: return "idle-close";
         case Mode::gatewayError: return "gateway-error";
+        case Mode::throttle: return "throttle";
     }
     return "unknown";
+}
+//---------------------------------------------------------------------------
+vector<chrono::steady_clock::time_point> FaultProxy::getAcceptTimes() const
+// Get the accept times
+{
+    scoped_lock lock(_acceptMutex);
+    return _acceptTimes;
 }
 //---------------------------------------------------------------------------
 void FaultProxy::relay(int client, uint64_t index)
 // Relay one connection and inject the faults of the handshake
 {
+    {
+        scoped_lock lock(_acceptMutex);
+        _acceptTimes.push_back(chrono::steady_clock::now());
+    }
     bound(client);
     auto faulty = _faults < 0 || index < static_cast<uint64_t>(_faults);
     auto server = -1;
@@ -70,6 +84,14 @@ void FaultProxy::relay(int client, uint64_t index)
             write(client, garbage.data(), garbage.size());
     } else if (faulty && _mode == Mode::gatewayError) {
         string response = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+        vector<char> request(64u << 10);
+        if (::recv(client, request.data(), request.size(), 0) > 0)
+            write(client, response.data(), response.size());
+    } else if (faulty && _mode == Mode::throttle) {
+        string response = "HTTP/1.1 503 Slow Down\r\nContent-Length: 0\r\n";
+        if (_arg)
+            response += "Retry-After: " + to_string(_arg) + "\r\n";
+        response += "Connection: close\r\n\r\n";
         vector<char> request(64u << 10);
         if (::recv(client, request.data(), request.size(), 0) > 0)
             write(client, response.data(), response.size());

@@ -1,9 +1,12 @@
 #pragma once
 #include "loopback_proxy.hpp"
 #include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <string_view>
+#include <vector>
 //---------------------------------------------------------------------------
 // AnyBlob - Universal Cloud Object Storage Library
 // Dominik Durner, 2026
@@ -44,7 +47,9 @@ class FaultProxy : public LoopbackProxy {
         /// Close after arg milliseconds without traffic
         idleClose,
         /// Answer with a bad gateway response
-        gatewayError
+        gatewayError,
+        /// Answer with a slow down, arg names the retry after seconds
+        throttle
     };
 
     private:
@@ -57,6 +62,10 @@ class FaultProxy : public LoopbackProxy {
     uint64_t _arg;
     /// Fault only the first n connections, negative faults all
     int _faults;
+    /// The accept time mutex
+    mutable std::mutex _acceptMutex;
+    /// The accept times
+    std::vector<std::chrono::steady_clock::time_point> _acceptTimes;
 
     public:
     /// The constructor listens on a free loopback port and starts the proxy
@@ -66,6 +75,8 @@ class FaultProxy : public LoopbackProxy {
 
     /// Get the name of a fault for the test output
     [[nodiscard]] static std::string_view getName(Mode mode);
+    /// Get the accept times
+    [[nodiscard]] std::vector<std::chrono::steady_clock::time_point> getAcceptTimes() const;
 
     private:
     /// Relay one connection and inject the faults of the handshake

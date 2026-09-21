@@ -38,6 +38,8 @@ class IOUringSocket : public Socket {
 
     /// Prepare a submission (sqe) event
     void prepare(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) override;
+    /// Prepare a timer submission
+    void prepareTimer(Request& req, std::chrono::milliseconds delay) override;
     /// Convert a timeout into kernel timespec
     static constexpr __kernel_timespec toKernelTimespec(std::chrono::milliseconds timeout) {
         auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timeout).count();

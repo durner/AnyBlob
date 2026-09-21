@@ -25,7 +25,8 @@ class Socket {
     /// Request message event type
     enum class EventType : uint8_t {
         read = 0,
-        write = 1
+        write = 1,
+        timer = 2
     };
 
     /// The request message
@@ -56,6 +57,8 @@ class Socket {
     virtual ~Socket() noexcept = default;
     /// Prepare a submission (a zero timeout waits indefinitely)
     virtual void prepare(Request& req, std::chrono::milliseconds timeout, int32_t msg_flags = 0) = 0;
+    /// Prepare a timer submission
+    virtual void prepareTimer(Request& req, std::chrono::milliseconds delay) = 0;
     /// Submit the queued requests and run the callback on the completed transfers.
     /// Blocks for the first completion unless nothing is outstanding.
     template <typename F>

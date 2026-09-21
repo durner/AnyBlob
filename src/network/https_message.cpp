@@ -119,8 +119,14 @@ MessageState HTTPSMessage::execute(ConnectionManager& connectionManager)
                             state = MessageState::TLSShutdown;
                         } else {
                             originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
-                            reset(connectionManager, !HttpResponse::checkRetryable(code) || exhausted(failuresMax));
-                            return execute(connectionManager);
+                            auto retryable = HttpResponse::checkRetryable(code);
+                            // Read before the reset clears the response
+                            auto delay = retryable ? retryDelay(originalMessage->result.response->response.retryAfter()) : chrono::milliseconds::zero();
+                            reset(connectionManager, !retryable || exhausted(failuresMax));
+                            if (state == MessageState::Aborted)
+                                return state;
+                            connectionManager.getSocketConnection().prepareTimer(*request, delay);
+                            return state;
                         }
                         // Decide if to cache the session
                         if (tcpSettings.reuse) {

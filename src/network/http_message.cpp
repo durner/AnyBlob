@@ -110,9 +110,14 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                             } else {
                                 originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::HTTP);
                                 if (HttpResponse::checkRetryable(code)) {
+                                    // Read before the reset clears the response
+                                    auto delay = retryDelay(originalMessage->result.response->response.retryAfter());
                                     request->fd = -1;
                                     reset(connectionManager, exhausted(failuresMax));
-                                    return execute(connectionManager);
+                                    if (state == MessageState::Aborted)
+                                        return state;
+                                    connectionManager.getSocketConnection().prepareTimer(*request, delay);
+                                    return state;
                                 }
                                 state = MessageState::Aborted;
                             }

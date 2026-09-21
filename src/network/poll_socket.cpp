@@ -30,6 +30,13 @@ void PollSocket::prepare(Request& req, chrono::milliseconds timeout, int32_t msg
     enqueue(req.fd, write ? POLLOUT : POLLIN, RequestInfo{.request = &req, .timeout = deadline(timeout), .flags = msg_flags});
 }
 //---------------------------------------------------------------------------
+void PollSocket::prepareTimer(Request& req, chrono::milliseconds delay)
+// Prepare a timer submission
+{
+    req.event = EventType::timer;
+    timers.push_back(RequestInfo{.request = &req, .timeout = deadline(delay), .flags = 0});
+}
+//---------------------------------------------------------------------------
 bool PollSocket::collectReady()
 // Poll the registered fds and append the finished tasks
 {
@@ -41,6 +48,16 @@ bool PollSocket::collectReady()
 
     auto completed = false;
     auto currentTime = chrono::steady_clock::now();
+    for (auto tit = timers.begin(); tit != timers.end();) {
+        if (tit->timeout < currentTime) {
+            tit->request->length = -ETIME;
+            _completions.push_back(tit->request->messageTask);
+            tit = timers.erase(tit);
+            completed = true;
+        } else {
+            ++tit;
+        }
+    }
     for (auto pit = pollfds.begin(); pit != pollfds.end();) {
         if (auto it = fdToRequest.find(pit->fd); it != fdToRequest.end()) {
             auto& req = it->second;

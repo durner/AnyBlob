@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -135,6 +136,8 @@ struct HttpResponse {
     }
     /// Get the size of the object
     [[nodiscard]] uint64_t getObjectSize() const;
+    /// Get the delay the endpoint asks for
+    [[nodiscard]] std::chrono::seconds retryAfter() const;
     /// Deserialize the response
     [[nodiscard]] static HttpResponse deserialize(std::string_view data);
 };
