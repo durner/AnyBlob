@@ -31,7 +31,7 @@ using namespace std;
 //---------------------------------------------------------------------------
 thread_local shared_ptr<AWS::Secret> AWS::_secret = nullptr;
 thread_local shared_ptr<AWS::Secret> AWS::_sessionSecret = nullptr;
-thread_local AWS* AWS::_validInstance = nullptr;
+thread_local uint64_t AWS::_validInstanceId = 0;
 //---------------------------------------------------------------------------
 static string buildAMZTimestamp()
 // Creates the AWS timestamp
@@ -251,7 +251,7 @@ bool AWS::updateSecret(string_view content, string_view iamUser)
     secret->iamUser = iamUser;
     _globalSecret = secret;
     _secret = secret;
-    _validInstance = this;
+    _validInstanceId = _instanceId;
     return true;
 }
 //---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ bool AWS::validKeys(uint32_t offset) const
 {
     if (_settings.anonymous)
         return true;
-    if (!_secret || _validInstance != this || ((!_secret->token.empty() && _secret->expiration - offset < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _secret->secret.empty()))
+    if (!_secret || _validInstanceId != _instanceId || ((!_secret->token.empty() && _secret->expiration - offset < chrono::system_clock::to_time_t(chrono::system_clock::now())) || _secret->secret.empty()))
         return false;
     return true;
 }
@@ -289,7 +289,7 @@ bool AWS::validKeys(uint32_t offset) const
 bool AWS::validSession(uint32_t offset) const
 // Checks whether the session token needs to be refresehd
 {
-    return _sessionSecret && _validInstance == this && (_sessionSecret->token.empty() || _sessionSecret->expiration - offset >= chrono::system_clock::to_time_t(chrono::system_clock::now())) && !_sessionSecret->secret.empty();
+    return _sessionSecret && _validInstanceId == _instanceId && (_sessionSecret->token.empty() || _sessionSecret->expiration - offset >= chrono::system_clock::to_time_t(chrono::system_clock::now())) && !_sessionSecret->secret.empty();
 }
 //---------------------------------------------------------------------------
 void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
@@ -298,7 +298,7 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
     if (_type == Provider::CloudService::AWS && !validKeys(180)) {
         unique_lock lock(_mutex);
         _secret = _globalSecret;
-        _validInstance = this;
+        _validInstanceId = _instanceId;
         // Bound retries when metadata cannot supply credentials
         for (auto attempt = 0u; !validKeys(180) && attempt < secretAttempts; attempt++) {
             auto token = imdsToken(sendReceiverHandle, getIAMAddress(), getIAMPort());
@@ -315,7 +315,7 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
     if (_type == Provider::CloudService::AWS && _settings.zonal && !validSession(180)) {
         unique_lock lock(_mutex);
         _sessionSecret = _globalSessionSecret;
-        _validInstance = this;
+        _validInstanceId = _instanceId;
         for (auto attempt = 0u; !validSession(180) && attempt < secretAttempts; attempt++) {
             auto message = getSessionToken();
             if (!message)
@@ -343,15 +343,15 @@ void AWS::initSecret(network::TaskedSendReceiverHandle& sendReceiverHandle)
 void AWS::getSecret()
 // Updates the local secret
 {
-    if (!_secret || _validInstance != this) {
+    if (!_secret || _validInstanceId != _instanceId) {
         unique_lock lock(_mutex);
         _secret = _globalSecret;
-        _validInstance = this;
+        _validInstanceId = _instanceId;
     }
-    if (_type == Provider::CloudService::AWS && _settings.zonal && (!_sessionSecret || _validInstance != this)) {
+    if (_type == Provider::CloudService::AWS && _settings.zonal && (!_sessionSecret || _validInstanceId != _instanceId)) {
         unique_lock lock(_mutex);
         _sessionSecret = _globalSessionSecret;
-        _validInstance = this;
+        _validInstanceId = _instanceId;
     }
 }
 //---------------------------------------------------------------------------

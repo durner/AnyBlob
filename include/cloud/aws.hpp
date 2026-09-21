@@ -82,7 +82,7 @@ class AWS : public Provider {
     /// The session secret
     thread_local static std::shared_ptr<Secret> _sessionSecret;
     /// Valid for which instance of AWS class
-    thread_local static AWS* _validInstance;
+    thread_local static uint64_t _validInstanceId;
 
     public:
     /// Get instance details
