@@ -53,6 +53,9 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                 if (request->length > 0) {
                     sendBufferOffset += request->length;
                     progressed();
+                } else if (request->zeroCopy) {
+                    // Retry with a copy, e.g., beyond the memlock limit
+                    zeroCopy = false;
                 } else if (request->length != -EINPROGRESS && request->length != -EAGAIN) {
                     if (request->length == -ECANCELED || request->length == -EINTR || request->length == -ETIMEDOUT)
                         originalMessage->result.failureCode |= static_cast<uint16_t>(MessageFailureCode::Timeout);
@@ -78,7 +81,7 @@ MessageState HTTPMessage::execute(ConnectionManager& connectionManager)
                     ptr = originalMessage->putData + sendBufferOffset - originalMessage->message->size();
                     length = static_cast<int64_t>(originalMessage->putLength + originalMessage->message->size()) - sendBufferOffset;
                 }
-                request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = length, .fd = fd, .event = Socket::EventType::write, .messageTask = this});
+                request = std::make_unique<Socket::Request>(Socket::Request{.data = {.cdata = ptr}, .length = length, .fd = fd, .event = Socket::EventType::write, .messageTask = this, .zeroCopy = zeroCopy && length > static_cast<int64_t>(chunkSize)});
                 connectionManager.getSocketConnection().prepare(*request, boundedByDeadline(attemptTimeout()));
             }
             break;
