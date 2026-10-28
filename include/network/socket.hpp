@@ -47,6 +47,8 @@ class Socket {
         EventType event;
         /// The associated message task
         MessageTask* messageTask;
+        /// Whether to send without copying
+        bool zeroCopy = false;
 #ifdef ANYBLOB_HAS_IO_URING
         /// The kernel async interface timeout
         __kernel_timespec kernelTimeout = {.tv_sec = 0, .tv_nsec = 0};

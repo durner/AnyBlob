@@ -16,6 +16,8 @@ namespace anyblob::network {
 struct HTTPMessage : public MessageTask {
     /// HTTP info header
     std::unique_ptr<HttpHelper::Info> info;
+    /// Whether large sends skip the copy
+    bool zeroCopy = true;
 
     /// The constructor
     HTTPMessage(OriginalMessage* sendingMessage, ConnectionManager::TCPSettings& tcpSettings, uint32_t chunkSize);
