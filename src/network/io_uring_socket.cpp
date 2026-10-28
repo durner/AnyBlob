@@ -39,7 +39,10 @@ void IOUringSocket::prepare(Request& req, chrono::milliseconds timeout, int32_t 
 {
     assert(req.length > 0);
     auto sqe = io_uring_get_sqe(&_uring);
-    if (req.event == EventType::write)
+    if (req.event == EventType::write && req.zeroCopy)
+        // One notification for the whole buffer
+        io_uring_prep_send_zc(sqe, req.fd, req.data.cdata, static_cast<size_t>(req.length), msg_flags | MSG_NOSIGNAL | MSG_WAITALL, 0);
+    else if (req.event == EventType::write)
         io_uring_prep_send(sqe, req.fd, req.data.cdata, static_cast<uint64_t>(req.length), msg_flags | MSG_NOSIGNAL);
     else
         io_uring_prep_recv(sqe, req.fd, req.data.data, static_cast<uint64_t>(req.length), msg_flags);
@@ -74,18 +77,24 @@ void IOUringSocket::processImpl()
 
     // Drain the whole completion queue
     uint32_t collected = 0;
+    uint32_t finished = 0;
     uint32_t head;
     io_uring_cqe* cqe;
     io_uring_for_each_cqe(&_uring, head, cqe) {
         collected++;
-        // A timeout carries no request
-        if (auto req = static_cast<Request*>(io_uring_cqe_get_data(cqe))) {
+        auto req = static_cast<Request*>(io_uring_cqe_get_data(cqe));
+        if (req && !(cqe->flags & IORING_CQE_F_NOTIF))
             req->length = cqe->res;
+        // A zero-copy send finishes with the notification that frees its buffer
+        if (cqe->flags & IORING_CQE_F_MORE)
+            continue;
+        finished++;
+        // A timeout carries no request
+        if (req)
             _completions.push_back(req->messageTask);
-        }
     }
     io_uring_cq_advance(&_uring, collected);
-    _outstanding -= collected;
+    _outstanding -= finished;
 }
 //---------------------------------------------------------------------------
 IOUringSocket::~IOUringSocket() noexcept
