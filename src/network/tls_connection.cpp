@@ -178,7 +178,8 @@ bool TLSConnection::init(HTTPSMessage* message)
             }
             SSL_set_verify(_ssl, SSL_VERIFY_PEER, nullptr);
             SSL_set_hostflags(_ssl, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
-            auto checked = named ? SSL_set1_host(_ssl, _hostname.c_str()) : X509_VERIFY_PARAM_set1_ip_asc(SSL_get0_param(_ssl), _hostname.c_str());
+            const auto param = SSL_get0_param(_ssl);
+            const auto checked = named ? X509_VERIFY_PARAM_set1_host(param, _hostname.c_str(), _hostname.size()) : X509_VERIFY_PARAM_set1_ip_asc(param, _hostname.c_str());
             if (checked != 1) {
                 fail(MessageFailureCode::TLS);
                 return false;
